@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: avail-postgres
+    environment:
+      POSTGRES_DB: avail_explorer
+      POSTGRES_USER: avail_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-avail_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U avail_user -d avail_explorer"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: avail-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # Avail Explorer Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: avail-backend
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://avail_user:${POSTGRES_PASSWORD:-avail_password}@postgres:5432/avail_explorer
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      AVAIL_RPC_ENDPOINT: ${AVAIL_RPC_ENDPOINT:-wss://mainnet-rpc.avail.so/ws}
+      SUBSCAN_API_KEY: ${SUBSCAN_API_KEY}
+      SUBSCAN_BASE_URL: ${SUBSCAN_BASE_URL:-https://avail.api.subscan.io}
+      ENABLE_WEBSOCKETS: ${ENABLE_WEBSOCKETS:-true}
+      ENABLE_CACHING: ${ENABLE_CACHING:-true}
+      ENABLE_RATE_LIMITING: ${ENABLE_RATE_LIMITING:-true}
+      ENABLE_ANALYTICS: ${ENABLE_ANALYTICS:-true}
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      API_RATE_LIMIT: ${API_RATE_LIMIT:-100}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Optional: PostgreSQL Admin (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: avail-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@avail.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles:
+      - admin
+
+  # Optional: Redis Admin (RedisInsight)
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: avail-redis-insight
+    ports:
+      - "${REDIS_INSIGHT_PORT:-8001}:8001"
+    volumes:
+      - redis_insight_data:/db
+    depends_on:
+      - redis
+    restart: unless-stopped
+    profiles:
+      - admin
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  redis_insight_data:
+    driver: local
+
+networks:
+  default:
+    name: avail-network 
