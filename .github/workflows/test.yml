@@ -4,12 +4,18 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'server/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/test.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'server/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/test.yml'
 
 jobs:
@@ -20,10 +26,6 @@ jobs:
     strategy:
       matrix:
         node-version: [18.x, 20.x]
-    
-    defaults:
-      run:
-        working-directory: ./server
     
     steps:
     - name: Checkout code
@@ -82,8 +84,8 @@ jobs:
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       with:
-        file: ./server/coverage/lcov.info
-        directory: ./server/coverage/
+        file: ./coverage/lcov.info
+        directory: ./coverage/
         flags: backend
         name: avail-explorer-backend
         fail_ci_if_error: false
@@ -94,8 +96,8 @@ jobs:
       with:
         name: test-results-node-${{ matrix.node-version }}
         path: |
-          server/coverage/
-          server/test-results.xml
+          coverage/
+          test-results.xml
         retention-days: 30
         
     - name: Comment PR with test results

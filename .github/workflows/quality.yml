@@ -4,22 +4,22 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'server/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/quality.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'server/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/quality.yml'
 
 jobs:
   quality:
     name: Code Quality Checks
     runs-on: ubuntu-latest
-    
-    defaults:
-      run:
-        working-directory: ./server
     
     steps:
     - name: Checkout code
