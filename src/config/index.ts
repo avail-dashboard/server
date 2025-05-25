@@ -185,9 +185,18 @@ export const config = {
   // Bull Queue Configuration
   queue: {
     redis: {
-      host: env.REDIS_URL.includes('://') ? env.REDIS_URL.split('@')[1]?.split(':')[0] || 'localhost' : 'localhost',
-      port: env.REDIS_URL.includes('://') ? parseInt(env.REDIS_URL.split(':').pop() || '6379') : 6379,
+      host: env.REDIS_URL.includes('://') ? 
+        (env.REDIS_URL.includes('@') ? env.REDIS_URL.split('@')[1]?.split(':')[0] : 'localhost') : 
+        'localhost',
+      port: env.REDIS_URL.includes('://') ? 
+        parseInt((env.REDIS_URL.includes('@') ? 
+          env.REDIS_URL.split('@')[1]?.split(':')[1] : 
+          env.REDIS_URL.split(':').pop()) || '6379') : 
+        6379,
       db: env.REDIS_QUEUE_DB,
+      password: env.REDIS_URL.includes('://') && env.REDIS_URL.includes(':') ? 
+        (env.REDIS_URL.match(/:([^:@]+)@/) ? env.REDIS_URL.match(/:([^:@]+)@/)[1] : undefined) :
+        undefined,
     },
     defaultJobOptions: {
       removeOnComplete: 10,
