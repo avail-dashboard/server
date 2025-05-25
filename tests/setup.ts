@@ -13,28 +13,55 @@ process.env.ENABLE_RATE_LIMITING = 'false';
 process.env.LOG_LEVEL = 'error';
 
 // Mock external services
+const mockCache = {
+  connect: jest.fn().mockResolvedValue(undefined),
+  disconnect: jest.fn().mockResolvedValue(undefined),
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue(true),
+  del: jest.fn().mockResolvedValue(true),
+  exists: jest.fn().mockResolvedValue(false),
+  expire: jest.fn().mockResolvedValue(true),
+  incr: jest.fn().mockResolvedValue(1),
+  keys: jest.fn().mockResolvedValue([]),
+  flushPattern: jest.fn().mockResolvedValue(0),
+  getHealth: jest.fn().mockResolvedValue({ connected: true, ping: 1 }),
+};
+
 jest.mock('../src/utils/cache', () => ({
-  cache: {
-    connect: jest.fn().mockResolvedValue(undefined),
-    disconnect: jest.fn().mockResolvedValue(undefined),
-    get: jest.fn().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue(true),
-    del: jest.fn().mockResolvedValue(true),
-    exists: jest.fn().mockResolvedValue(false),
-    expire: jest.fn().mockResolvedValue(true),
+  cache: mockCache,
+  default: mockCache,
+  CacheKeys: {
+    latestBlocks: () => 'blocks:latest',
+    blockByNumber: (number: bigint) => `blocks:number:${number}`,
+    blockByHash: (hash: string) => `blocks:hash:${hash}`,
+    chainStats: () => 'chain:stats',
+    validatorsList: () => 'validators:list',
   },
+  cacheWrapper: jest.fn().mockImplementation(async (key, fetchFunction) => {
+    const data = await fetchFunction();
+    return { data, cached: false };
+  }),
 }));
 
 // Mock blockchain service
+const mockBlockchainService = {
+  connectRPC: jest.fn().mockResolvedValue(undefined),
+  disconnectRPC: jest.fn().mockResolvedValue(undefined),
+  getLatestBlocks: jest.fn().mockResolvedValue({ blocks: [], total: 0 }),
+  getBlockByNumber: jest.fn().mockResolvedValue(null),
+  getBlockByHash: jest.fn().mockResolvedValue(null),
+  getLatestExtrinsics: jest.fn().mockResolvedValue({ extrinsics: [], total: 0 }),
+  getExtrinsicByHash: jest.fn().mockResolvedValue(null),
+  getExtrinsicsByBlock: jest.fn().mockResolvedValue([]),
+  getAccountDetails: jest.fn().mockResolvedValue(null),
+  getChainStats: jest.fn().mockResolvedValue({ blockHeight: BigInt(1000), blockTime: 12 }),
+  getHealth: jest.fn().mockResolvedValue({ rpc: true, subscan: true, subquery: true }),
+  getValidators: jest.fn().mockResolvedValue([]),
+};
+
 jest.mock('../src/services/blockchain', () => ({
-  default: {
-    connectRPC: jest.fn().mockResolvedValue(undefined),
-    disconnectRPC: jest.fn().mockResolvedValue(undefined),
-    getLatestBlocks: jest.fn().mockResolvedValue({ blocks: [], total: 0 }),
-    getChainStats: jest.fn().mockResolvedValue({ blockHeight: BigInt(1000), blockTime: 12 }),
-    getHealth: jest.fn().mockResolvedValue({ rpc: true, subscan: true, subquery: true }),
-    getValidators: jest.fn().mockResolvedValue([]),
-  },
+  default: mockBlockchainService,
+  blockchainService: mockBlockchainService,
 }));
 
 // Increase timeout for async operations

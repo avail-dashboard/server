@@ -1,4 +1,44 @@
-// The cache is already mocked in setup.ts, so we just import it
+// Mock the cache directly in this test file
+jest.mock('../../../src/utils/cache', () => ({
+  cache: {
+    connect: jest.fn().mockResolvedValue(undefined),
+    disconnect: jest.fn().mockResolvedValue(undefined),
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(true),
+    del: jest.fn().mockResolvedValue(true),
+    exists: jest.fn().mockResolvedValue(false),
+    expire: jest.fn().mockResolvedValue(true),
+    incr: jest.fn().mockResolvedValue(1),
+    keys: jest.fn().mockResolvedValue([]),
+    flushPattern: jest.fn().mockResolvedValue(0),
+    getHealth: jest.fn().mockResolvedValue({ connected: true, ping: 1 }),
+  },
+  default: {
+    connect: jest.fn().mockResolvedValue(undefined),
+    disconnect: jest.fn().mockResolvedValue(undefined),
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(true),
+    del: jest.fn().mockResolvedValue(true),
+    exists: jest.fn().mockResolvedValue(false),
+    expire: jest.fn().mockResolvedValue(true),
+    incr: jest.fn().mockResolvedValue(1),
+    keys: jest.fn().mockResolvedValue([]),
+    flushPattern: jest.fn().mockResolvedValue(0),
+    getHealth: jest.fn().mockResolvedValue({ connected: true, ping: 1 }),
+  },
+  CacheKeys: {
+    latestBlocks: () => 'blocks:latest',
+    blockByNumber: (number: bigint) => `blocks:number:${number}`,
+    blockByHash: (hash: string) => `blocks:hash:${hash}`,
+    chainStats: () => 'chain:stats',
+    validatorsList: () => 'validators:list',
+  },
+  cacheWrapper: jest.fn().mockImplementation(async (key, fetchFunction) => {
+    const data = await fetchFunction();
+    return { data, cached: false };
+  }),
+}));
+
 import { cache } from '../../../src/utils/cache';
 
 describe('Cache Utility', () => {
@@ -24,11 +64,13 @@ describe('Cache Utility', () => {
 
   describe('cache operations', () => {
     it('should connect successfully', async () => {
-      await expect(cache.connect()).resolves.toBeUndefined();
+      const result = await cache.connect();
+      expect(result).toBeUndefined();
     });
 
     it('should disconnect successfully', async () => {
-      await expect(cache.disconnect()).resolves.toBeUndefined();
+      const result = await cache.disconnect();
+      expect(result).toBeUndefined();
     });
 
     it('should get value from cache', async () => {
