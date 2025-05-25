@@ -10,6 +10,16 @@ class CacheService {
     this.redis = new Redis(config.redis.url, {
       maxRetriesPerRequest: 3,
       lazyConnect: true,
+      connectTimeout: 10000,
+      retryStrategy: (times) => {
+        if (times > 10) {
+          console.log('Cache: Too many Redis connection attempts, giving up');
+          return null; // stop retrying
+        }
+        const delay = Math.min(times * 500, 5000);
+        console.log(`Cache: Retrying Redis connection in ${delay}ms (attempt ${times})`);
+        return delay;
+      },
     });
 
     this.setupEventHandlers();
