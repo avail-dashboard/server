@@ -1,0 +1,171 @@
+name: Performance Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+  schedule:
+    # Run performance tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  performance:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./server
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: server/package-lock.json
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Start server in background
+      run: |
+        npm start &
+        echo $! > server.pid
+        sleep 10  # Wait for server to start
+      env:
+        NODE_ENV: production
+        PORT: 3001
+        
+    - name: Wait for server to be ready
+      run: |
+        timeout 30 bash -c 'until curl -f http://localhost:3001/health; do sleep 1; done'
+        
+    - name: Run performance tests
+      run: |
+        # Install artillery for load testing
+        npm install -g artillery@latest
+        
+        # Create artillery config
+        cat > artillery-config.yml << EOF
+        config:
+          target: 'http://localhost:3001'
+          phases:
+            - duration: 60
+              arrivalRate: 10
+              name: "Warm up"
+            - duration: 120
+              arrivalRate: 50
+              name: "Load test"
+            - duration: 60
+              arrivalRate: 100
+              name: "Stress test"
+          processor: "./artillery-processor.js"
+        scenarios:
+          - name: "API Health Check"
+            weight: 20
+            flow:
+              - get:
+                  url: "/health"
+          - name: "Get Latest Blocks"
+            weight: 30
+            flow:
+              - get:
+                  url: "/api/v1/blocks"
+          - name: "Search Functionality"
+            weight: 25
+            flow:
+              - get:
+                  url: "/api/v1/search?q=1000"
+          - name: "Chain Stats"
+            weight: 25
+            flow:
+              - get:
+                  url: "/api/v1/chain/stats"
+        EOF
+        
+        # Create processor file
+        cat > artillery-processor.js << EOF
+        module.exports = {
+          logResponse: function(requestParams, response, context, ee, next) {
+            console.log('Response status:', response.statusCode);
+            return next();
+          }
+        };
+        EOF
+        
+        # Run artillery test
+        artillery run artillery-config.yml --output performance-report.json
+        
+    - name: Generate performance report
+      run: |
+        artillery report performance-report.json --output performance-report.html
+        
+        # Extract key metrics
+        echo "## 📊 Performance Test Results" > performance-summary.md
+        echo "" >> performance-summary.md
+        
+        # Parse JSON report for key metrics (simplified)
+        node -e "
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('performance-report.json', 'utf8'));
+          const aggregate = report.aggregate;
+          
+          console.log('### Key Metrics');
+          console.log('- **Total Requests**: ' + (aggregate.counters?.['http.requests'] || 'N/A'));
+          console.log('- **Success Rate**: ' + ((aggregate.counters?.['http.codes.200'] || 0) / (aggregate.counters?.['http.requests'] || 1) * 100).toFixed(2) + '%');
+          console.log('- **Average Response Time**: ' + (aggregate.latency?.mean || 'N/A') + 'ms');
+          console.log('- **95th Percentile**: ' + (aggregate.latency?.p95 || 'N/A') + 'ms');
+          console.log('- **99th Percentile**: ' + (aggregate.latency?.p99 || 'N/A') + 'ms');
+          console.log('- **Errors**: ' + (aggregate.counters?.['http.codes.4xx'] || 0) + ' (4xx) + ' + (aggregate.counters?.['http.codes.5xx'] || 0) + ' (5xx)');
+        " >> performance-summary.md
+        
+    - name: Upload performance artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-results
+        path: |
+          server/performance-report.html
+          server/performance-report.json
+          server/performance-summary.md
+        retention-days: 30
+        
+    - name: Comment PR with performance results
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const summary = fs.readFileSync('./server/performance-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary + '\n\n📈 Full performance report available in artifacts.'
+            });
+          } catch (error) {
+            console.log('Could not read performance summary:', error.message);
+          }
+          
+    - name: Stop server
+      if: always()
+      run: |
+        if [ -f server.pid ]; then
+          kill $(cat server.pid) || true
+          rm server.pid
+        fi 
