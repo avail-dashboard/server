@@ -250,7 +250,7 @@ export const cache = new CacheService();
 export const cacheWrapper = async <T>(
   key: string,
   fetchFunction: () => Promise<T>,
-  ttl?: number
+  ttl?: number,
 ): Promise<{ data: T; cached: boolean }> => {
   // Try to get from cache first
   const cached = await cache.get<T>(key);

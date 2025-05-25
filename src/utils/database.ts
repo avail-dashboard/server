@@ -73,7 +73,7 @@ class DatabaseService {
   }
 
   private setupPgEventHandlers(): void {
-    if (!this.pgPool) return;
+    if (!this.pgPool) {return;}
 
     this.pgPool.on('connect', () => {
       this.isConnected = true;
@@ -146,7 +146,7 @@ class DatabaseService {
         component: 'database', 
         action: 'query', 
         query: text,
-        duration 
+        duration, 
       });
       throw error;
     }
@@ -167,7 +167,7 @@ class DatabaseService {
         const rows = params ? stmt.all(...params) : stmt.all();
         return {
           rows: rows as T[],
-          rowCount: rows.length
+          rowCount: rows.length,
         };
       } else {
         const stmt = this.sqliteDb.prepare(sqliteQuery);
@@ -182,14 +182,14 @@ class DatabaseService {
             const rows = selectStmt.all();
             return {
               rows: rows as T[],
-              rowCount: info.changes
+              rowCount: info.changes,
             };
           }
         }
         
         return {
           rows: [] as T[],
-          rowCount: info.changes
+          rowCount: info.changes,
         };
       }
     } catch (error: any) {
@@ -209,7 +209,7 @@ class DatabaseService {
       const result = await client.query(text, params);
       return {
         rows: result.rows as T[],
-        rowCount: result.rowCount || 0
+        rowCount: result.rowCount || 0,
       };
     } finally {
       client.release();
@@ -314,7 +314,7 @@ class DatabaseService {
       order?: 'ASC' | 'DESC';
       limit?: number;
       offset?: number;
-    }
+    },
   ): Promise<T[]> {
     let query = `SELECT * FROM ${table}`;
     const values: any[] = [];
@@ -359,7 +359,7 @@ class DatabaseService {
   async update<T = any>(
     table: string, 
     data: Record<string, any>, 
-    where: Record<string, any>
+    where: Record<string, any>,
   ): Promise<T | null> {
     const dataKeys = Object.keys(data);
     const dataValues = Object.values(data);
@@ -408,7 +408,7 @@ class DatabaseService {
     limit: number = 20,
     where?: Record<string, any>,
     orderBy?: string,
-    order: 'ASC' | 'DESC' = 'DESC'
+    order: 'ASC' | 'DESC' = 'DESC',
   ): Promise<{
     data: T[];
     meta: {
@@ -461,8 +461,8 @@ export const createTables = async (): Promise<void> => {
     )`,
 
     // Indexes for blocks table
-    `CREATE INDEX IF NOT EXISTS idx_blocks_timestamp ON blocks(timestamp)`,
-    `CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash)`,
+    'CREATE INDEX IF NOT EXISTS idx_blocks_timestamp ON blocks(timestamp)',
+    'CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash)',
 
     // Extrinsics table - with SQLite compatibility
     `CREATE TABLE IF NOT EXISTS extrinsics (
@@ -480,10 +480,10 @@ export const createTables = async (): Promise<void> => {
     )`,
 
     // Indexes for extrinsics table
-    `CREATE INDEX IF NOT EXISTS idx_extrinsics_block ON extrinsics(block_number)`,
-    `CREATE INDEX IF NOT EXISTS idx_extrinsics_hash ON extrinsics(hash)`,
-    `CREATE INDEX IF NOT EXISTS idx_extrinsics_signer ON extrinsics(signer)`,
-    `CREATE INDEX IF NOT EXISTS idx_extrinsics_timestamp ON extrinsics(timestamp)`,
+    'CREATE INDEX IF NOT EXISTS idx_extrinsics_block ON extrinsics(block_number)',
+    'CREATE INDEX IF NOT EXISTS idx_extrinsics_hash ON extrinsics(hash)',
+    'CREATE INDEX IF NOT EXISTS idx_extrinsics_signer ON extrinsics(signer)',
+    'CREATE INDEX IF NOT EXISTS idx_extrinsics_timestamp ON extrinsics(timestamp)',
 
     // Accounts table
     `CREATE TABLE IF NOT EXISTS accounts (
@@ -494,7 +494,7 @@ export const createTables = async (): Promise<void> => {
     )`,
 
     // Indexes for accounts table
-    `CREATE INDEX IF NOT EXISTS idx_accounts_balance ON accounts(balance)`,
+    'CREATE INDEX IF NOT EXISTS idx_accounts_balance ON accounts(balance)',
 
     // Watchlists table
     `CREATE TABLE IF NOT EXISTS watchlists (
@@ -506,7 +506,7 @@ export const createTables = async (): Promise<void> => {
     )`,
 
     // Indexes for watchlists table
-    `CREATE INDEX IF NOT EXISTS idx_watchlists_user ON watchlists(user_id)`,
+    'CREATE INDEX IF NOT EXISTS idx_watchlists_user ON watchlists(user_id)',
   ];
 
   for (const query of queries) {

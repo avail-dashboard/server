@@ -15,7 +15,7 @@ const configSchema = Joi.object({
   DATABASE_URL: Joi.string().when('NODE_ENV', {
     is: 'production',
     then: Joi.required(),
-    otherwise: Joi.optional()
+    otherwise: Joi.optional(),
   }),
   DATABASE_TYPE: Joi.string().valid('sqlite', 'postgresql').default('sqlite'),
   SQLITE_PATH: Joi.string().default('./data/avail_explorer.db'),
@@ -73,7 +73,7 @@ const getDatabaseConfig = () => {
     return {
       type: 'sqlite' as const,
       path: env.SQLITE_PATH,
-      ssl: false
+      ssl: false,
     };
   }
   
@@ -81,7 +81,7 @@ const getDatabaseConfig = () => {
   return {
     type: 'postgresql' as const,
     url: env.DATABASE_URL,
-    ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   };
 };
 

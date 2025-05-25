@@ -19,7 +19,7 @@ const logFormat = winston.format.combine(
     }
     
     return log;
-  })
+  }),
 );
 
 // Console format for development
@@ -34,7 +34,7 @@ const consoleFormat = winston.format.combine(
     }
     
     return log;
-  })
+  }),
 );
 
 // Create transports array
@@ -46,7 +46,7 @@ if (config.server.isDev || config.server.isTest) {
     new winston.transports.Console({
       format: consoleFormat,
       level: config.logging.level,
-    })
+    }),
   );
 }
 
@@ -61,7 +61,7 @@ if (config.server.isProd || config.server.isDev) {
       maxFiles: config.logging.maxFiles,
       format: logFormat,
       level: config.logging.level,
-    })
+    }),
   );
 
   // Error logs
@@ -73,7 +73,7 @@ if (config.server.isProd || config.server.isDev) {
       maxFiles: config.logging.maxFiles,
       format: logFormat,
       level: 'error',
-    })
+    }),
   );
 }
 
