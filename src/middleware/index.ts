@@ -5,6 +5,7 @@ import config from '../config';
 import { APIResponse, APIError } from '../types';
 import { logRequest, logError } from '../utils/logger';
 import { cache } from '../utils/cache';
+import { db } from '../utils/database';
 
 // Request timing middleware
 export const requestTimer = (req: Request, res: Response, next: NextFunction): void => {
@@ -263,38 +264,56 @@ export const getClientIP = (req: Request): string => {
 // Health check middleware
 export const healthCheck = async (req: Request, res: Response): Promise<void> => {
   try {
-    const [cacheHealth, dbHealth] = await Promise.all([
-      cache.getHealth(),
-      // db.getHealth(), // Uncomment when database is implemented
-      Promise.resolve({ connected: true }), // Placeholder
-    ]);
+    const healthChecks = [];
+    
+    // Database health check
+    healthChecks.push(db.getHealth());
+    
+    // Cache health check (only if caching is enabled)
+    if (config.features.caching) {
+      healthChecks.push(cache.getHealth());
+    } else {
+      healthChecks.push(Promise.resolve({ connected: false, disabled: true }));
+    }
+
+    const [dbHealth, cacheHealth] = await Promise.all(healthChecks);
 
     const health = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      version: '1.0.0',
+      environment: config.server.env,
       services: {
-        cache: cacheHealth,
         database: dbHealth,
+        caching: cacheHealth,
+        websocket: config.features.websockets,
       },
     };
 
-    // Check if all services are healthy
-    const allHealthy = Object.values(health.services).every(
-      service => service.connected
-    );
+    // Check if critical services are healthy
+    const databaseHealthy = dbHealth.connected;
+    const cachingHealthy = !config.features.caching || cacheHealth.connected;
+    const allHealthy = databaseHealthy && cachingHealthy;
+
+    // Set overall status
+    health.status = allHealthy ? 'healthy' : 'degraded';
 
     res.status(allHealthy ? 200 : 503).json({
       success: allHealthy,
       data: health,
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    logError(error as Error, { component: 'health-check' });
+    
     res.status(503).json({
       success: false,
       error: {
         code: 'HEALTH_CHECK_FAILED',
         message: 'Health check failed',
       },
+      timestamp: new Date().toISOString(),
     });
   }
 };
