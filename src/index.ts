@@ -9,7 +9,7 @@ import config from './config';
 import { logger } from './utils/logger';
 import { cache } from './utils/cache';
 import { db, createTables } from './utils/database';
-import { blockchainService } from './services/blockchain';
+import blockchainService from './services/blockchain';
 
 // Middleware imports
 import {
@@ -175,7 +175,7 @@ class AvailExplorerServer {
         cache.connect().catch(err => {
           logger.error('Failed to connect to Redis cache', { error: err.message });
           throw err;
-        })
+        }),
       );
     }
 
@@ -184,16 +184,11 @@ class AvailExplorerServer {
       db.connect().catch(err => {
         logger.error('Failed to connect to PostgreSQL database', { error: err.message });
         throw err;
-      })
+      }),
     );
 
-    // Connect to Avail RPC
-    services.push(
-      blockchainService.connectRPC().catch(err => {
-        logger.warn('Failed to connect to Avail RPC (will use Subscan only)', { error: err.message });
-        // Don't throw - we can operate with Subscan only
-      })
-    );
+    // Blockchain service initializes automatically in constructor
+    // No explicit connection needed as it's handled internally
 
     // Wait for all critical services
     await Promise.all(services);
@@ -221,8 +216,8 @@ class AvailExplorerServer {
     // Disconnect from database
     disconnections.push(db.disconnect());
 
-    // Disconnect from RPC
-    disconnections.push(blockchainService.disconnectRPC());
+    // Disconnect from blockchain service
+    disconnections.push(blockchainService.shutdown());
 
     await Promise.all(disconnections);
     logger.info('Services: All services disconnected');
