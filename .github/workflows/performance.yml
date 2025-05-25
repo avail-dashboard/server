@@ -45,18 +45,62 @@ jobs:
     - name: Build application
       run: npm run build
       
+    - name: Create data directory
+      run: mkdir -p ./data
+      
     - name: Start server in background
       run: |
-        npm start &
+        echo "Starting server with environment:"
+        echo "NODE_ENV=$NODE_ENV"
+        echo "PORT=$PORT"
+        echo "DATABASE_TYPE=$DATABASE_TYPE"
+        echo "SQLITE_PATH=$SQLITE_PATH"
+        npm start > server.log 2>&1 &
         echo $! > server.pid
-        sleep 10  # Wait for server to start
+        sleep 15  # Wait longer for server to start
+        echo "Server PID: $(cat server.pid)"
+        echo "Server log:"
+        cat server.log || echo "No log file found"
       env:
         NODE_ENV: production
         PORT: 3001
+        DATABASE_TYPE: sqlite
+        SQLITE_PATH: ./data/avail_explorer_perf.db
+        ENABLE_CACHING: false
+        ENABLE_WEBSOCKETS: false
+        ENABLE_RATE_LIMITING: false
+        LOG_LEVEL: error
         
     - name: Wait for server to be ready
       run: |
-        timeout 30 bash -c 'until curl -f http://localhost:3001/health; do sleep 1; done'
+        echo "Waiting for server to be ready..."
+        timeout 30 bash -c 'until curl -f http://localhost:3001/health; do 
+          echo "Server not ready yet, retrying in 1 second..."
+          sleep 1
+        done'
+        echo "Server is ready!"
+        echo "Health check response:"
+        curl -s http://localhost:3001/health | jq . || curl -s http://localhost:3001/health
+        
+    - name: Debug server status if health check failed
+      if: failure()
+      run: |
+        echo "Health check failed. Debugging server status..."
+        if [ -f server.pid ]; then
+          PID=$(cat server.pid)
+          echo "Server PID: $PID"
+          if ps -p $PID > /dev/null; then
+            echo "Server process is still running"
+          else
+            echo "Server process has died"
+          fi
+        else
+          echo "No server.pid file found"
+        fi
+        echo "Server log contents:"
+        cat server.log || echo "No server log found"
+        echo "Checking if port 3001 is in use:"
+        netstat -tlnp | grep :3001 || echo "Port 3001 not in use"
         
     - name: Run performance tests
       run: |
