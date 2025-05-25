@@ -1,0 +1,168 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'server/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'server/**'
+  schedule:
+    # Run security scan weekly on Sundays at 3 AM UTC
+    - cron: '0 3 * * 0'
+
+jobs:
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./server
+    
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: server/package-lock.json
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run npm audit
+      run: |
+        npm audit --audit-level=moderate --json > npm-audit-results.json || true
+        npm audit --audit-level=moderate
+      continue-on-error: true
+      
+    - name: Run Snyk security scan
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=medium --file=server/package.json
+      continue-on-error: true
+      
+    - name: Upload Snyk results to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: snyk.sarif
+      continue-on-error: true
+      
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: javascript
+        queries: security-and-quality
+      continue-on-error: true
+      
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+      continue-on-error: true
+      
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      continue-on-error: true
+      
+    - name: Check for secrets
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./server
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+      continue-on-error: true
+      
+    - name: OWASP ZAP Baseline Scan
+      if: github.event_name == 'pull_request'
+      uses: zaproxy/action-baseline@v0.10.0
+      with:
+        target: 'http://localhost:3001'
+        rules_file_name: '.zap/rules.tsv'
+        cmd_options: '-a'
+      continue-on-error: true
+      
+    - name: Generate security report
+      if: always()
+      run: |
+        echo "# 🔒 Security Scan Results" > security-report.md
+        echo "" >> security-report.md
+        echo "## NPM Audit Results" >> security-report.md
+        
+        if [ -f npm-audit-results.json ]; then
+          node -e "
+            const fs = require('fs');
+            try {
+              const audit = JSON.parse(fs.readFileSync('npm-audit-results.json', 'utf8'));
+              const vulnerabilities = audit.metadata?.vulnerabilities || {};
+              
+              console.log('- **Critical**: ' + (vulnerabilities.critical || 0));
+              console.log('- **High**: ' + (vulnerabilities.high || 0));
+              console.log('- **Moderate**: ' + (vulnerabilities.moderate || 0));
+              console.log('- **Low**: ' + (vulnerabilities.low || 0));
+              console.log('- **Info**: ' + (vulnerabilities.info || 0));
+              
+              if (audit.advisories && Object.keys(audit.advisories).length > 0) {
+                console.log('\\n### Top Vulnerabilities:');
+                Object.values(audit.advisories).slice(0, 5).forEach(adv => {
+                  console.log('- **' + adv.title + '** (' + adv.severity + '): ' + adv.overview);
+                });
+              }
+            } catch (e) {
+              console.log('No vulnerabilities found or unable to parse audit results.');
+            }
+          " >> security-report.md
+        else
+          echo "No audit results available." >> security-report.md
+        fi
+        
+        echo "" >> security-report.md
+        echo "## Recommendations" >> security-report.md
+        echo "- Keep dependencies updated regularly" >> security-report.md
+        echo "- Review and fix any high/critical vulnerabilities" >> security-report.md
+        echo "- Consider using \`npm audit fix\` for automatic fixes" >> security-report.md
+        echo "- Monitor security advisories for your dependencies" >> security-report.md
+        
+    - name: Upload security artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-results
+        path: |
+          server/npm-audit-results.json
+          server/security-report.md
+          snyk.sarif
+        retention-days: 30
+        
+    - name: Comment PR with security results
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const report = fs.readFileSync('./server/security-report.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report + '\n\n🔍 Full security scan results available in artifacts.'
+            });
+          } catch (error) {
+            console.log('Could not read security report:', error.message);
+          } 
