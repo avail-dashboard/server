@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
-import { pagination, cacheMiddleware } from '../middleware';
-import config from '../config';
+import { pagination } from '../middleware';
 
 const router = Router();
 
@@ -17,17 +16,15 @@ router.get('/',
 
       // Mock extrinsics data
       const mockExtrinsics = Array.from({ length: limit }, (_, i) => ({
-        id: (page - 1) * limit + i + 1,
         hash: `0x${Math.random().toString(16).substring(2).padStart(64, '0')}`,
-        block_number: blockNumber || (999999 - Math.floor(Math.random() * 1000)),
-        extrinsic_index: i,
+        blockNumber: blockNumber || (999999 - Math.floor(Math.random() * 1000)),
+        extrinsicIndex: i,
         module: ['system', 'balances', 'staking', 'utility'][Math.floor(Math.random() * 4)],
         call: ['transfer', 'transferKeepAlive', 'bond', 'batch'][Math.floor(Math.random() * 4)],
         success: Math.random() > 0.1,
         timestamp: Date.now() - (i * 6000), // 6 seconds between extrinsics
         signer: `5${Math.random().toString(36).substring(2, 48)}`,
-        fee: Math.floor(Math.random() * 1000000000000), // Random fee as number instead of BigInt
-        time: new Date(Date.now() - (i * 6000)).toISOString(),
+        fee: Math.floor(Math.random() * 1000000000000), // Random fee as number
       }));
 
       const response: APIResponse = {

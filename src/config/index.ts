@@ -107,15 +107,26 @@ export const config = {
 
   // Blockchain Data Sources
   dataSources: {
-    subscan: {
-      baseURL: env.SUBSCAN_BASE_URL,
-      apiKey: env.SUBSCAN_API_KEY,
-      rateLimitPerMinute: 100,
-    },
+    // subscan: {
+    //   baseURL: env.SUBSCAN_BASE_URL,
+    //   apiKey: env.SUBSCAN_API_KEY,
+    //   rateLimitPerMinute: 100,
+    // },
     rpc: {
-      endpoint: env.AVAIL_RPC_ENDPOINT,
-      reconnectAttempts: 5,
+      endpoints: [
+        env.AVAIL_RPC_ENDPOINT,
+        'wss://mainnet-rpc.avail.so/ws',
+        'wss://avail-rpc.dwellir.com',
+      ].filter(Boolean),
+      reconnectAttempts: 10,
       timeout: 30000,
+      maxConnections: 3,
+      healthCheckInterval: 30000,
+      subscriptionTimeout: 60000,
+      batchSize: 100,
+      retryDelay: 5000,
+      maxRetryDelay: 30000,
+      connectionPoolSize: 5,
     },
     subquery: {
       endpoint: env.SUBQUERY_ENDPOINT,
