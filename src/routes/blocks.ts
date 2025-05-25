@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../utils/database';
 import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { pagination, cacheMiddleware } from '../middleware';
 import config from '../config';
+import blockchainService from '../services/blockchain';
 
 const router = Router();
 
@@ -16,24 +16,39 @@ router.get('/',
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
 
-      // For now, return mock data since we don't have real blockchain data yet
-      const mockBlocks = Array.from({ length: limit }, (_, i) => ({
-        number: 1000000 - (page - 1) * limit - i,
-        hash: `0x${Math.random().toString(16).substring(2).padStart(64, '0')}`,
-        parent_hash: `0x${Math.random().toString(16).substring(2).padStart(64, '0')}`,
-        timestamp: Date.now() - (i * 12000), // 12 seconds per block
-        extrinsics: Math.floor(Math.random() * 20) + 1,
-        time: new Date(Date.now() - (i * 12000)).toISOString(),
+      // Fetch real blocks data from RPC
+      const blocksResult = await blockchainService.getLatestBlocks({ 
+        page, 
+        limit,
+        orderBy: 'number',
+        order: 'desc',
+      });
+
+      // Transform RPC data to match API response format
+      const transformedBlocks = blocksResult.blocks.map(block => ({
+        number: Number(block.number),
+        hash: block.hash,
+        parent_hash: block.parentHash,
+        timestamp: Number(block.timestamp),
+        extrinsics: block.extrinsicsCount,
+        time: new Date(Number(block.timestamp)).toISOString(),
+        state_root: block.stateRoot,
+        extrinsics_root: block.extrinsicsRoot,
+        author_id: block.authorId,
+        size: block.size,
+        weight: block.weight,
+        spec: block.spec,
+        finalized: block.finalized,
       }));
 
       const response: APIResponse = {
         success: true,
-        data: mockBlocks,
+        data: transformedBlocks,
         meta: {
           page,
           limit,
-          total: 1000000, // Mock total
-          source: 'database',
+          total: blocksResult.total,
+          source: 'rpc',
         },
       };
 
@@ -59,29 +74,66 @@ router.get('/:numberOrHash',
     try {
       const { numberOrHash } = req.params;
 
-      // Mock block data
-      const mockBlock = {
-        number: parseInt(numberOrHash) || 999999,
-        hash: `0x${Math.random().toString(16).substring(2).padStart(64, '0')}`,
-        parent_hash: `0x${Math.random().toString(16).substring(2).padStart(64, '0')}`,
-        state_root: `0x${Math.random().toString(16).substring(2).padStart(64, '0')}`,
-        timestamp: Date.now(),
-        extrinsics_count: Math.floor(Math.random() * 20) + 1,
-        time: new Date().toISOString(),
-        extrinsics: Array.from({ length: 3 }, (_, i) => ({
-          id: i + 1,
-          hash: `0x${Math.random().toString(16).substring(2).padStart(64, '0')}`,
-          module: 'system',
-          call: 'transfer',
-          success: Math.random() > 0.1,
+      // Determine if it's a number or hash and fetch accordingly
+      let block;
+      if (/^\d+$/.test(numberOrHash)) {
+        // It's a block number
+        block = await blockchainService.getBlockByNumber(BigInt(numberOrHash));
+      } else {
+        // It's a block hash
+        block = await blockchainService.getBlockByHash(numberOrHash);
+      }
+
+      if (!block) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Block not found',
+          },
+        });
+      }
+
+      // Fetch extrinsics for this block
+      const extrinsics = await blockchainService.getExtrinsicsByBlock(block.number);
+
+      // Transform block data to match API response format
+      const transformedBlock = {
+        number: Number(block.number),
+        hash: block.hash,
+        parent_hash: block.parentHash,
+        state_root: block.stateRoot,
+        timestamp: Number(block.timestamp),
+        extrinsics_count: block.extrinsicsCount,
+        time: new Date(Number(block.timestamp)).toISOString(),
+        extrinsics_root: block.extrinsicsRoot,
+        author_id: block.authorId,
+        size: block.size,
+        weight: block.weight,
+        spec: block.spec,
+        finalized: block.finalized,
+        extrinsics: extrinsics.map(ext => ({
+          id: ext.id,
+          hash: ext.hash,
+          extrinsic_index: ext.extrinsicIndex,
+          module: ext.module,
+          call: ext.call,
+          success: ext.success,
+          timestamp: Number(ext.timestamp),
+          signer: ext.signer,
+          fee: Number(ext.fee),
+          tip: ext.tip ? Number(ext.tip) : 0,
+          signature: ext.signature,
+          args: ext.args,
+          events: ext.events,
         })),
       };
 
       const response: APIResponse = {
         success: true,
-        data: mockBlock,
+        data: transformedBlock,
         meta: {
-          source: 'database',
+          source: 'rpc',
         },
       };
 

@@ -3,6 +3,7 @@ import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
+import blockchainService from '../services/blockchain';
 
 const router = Router();
 
@@ -11,28 +12,43 @@ router.get('/stats',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      // Mock chain data for development
-      const mockChainData = {
-        finalizedBlocks: 999999 + Math.floor(Math.random() * 100),
-        totalAccounts: 450000 + Math.floor(Math.random() * 1000),
-        totalExtrinsics: 5500000 + Math.floor(Math.random() * 10000),
-        tokenPrice: 0.0525 + (Math.random() - 0.5) * 0.01, // Mock price around $0.0525
-        priceChange: (Math.random() - 0.5) * 20, // ±10% change
-        marketCap: 25000000 + Math.floor(Math.random() * 1000000),
-        totalSupply: 1000000000, // 1B AVAIL
-        circulatingSupply: 850000000, // 850M AVAIL
-        stakingRatio: 65.5 + (Math.random() - 0.5) * 10,
-        inflation: 7.2 + (Math.random() - 0.5) * 2,
-        activeValidators: 50 + Math.floor(Math.random() * 10),
-        blockTime: 20.1 + (Math.random() - 0.5) * 2, // seconds
-        lastBlockTimestamp: Date.now(),
+      // Fetch real chain data from RPC
+      const chainStats = await blockchainService.getChainStats();
+      
+      // Transform RPC data to match frontend ChainData interface
+      const chainData = {
+        finalizedBlocks: Number(chainStats.blockHeight),
+        signedExtrinsics: 0, // TODO: Calculate from database
+        stakedAmount: '0', // TODO: Calculate from staking data
+        bondedAmount: '0', // TODO: Calculate from staking data
+        holders: 0, // TODO: Calculate from database
+        totalAccounts: 0, // TODO: Calculate from database
+        transfers: 0, // TODO: Calculate from database
+        inflationRate: chainStats.inflation,
+        tokenPrice: 0, // TODO: Fetch from external API
+        priceChange: 0, // TODO: Calculate from price history
+        totalIssuance: chainStats.totalIssuance.toString(),
+        circulating: { amount: '0', percentage: 0 }, // TODO: Calculate
+        staking: { amount: '0', percentage: 0 }, // TODO: Calculate
+        treasury: { amount: '0', percentage: 0 }, // TODO: Calculate
+        others: { amount: '0', percentage: 0 }, // TODO: Calculate
+        
+        // Additional fields for compatibility
+        marketCap: 0, // TODO: Calculate from price and supply
+        totalSupply: Number(chainStats.totalIssuance),
+        circulatingSupply: 0, // TODO: Calculate
+        stakingRatio: chainStats.stakingRatio,
+        inflation: chainStats.inflation,
+        activeValidators: chainStats.activeValidators,
+        blockTime: chainStats.blockTime,
+        lastBlockTimestamp: Number(chainStats.lastUpdateTime),
       };
 
       const response: APIResponse = {
         success: true,
-        data: mockChainData,
+        data: chainData,
         meta: {
-          source: 'database',
+          source: 'rpc',
         },
       };
 

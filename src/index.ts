@@ -28,7 +28,7 @@ import blockRoutes from './routes/blocks';
 import extrinsicRoutes from './routes/extrinsics';
 import chainRoutes from './routes/chain';
 import searchRoutes from './routes/search';
-// import accountRoutes from './routes/accounts';
+import accountRoutes from './routes/accounts';
 // import validatorRoutes from './routes/validators';
 // import analyticsRoutes from './routes/analytics';
 
@@ -105,7 +105,7 @@ class AvailExplorerServer {
     this.app.use(`${config.api.prefix}/search`, searchRoutes);
 
     // Future route mounting (uncomment when routes are created)
-    // this.app.use(`${config.api.prefix}/accounts`, accountRoutes);
+    this.app.use(`${config.api.prefix}/accounts`, accountRoutes);
     // this.app.use(`${config.api.prefix}/validators`, validatorRoutes);
     // this.app.use(`${config.api.prefix}/analytics`, analyticsRoutes);
   }
@@ -158,7 +158,7 @@ class AvailExplorerServer {
       socket.on('disconnect', (reason) => {
         logger.info('WebSocket: Client disconnected', { 
           socketId: socket.id, 
-          reason 
+          reason,
         });
       });
     });
