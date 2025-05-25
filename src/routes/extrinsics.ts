@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { pagination } from '../middleware';
+import blockchainService from '../services/blockchain';
 
 const router = Router();
 
@@ -12,29 +13,50 @@ router.get('/',
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-      const blockNumber = req.query.block ? parseInt(req.query.block as string) : undefined;
+      const blockNumber = req.query.block ? BigInt(req.query.block as string) : undefined;
 
-      // Mock extrinsics data
-      const mockExtrinsics = Array.from({ length: limit }, (_, i) => ({
-        hash: `0x${Math.random().toString(16).substring(2).padStart(64, '0')}`,
-        blockNumber: blockNumber || (999999 - Math.floor(Math.random() * 1000)),
-        extrinsicIndex: i,
-        module: ['system', 'balances', 'staking', 'utility'][Math.floor(Math.random() * 4)],
-        call: ['transfer', 'transferKeepAlive', 'bond', 'batch'][Math.floor(Math.random() * 4)],
-        success: Math.random() > 0.1,
-        timestamp: Date.now() - (i * 6000), // 6 seconds between extrinsics
-        signer: `5${Math.random().toString(36).substring(2, 48)}`,
-        fee: Math.floor(Math.random() * 1000000000000), // Random fee as number
+      let extrinsicsResult;
+
+      if (blockNumber) {
+        // Fetch extrinsics for a specific block
+        const extrinsics = await blockchainService.getExtrinsicsByBlock(blockNumber);
+        extrinsicsResult = {
+          extrinsics,
+          total: extrinsics.length,
+        };
+      } else {
+        // Fetch latest extrinsics across all blocks
+        extrinsicsResult = await blockchainService.getLatestExtrinsics({
+          page,
+          limit,
+        });
+      }
+
+      // Transform RPC data to match API response format
+      const transformedExtrinsics = extrinsicsResult.extrinsics.map(ext => ({
+        hash: ext.hash,
+        blockNumber: Number(ext.blockNumber),
+        extrinsicIndex: ext.extrinsicIndex,
+        module: ext.module,
+        call: ext.call,
+        success: ext.success,
+        timestamp: Number(ext.timestamp),
+        signer: ext.signer,
+        fee: Number(ext.fee),
+        tip: ext.tip ? Number(ext.tip) : 0,
+        signature: ext.signature,
+        args: ext.args,
+        events: ext.events,
       }));
 
       const response: APIResponse = {
         success: true,
-        data: mockExtrinsics,
+        data: transformedExtrinsics,
         meta: {
           page,
           limit,
-          total: blockNumber ? limit : 5500000, // If specific block, return count; otherwise mock total
-          source: 'database',
+          total: extrinsicsResult.total,
+          source: 'rpc',
         },
       };
 
@@ -47,6 +69,65 @@ router.get('/',
         error: {
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch extrinsics',
+        },
+      });
+    }
+  },
+);
+
+// GET /api/v1/extrinsics/:hash - Get specific extrinsic
+router.get('/:hash', 
+  async (req: Request, res: Response) => {
+    try {
+      const { hash } = req.params;
+
+      // Fetch extrinsic by hash
+      const extrinsic = await blockchainService.getExtrinsicByHash(hash);
+
+      if (!extrinsic) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Extrinsic not found',
+          },
+        });
+      }
+
+      // Transform extrinsic data to match API response format
+      const transformedExtrinsic = {
+        hash: extrinsic.hash,
+        blockNumber: Number(extrinsic.blockNumber),
+        extrinsicIndex: extrinsic.extrinsicIndex,
+        module: extrinsic.module,
+        call: extrinsic.call,
+        success: extrinsic.success,
+        timestamp: Number(extrinsic.timestamp),
+        signer: extrinsic.signer,
+        fee: Number(extrinsic.fee),
+        tip: extrinsic.tip ? Number(extrinsic.tip) : 0,
+        signature: extrinsic.signature,
+        args: extrinsic.args,
+        events: extrinsic.events,
+      };
+
+      const response: APIResponse = {
+        success: true,
+        data: transformedExtrinsic,
+        meta: {
+          source: 'rpc',
+        },
+      };
+
+      res.json(response);
+    } catch (error) {
+      logError(error as Error, { component: 'extrinsics-route', action: 'getExtrinsic' });
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch extrinsic',
         },
       });
     }
