@@ -152,6 +152,7 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 *.db
+data/
 
 # Redis dump files
 dump.rdb
@@ -205,4 +206,5 @@ dist/
 # Avail specific (if any blockchain data files)
 *.chain
 *.db
-data/ 
+
+# Redis dump files 

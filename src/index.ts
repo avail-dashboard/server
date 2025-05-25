@@ -23,13 +23,13 @@ import {
   metricsHandler,
 } from './middleware';
 
-// Route imports (to be created)
-// import blockRoutes from './routes/blocks';
-// import extrinsicRoutes from './routes/extrinsics';
+// Route imports
+import blockRoutes from './routes/blocks';
+import extrinsicRoutes from './routes/extrinsics';
+import chainRoutes from './routes/chain';
+import searchRoutes from './routes/search';
 // import accountRoutes from './routes/accounts';
-// import chainRoutes from './routes/chain';
 // import validatorRoutes from './routes/validators';
-// import searchRoutes from './routes/search';
 // import analyticsRoutes from './routes/analytics';
 
 class AvailExplorerServer {
@@ -80,6 +80,9 @@ class AvailExplorerServer {
     // API routes
     const apiRouter = express.Router();
 
+    // Health endpoint under API versioning
+    apiRouter.get('/health', healthCheck);
+
     // Temporary basic routes for testing
     apiRouter.get('/', (req, res) => {
       res.json({
@@ -95,13 +98,15 @@ class AvailExplorerServer {
     // Mount API routes
     this.app.use(config.api.prefix, apiRouter);
 
+    // Mount specific routes
+    this.app.use(`${config.api.prefix}/blocks`, blockRoutes);
+    this.app.use(`${config.api.prefix}/extrinsics`, extrinsicRoutes);
+    this.app.use(`${config.api.prefix}/chain`, chainRoutes);
+    this.app.use(`${config.api.prefix}/search`, searchRoutes);
+
     // Future route mounting (uncomment when routes are created)
-    // this.app.use(`${config.api.prefix}/blocks`, blockRoutes);
-    // this.app.use(`${config.api.prefix}/extrinsics`, extrinsicRoutes);
     // this.app.use(`${config.api.prefix}/accounts`, accountRoutes);
-    // this.app.use(`${config.api.prefix}/chain`, chainRoutes);
     // this.app.use(`${config.api.prefix}/validators`, validatorRoutes);
-    // this.app.use(`${config.api.prefix}/search`, searchRoutes);
     // this.app.use(`${config.api.prefix}/analytics`, analyticsRoutes);
   }
 
@@ -144,7 +149,9 @@ class AvailExplorerServer {
       });
 
       socket.on('unsubscribe:all', () => {
-        socket.leaveAll();
+        socket.leave('blocks');
+        socket.leave('extrinsics');
+        socket.leave('chain');
         logger.info('WebSocket: Client unsubscribed from all', { socketId: socket.id });
       });
 

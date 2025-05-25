@@ -1,101 +1,290 @@
-# Avail Blockchain Explorer Backend
+# Avail Explorer Backend
 
-A comprehensive Node.js Express server that provides a unified API layer for the Avail blockchain explorer, integrating multiple data sources with real-time capabilities.
+Backend server for the Avail blockchain explorer with automatic API integration and fallback support.
 
 ## Features
 
-- **Multi-Source Data Integration**: Subscan API, Direct RPC, SubQuery support
-- **Redis Caching**: High-performance caching with intelligent TTL strategies
-- **PostgreSQL Storage**: Persistent data storage with optimized queries
-- **Real-time WebSocket**: Live updates for blocks, transactions, and chain stats
-- **Background Jobs**: Automated data synchronization and cleanup
-- **Comprehensive API**: RESTful endpoints for all blockchain data
-- **Rate Limiting**: Protection against abuse with configurable limits
-- **Error Handling**: Robust error handling with fallback strategies
+- **Dual Database Support**: SQLite for development, PostgreSQL for production
+- **Automatic API Integration**: Direct backend APIs with external API fallbacks
+- **Real-time Updates**: WebSocket support for live data
+- **Health Monitoring**: Comprehensive health checks and monitoring
+- **Development-friendly**: Zero-config SQLite setup for local development
 
-## Prerequisites
+## Quick Start (Development)
 
+### Prerequisites
 - Node.js 18+
-- PostgreSQL 12+
-- Redis 6+
-- Avail RPC endpoint access
-- Subscan API key (optional)
+- npm or yarn
 
-## Installation
+### Setup
 
-1. Install dependencies:
+1. **Clone and install:**
 ```bash
+git clone <repository>
+cd server
 npm install
 ```
 
-2. Copy environment template:
+2. **Quick setup (recommended):**
 ```bash
-cp env.example .env
+npm run setup
 ```
+This will:
+- Create `.env` file from template
+- Create `data/` directory for SQLite
+- Set up development defaults
 
-3. Configure your .env file with database URLs and API keys
-
-4. Start the server:
+3. **Start development server:**
 ```bash
 npm run dev
 ```
 
+The server will start on `http://localhost:3001` with:
+- ✅ SQLite database (auto-created at `./data/avail_explorer.db`)
+- ✅ API endpoints ready
+- ✅ WebSocket support
+- ⚠️ Redis optional (caching disabled by default)
+
+## Database Configuration
+
+### Development (SQLite) - Default
+```bash
+# .env
+DATABASE_TYPE=sqlite
+SQLITE_PATH=./data/avail_explorer.db
+NODE_ENV=development
+```
+
+**Pros:**
+- ✅ No setup required
+- ✅ File-based, portable
+- ✅ Perfect for development
+- ✅ No external dependencies
+
+**Cons:**
+- ⚠️ Single-threaded
+- ⚠️ Limited concurrent writes
+- ⚠️ Not suitable for production
+
+### Production (PostgreSQL)
+```bash
+# .env
+DATABASE_URL=postgresql://user:password@host:port/database
+NODE_ENV=production
+```
+
+**Pros:**
+- ✅ High performance
+- ✅ Concurrent connections
+- ✅ Production-ready
+- ✅ Advanced features
+
+**Cons:**
+- ⚠️ Requires PostgreSQL server
+- ⚠️ More complex setup
+
+## Environment Variables
+
+### Required for Production
+```bash
+DATABASE_URL=postgresql://user:password@host:port/database
+```
+
+### Optional (with defaults)
+```bash
+# Server
+PORT=3001
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:3000
+
+# Database (SQLite defaults)
+DATABASE_TYPE=sqlite
+SQLITE_PATH=./data/avail_explorer.db
+
+# External APIs
+SUBSCAN_API_KEY=your-subscan-key
+COINGECKO_API_KEY=your-coingecko-key
+
+# Features
+ENABLE_WEBSOCKETS=true
+ENABLE_CACHING=false  # Redis required if true
+ENABLE_RATE_LIMITING=true
+```
+
 ## API Endpoints
 
-Base URL: `http://localhost:3001/api/v1`
+The server provides these main endpoints:
 
-### Core Endpoints
+### Core Data
+- `GET /api/v1/blocks` - Latest blocks with pagination
+- `GET /api/v1/blocks/:numberOrHash` - Specific block details
+- `GET /api/v1/chain/stats` - Chain statistics
+- `GET /api/v1/extrinsics` - Extrinsics with filtering
+- `GET /api/v1/search` - Search functionality
 
-- `GET /health` - Health check
-- `GET /chain/stats` - Chain statistics
-- `GET /blocks` - Latest blocks
-- `GET /blocks/:number` - Block by number
-- `GET /extrinsics` - Latest extrinsics
-- `GET /accounts/:address` - Account details
-- `GET /validators` - All validators
-- `GET /search?q=query` - Universal search
+### System
+- `GET /health` - Server health check
+- WebSocket at `/` - Real-time updates
 
-## WebSocket Events
+## Development Workflow
 
-Connect to: `ws://localhost:3001`
+### 1. Quick Start
+```bash
+npm run setup  # One-time setup
+npm run dev    # Start development server
+```
 
-- `subscribe:blocks` - Subscribe to new blocks
-- `subscribe:extrinsics` - Subscribe to new transactions
-- `newBlock` - Receive new block data
-- `newExtrinsic` - Receive new transaction data
+### 2. Database Management
+```bash
+# Tables are created automatically on first run
+# SQLite file: ./data/avail_explorer.db
 
-## Configuration
+# View database
+sqlite3 ./data/avail_explorer.db
+.tables
+.schema blocks
+```
 
-The server uses environment variables for configuration. Key variables:
+### 3. Testing API Integration
+```bash
+# Health check
+curl http://localhost:3001/health
 
-- `DATABASE_URL` - PostgreSQL connection string
-- `REDIS_URL` - Redis connection string
-- `AVAIL_RPC_ENDPOINT` - Avail RPC endpoint
-- `SUBSCAN_API_KEY` - Subscan API key
-- `PORT` - Server port (default: 3001)
+# Get latest blocks
+curl http://localhost:3001/api/v1/blocks
 
-## Development
+# Chain statistics
+curl http://localhost:3001/api/v1/chain/stats
+```
 
-- `npm run dev` - Development server with hot reload
-- `npm run build` - Build for production
-- `npm start` - Start production server
-- `npm test` - Run tests
-- `npm run migrate` - Run database migrations
+## Production Deployment
 
-## Performance
+### 1. Environment Setup
+```bash
+# Set production environment
+export NODE_ENV=production
+export DATABASE_URL=postgresql://user:password@host:port/database
 
-The server includes caching, rate limiting, and error handling to ensure high performance and reliability:
+# Optional: Enable caching
+export ENABLE_CACHING=true
+export REDIS_URL=redis://host:port
+```
 
-- Cached responses: < 50ms
-- Fresh data: < 500ms
-- Search queries: < 200ms
-- Rate limiting: 100 requests/minute per IP
+### 2. Database Setup
+```bash
+# Build and run migrations
+npm run build
+npm run migrate  # Creates tables in PostgreSQL
+```
 
-## Deployment
+### 3. Start Production Server
+```bash
+npm start
+```
 
-1. Build the application: `npm run build`
-2. Set environment variables for production
-3. Start with: `npm start`
-4. Configure reverse proxy and SSL
+## Architecture
 
-For detailed setup instructions, see the configuration section above. 
+### Database Layer
+```
+┌─────────────────┐    ┌─────────────────┐
+│   Development   │    │   Production    │
+│     SQLite      │    │  PostgreSQL     │
+│                 │    │                 │
+│ • File-based    │    │ • Network DB    │
+│ • Zero config   │    │ • High perf     │
+│ • Local only    │    │ • Scalable      │
+└─────────────────┘    └─────────────────┘
+         │                       │
+         └───────┬───────────────┘
+                 │
+         ┌─────────────────┐
+         │ Unified DB API  │
+         │                 │
+         │ • Same interface│
+         │ • Auto-detection│
+         │ • Type safety   │
+         └─────────────────┘
+```
+
+### API Integration
+```
+Frontend ──┐
+           │
+           ▼
+    ┌─────────────┐     ┌─────────────┐
+    │   Next.js   │────▶│   Backend   │
+    │ API Routes  │     │   Server    │
+    └─────────────┘     └─────────────┘
+           │                     │
+           │ (fallback)          ▼
+           ▼              ┌─────────────┐
+    ┌─────────────┐      │  Database   │
+    │  External   │      │   (SQLite/  │
+    │    APIs     │      │ PostgreSQL) │
+    │ (Subscan,   │      └─────────────┘
+    │ CoinGecko)  │
+    └─────────────┘
+```
+
+## Troubleshooting
+
+### SQLite Issues
+```bash
+# Check if database exists
+ls -la ./data/
+
+# Check database file
+sqlite3 ./data/avail_explorer.db ".tables"
+
+# Reset database (delete file)
+rm ./data/avail_explorer.db
+npm run dev  # Will recreate
+```
+
+### Connection Issues
+```bash
+# Check health endpoint
+curl http://localhost:3001/health
+
+# Check logs
+npm run dev  # Watch console output
+
+# Verify environment
+cat .env
+```
+
+### PostgreSQL Issues (Production)
+```bash
+# Test connection
+psql $DATABASE_URL -c "SELECT 1"
+
+# Check tables
+psql $DATABASE_URL -c "\dt"
+
+# Run migrations manually
+npm run migrate
+```
+
+## Performance Notes
+
+### SQLite (Development)
+- **Read performance**: Excellent
+- **Write performance**: Good for development
+- **Concurrent connections**: Limited
+- **File size**: Grows with data
+
+### PostgreSQL (Production)
+- **Read performance**: Excellent
+- **Write performance**: Excellent
+- **Concurrent connections**: High
+- **Scalability**: Horizontal and vertical
+
+## Support
+
+For issues:
+1. Check server logs
+2. Verify environment variables
+3. Test database connection
+4. Check health endpoint: `/health`
+
+The system is designed to be development-friendly with SQLite while production-ready with PostgreSQL. 
