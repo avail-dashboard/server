@@ -1,3 +1,7 @@
+[![Test Suite](https://github.com/avail-dashboard/server/actions/workflows/test.yml/badge.svg)](https://github.com/avail-dashboard/server/actions/workflows/test.yml)
+[![Code Quality](https://github.com/avail-dashboard/server/actions/workflows/quality.yml/badge.svg)](https://github.com/avail-dashboard/server/actions/workflows/quality.yml)
+[![Security Scan](https://github.com/avail-dashboard/server/actions/workflows/security.yml/badge.svg)](https://github.com/avail-dashboard/server/actions/workflows/security.yml)
+[![Performance Tests](https://github.com/avail-dashboard/server/actions/workflows/performance.yml/badge.svg)](https://github.com/avail-dashboard/server/actions/workflows/performance.yml)
 # GitHub Actions CI/CD for Avail Explorer Backend
 
 This directory contains GitHub Actions workflows for automated testing, quality checks, security scanning, and performance monitoring of the Avail Explorer Backend.
@@ -88,13 +92,6 @@ CODECOV_TOKEN=your_codecov_token_here
 ## 📊 Workflow Status Badges
 
 Add these badges to your main README:
-
-```markdown
-![Test Suite](https://github.com/your-org/insights.avail/workflows/Test%20Suite/badge.svg)
-![Code Quality](https://github.com/your-org/insights.avail/workflows/Code%20Quality/badge.svg)
-![Security Scan](https://github.com/your-org/insights.avail/workflows/Security%20Scan/badge.svg)
-![Performance Tests](https://github.com/your-org/insights.avail/workflows/Performance%20Tests/badge.svg)
-```
 
 ## 🎯 Workflow Triggers
 
