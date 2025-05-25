@@ -4,11 +4,15 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'server/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'server/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
   schedule:
     # Run security scan weekly on Sundays at 3 AM UTC
     - cron: '0 3 * * 0'
@@ -17,10 +21,6 @@ jobs:
   security:
     name: Security Scanning
     runs-on: ubuntu-latest
-    
-    defaults:
-      run:
-        working-directory: ./server
     
     permissions:
       security-events: write
@@ -58,7 +58,7 @@ jobs:
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       with:
-        args: --severity-threshold=medium --file=server/package.json
+        args: --severity-threshold=medium --file=package.json
       continue-on-error: true
       
     - name: Upload Snyk results to GitHub Code Scanning
@@ -86,7 +86,7 @@ jobs:
     - name: Check for secrets
       uses: trufflesecurity/trufflehog@main
       with:
-        path: ./server
+        path: ./
         base: main
         head: HEAD
         extra_args: --debug --only-verified
@@ -148,8 +148,8 @@ jobs:
       with:
         name: security-results
         path: |
-          server/npm-audit-results.json
-          server/security-report.md
+          npm-audit-results.json
+          security-report.md
           snyk.sarif
         retention-days: 30
         
@@ -161,7 +161,7 @@ jobs:
           const fs = require('fs');
           
           try {
-            const report = fs.readFileSync('./server/security-report.md', 'utf8');
+            const report = fs.readFileSync('./security-report.md', 'utf8');
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,

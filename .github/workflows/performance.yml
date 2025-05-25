@@ -4,11 +4,15 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'server/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
   pull_request:
     branches: [ main ]
     paths:
-      - 'server/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
   schedule:
     # Run performance tests daily at 2 AM UTC
     - cron: '0 2 * * *'
@@ -17,10 +21,6 @@ jobs:
   performance:
     name: Performance Testing
     runs-on: ubuntu-latest
-    
-    defaults:
-      run:
-        working-directory: ./server
     
     steps:
     - name: Checkout code
@@ -143,9 +143,9 @@ jobs:
       with:
         name: performance-results
         path: |
-          server/performance-report.html
-          server/performance-report.json
-          server/performance-summary.md
+          performance-report.html
+          performance-report.json
+          performance-summary.md
         retention-days: 30
         
     - name: Comment PR with performance results
@@ -156,7 +156,7 @@ jobs:
           const fs = require('fs');
           
           try {
-            const summary = fs.readFileSync('./server/performance-summary.md', 'utf8');
+            const summary = fs.readFileSync('./performance-summary.md', 'utf8');
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
