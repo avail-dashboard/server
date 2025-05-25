@@ -49,7 +49,7 @@ router.get('/',
         },
       });
     }
-  }
+  },
 );
 
 // GET /api/v1/blocks/:numberOrHash - Get specific block
@@ -97,7 +97,7 @@ router.get('/:numberOrHash',
         },
       });
     }
-  }
+  },
 );
 
 export default router; 

@@ -9,7 +9,7 @@ import {
   Validator, 
   DataSource,
   BlocksQuery,
-  ExtrinsicsQuery 
+  ExtrinsicsQuery, 
 } from '../types';
 import { logRpcCall, logError } from '../utils/logger';
 import { cache, CacheKeys, cacheWrapper } from '../utils/cache';
@@ -52,7 +52,7 @@ class BlockchainService {
       error => {
         logError(error, { component: 'subscan-api', url: error.config?.url });
         throw error;
-      }
+      },
     );
 
     // Setup SubQuery API interceptors
@@ -62,7 +62,7 @@ class BlockchainService {
         error => {
           logError(error, { component: 'subquery-api', url: error.config?.url });
           throw error;
-        }
+        },
       );
     }
   }
@@ -117,7 +117,7 @@ class BlockchainService {
           }
         }
       },
-      config.cache.ttl.blocks
+      config.cache.ttl.blocks,
     ).then(result => result.data);
   }
 
@@ -140,7 +140,7 @@ class BlockchainService {
           }
         }
       },
-      config.cache.ttl.blockByNumber
+      config.cache.ttl.blockByNumber,
     ).then(result => result.data);
   }
 
@@ -163,7 +163,7 @@ class BlockchainService {
           }
         }
       },
-      config.cache.ttl.blockByHash
+      config.cache.ttl.blockByHash,
     ).then(result => result.data);
   }
 
@@ -188,7 +188,7 @@ class BlockchainService {
           }
         }
       },
-      config.cache.ttl.blocks
+      config.cache.ttl.blocks,
     ).then(result => result.data);
   }
 
@@ -209,7 +209,7 @@ class BlockchainService {
           }
         }
       },
-      config.cache.ttl.blockByHash
+      config.cache.ttl.blockByHash,
     ).then(result => result.data);
   }
 
@@ -230,7 +230,7 @@ class BlockchainService {
           }
         }
       },
-      config.cache.ttl.blockByNumber
+      config.cache.ttl.blockByNumber,
     ).then(result => result.data);
   }
 
@@ -255,7 +255,7 @@ class BlockchainService {
           }
         }
       },
-      config.cache.ttl.accountBalance
+      config.cache.ttl.accountBalance,
     ).then(result => result.data);
   }
 
@@ -280,7 +280,7 @@ class BlockchainService {
           }
         }
       },
-      config.cache.ttl.chainStats
+      config.cache.ttl.chainStats,
     ).then(result => result.data);
   }
 
@@ -305,7 +305,7 @@ class BlockchainService {
           }
         }
       },
-      config.cache.ttl.validators
+      config.cache.ttl.validators,
     ).then(result => result.data);
   }
 

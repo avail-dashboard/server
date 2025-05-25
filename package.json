@@ -18,6 +18,8 @@
     "migrate": "node dist/database/migrate.js",
     "seed": "node dist/database/seed.js",
     "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "lint:check": "eslint src/**/*.ts --max-warnings 0",
     "format": "prettier --write src/**/*.ts",
     "validate:workflows": "node .github/validate-workflows.js"
   },

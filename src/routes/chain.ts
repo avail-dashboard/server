@@ -48,7 +48,7 @@ router.get('/stats',
         },
       });
     }
-  }
+  },
 );
 
 export default router; 

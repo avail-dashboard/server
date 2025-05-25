@@ -31,7 +31,7 @@ export const errorHandler = (
   err: Error | APIError,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   // Log the error
   logError(err, {
@@ -139,7 +139,7 @@ export const pagination = (req: Request, res: Response, next: NextFunction): voi
   const page = parseInt(req.query.page as string) || 1;
   const limit = Math.min(
     parseInt(req.query.limit as string) || config.api.defaultPageSize,
-    config.api.maxPageSize
+    config.api.maxPageSize,
   );
   const offset = (page - 1) * limit;
 
