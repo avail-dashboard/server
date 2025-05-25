@@ -40,8 +40,8 @@ const consoleFormat = winston.format.combine(
 // Create transports array
 const transports: winston.transport[] = [];
 
-// Console transport (always enabled in development)
-if (config.server.isDev) {
+// Console transport (enabled in development and test)
+if (config.server.isDev || config.server.isTest) {
   transports.push(
     new winston.transports.Console({
       format: consoleFormat,

@@ -640,8 +640,8 @@ class BlockchainService {
       
       return {
         address,
-        balance: BigInt(accountInfo.data.free.toString()),
-        nonce: accountInfo.nonce.toNumber(),
+        balance: BigInt((accountInfo as any).data.free.toString()),
+        nonce: (accountInfo as any).nonce.toNumber(),
       };
     } catch (error) {
       const duration = Date.now() - start;
