@@ -76,4 +76,54 @@ The workflows should now:
 - Used specific path filters (`src/**`, `package.json`) instead of broad wildcards
 - Removed unnecessary working directory configurations
 - Maintained consistency across all workflow files
-- Preserved all existing functionality while fixing the path issues 
+- Preserved all existing functionality while fixing the path issues
+
+## Additional Fixes Applied
+
+### Winston Logger Configuration
+**Issue:** Logger had no transports configured in test environment, causing warnings.
+**Fix:** Added test environment to console transport condition in `src/utils/logger.ts`:
+```typescript
+// Before
+if (config.server.isDev) {
+
+// After  
+if (config.server.isDev || config.server.isTest) {
+```
+
+### Redis Configuration Error
+**Issue:** Invalid `retryDelayOnFailover` option in ioredis configuration.
+**Fix:** Removed the invalid option from `src/utils/cache.ts`:
+```typescript
+// Before
+this.redis = new Redis(config.redis.url, {
+  retryDelayOnFailover: 100,
+  maxRetriesPerRequest: 3,
+  lazyConnect: true,
+});
+
+// After
+this.redis = new Redis(config.redis.url, {
+  maxRetriesPerRequest: 3,
+  lazyConnect: true,
+});
+```
+
+### Blockchain Service TypeScript Errors
+**Issue:** Property access errors on Codec types from Polkadot API.
+**Fix:** Added type assertions in `src/services/blockchain.ts`:
+```typescript
+// Before
+balance: BigInt(accountInfo.data.free.toString()),
+nonce: accountInfo.nonce.toNumber(),
+
+// After
+balance: BigInt((accountInfo as any).data.free.toString()),
+nonce: (accountInfo as any).nonce.toNumber(),
+```
+
+These fixes resolve:
+- ✅ Winston logger warnings in test environment
+- ✅ Redis configuration TypeScript errors
+- ✅ Blockchain service compilation errors
+- ✅ All CI workflow path issues 

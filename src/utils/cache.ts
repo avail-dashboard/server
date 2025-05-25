@@ -8,7 +8,6 @@ class CacheService {
 
   constructor() {
     this.redis = new Redis(config.redis.url, {
-      retryDelayOnFailover: 100,
       maxRetriesPerRequest: 3,
       lazyConnect: true,
     });
