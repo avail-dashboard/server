@@ -47,6 +47,8 @@ router.get('/',
         signature: ext.signature,
         args: ext.args,
         events: ext.events,
+        isSigned: ext.isSigned,
+        isUserTransaction: ext.isUserTransaction,
       }));
 
       const response: APIResponse = {
@@ -109,6 +111,8 @@ router.get('/:hash',
         signature: extrinsic.signature,
         args: extrinsic.args,
         events: extrinsic.events,
+        isSigned: extrinsic.isSigned,
+        isUserTransaction: extrinsic.isUserTransaction,
       };
 
       const response: APIResponse = {

@@ -49,6 +49,8 @@ export interface Extrinsic {
   events?: ExtrinsicEvent[];
   tip?: bigint;
   signature?: string;
+  isSigned?: boolean;
+  isUserTransaction?: boolean;
 }
 
 export interface ExtrinsicEvent {
