@@ -55,7 +55,7 @@ services:
       ENABLE_CACHING: ${ENABLE_CACHING:-true}
       ENABLE_RATE_LIMITING: ${ENABLE_RATE_LIMITING:-true}
       ENABLE_ANALYTICS: ${ENABLE_ANALYTICS:-true}
-      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      JWT_SECRET: ${JWT_SECRET:-avail-explorer-randomasdf}
       API_RATE_LIMIT: ${API_RATE_LIMIT:-100}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
