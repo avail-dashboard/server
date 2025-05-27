@@ -12,6 +12,7 @@ import {
   Validator,
   BlocksQuery,
   ExtrinsicsQuery,
+  DataSubmissionQuery,
 } from '../../types';
 import {
   DataAvailabilityProof,
@@ -173,6 +174,16 @@ export class AvailRPCService extends EventEmitter {
   async getApplicationData(blockHash: string, appId: number): Promise<ApplicationData[]> {
     this.ensureInitialized();
     return this.methodsService.getApplicationData(blockHash, appId);
+  }
+
+  async getDataSubmissions(query: DataSubmissionQuery = {}) {
+    this.ensureInitialized();
+    return this.methodsService.getDataSubmissions(query);
+  }
+
+  async getDataSubmissionStats() {
+    this.ensureInitialized();
+    return this.methodsService.getDataSubmissionStats();
   }
 
   async getBlockDataRoot(blockHash: string): Promise<string | null> {

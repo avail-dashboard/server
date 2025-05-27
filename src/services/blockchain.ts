@@ -7,6 +7,7 @@ import {
   Validator, 
   BlocksQuery,
   ExtrinsicsQuery, 
+  DataSubmissionQuery,
 } from '../types';
 import { logError, rpcLogger } from '../utils/logger';
 
@@ -174,6 +175,34 @@ class BlockchainService {
     } catch (error) {
       logError(error as Error, { operation: 'getApplicationData', blockHash, appId });
       return [];
+    }
+  }
+
+  async getDataSubmissions(query: DataSubmissionQuery = {}) {
+    this.ensureInitialized();
+    try {
+      return await availRPCService.getDataSubmissions(query);
+    } catch (error) {
+      logError(error as Error, { operation: 'getDataSubmissions', query });
+      return { submissions: [], total: 0 };
+    }
+  }
+
+  async getDataSubmissionStats() {
+    this.ensureInitialized();
+    try {
+      return await availRPCService.getDataSubmissionStats();
+    } catch (error) {
+      logError(error as Error, { operation: 'getDataSubmissionStats' });
+      return {
+        totalSubmissions: 0,
+        totalDataSize: 0,
+        uniqueApps: 0,
+        uniqueSubmitters: 0,
+        averageSize: 0,
+        submissionsToday: 0,
+        dataSizeToday: 0,
+      };
     }
   }
 

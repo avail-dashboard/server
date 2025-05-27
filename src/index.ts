@@ -29,6 +29,7 @@ import extrinsicRoutes from './routes/extrinsics';
 import chainRoutes from './routes/chain';
 import searchRoutes from './routes/search';
 import accountRoutes from './routes/accounts';
+import dataSubmissionRoutes from './routes/data-submissions';
 // import validatorRoutes from './routes/validators';
 // import analyticsRoutes from './routes/analytics';
 
@@ -103,9 +104,8 @@ class AvailExplorerServer {
     this.app.use(`${config.api.prefix}/extrinsics`, extrinsicRoutes);
     this.app.use(`${config.api.prefix}/chain`, chainRoutes);
     this.app.use(`${config.api.prefix}/search`, searchRoutes);
-
-    // Future route mounting (uncomment when routes are created)
     this.app.use(`${config.api.prefix}/accounts`, accountRoutes);
+    this.app.use(`${config.api.prefix}/data-submissions`, dataSubmissionRoutes);
     // this.app.use(`${config.api.prefix}/validators`, validatorRoutes);
     // this.app.use(`${config.api.prefix}/analytics`, analyticsRoutes);
   }

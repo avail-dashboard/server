@@ -300,4 +300,39 @@ export interface AnalyticsData {
   tokenDistribution: TokenDistribution[];
   blocksPerDay: BlocksPerDay[];
   transactionVolume: TransactionVolume[];
+}
+
+// Data Submission Types
+export interface DataSubmission {
+  extrinsicId: string;
+  blockNumber: bigint;
+  extrinsicIndex: number;
+  appId: number;
+  size: number; // in bytes
+  dataHash: string;
+  submitter: string;
+  timestamp: bigint;
+  success: boolean;
+  data?: string; // optional raw data
+}
+
+export interface DataSubmissionQuery extends PaginationParams {
+  appId?: number;
+  submitter?: string;
+  minSize?: number;
+  maxSize?: number;
+  from?: number;
+  to?: number;
+  orderBy?: 'timestamp' | 'size' | 'appId';
+  order?: 'asc' | 'desc';
+}
+
+export interface DataSubmissionStats {
+  totalSubmissions: number;
+  totalDataSize: number; // in bytes
+  uniqueApps: number;
+  uniqueSubmitters: number;
+  averageSize: number;
+  submissionsToday: number;
+  dataSizeToday: number;
 } 
