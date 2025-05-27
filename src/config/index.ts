@@ -12,13 +12,8 @@ const configSchema = Joi.object({
   CORS_ORIGIN: Joi.string().default('http://localhost:3000'),
 
   // Database Configuration
-  DATABASE_URL: Joi.string().when('NODE_ENV', {
-    is: 'production',
-    then: Joi.required(),
-    otherwise: Joi.optional(),
-  }),
-  DATABASE_TYPE: Joi.string().valid('sqlite', 'postgresql').default('sqlite'),
-  SQLITE_PATH: Joi.string().default('./data/avail_explorer.db'),
+  DATABASE_URL: Joi.string().required(),
+  DATABASE_TYPE: Joi.string().valid('postgresql').default('postgresql'),
   
   REDIS_URL: Joi.string().default('redis://localhost:6379'),
 
@@ -63,25 +58,14 @@ if (error) {
   throw new Error(`Config validation error: ${error.message}`);
 }
 
-// Determine database type based on environment
+// Set up PostgreSQL configuration
 const getDatabaseConfig = () => {
-  const isDevelopment = env.NODE_ENV === 'development';
-  const isTest = env.NODE_ENV === 'test';
+  const isProd = env.NODE_ENV === 'production';
   
-  // Use SQLite for development and test environments by default
-  if ((isDevelopment || isTest) && !env.DATABASE_URL) {
-    return {
-      type: 'sqlite' as const,
-      path: env.SQLITE_PATH,
-      ssl: false,
-    };
-  }
-  
-  // Use PostgreSQL for production or when DATABASE_URL is explicitly provided
   return {
     type: 'postgresql' as const,
     url: env.DATABASE_URL,
-    ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: isProd ? { rejectUnauthorized: false } : false,
   };
 };
 

@@ -45,6 +45,14 @@ jobs:
     - name: Build application
       run: npm run build
       
+    - name: Setup PostgreSQL
+      uses: harmon758/postgresql-action@v1
+      with:
+        postgresql version: '14'
+        postgresql db: avail_explorer_perf
+        postgresql user: postgres
+        postgresql password: postgres
+      
     - name: Create data directory
       run: mkdir -p ./data
       
@@ -54,7 +62,7 @@ jobs:
         echo "NODE_ENV=$NODE_ENV"
         echo "PORT=$PORT"
         echo "DATABASE_TYPE=$DATABASE_TYPE"
-        echo "SQLITE_PATH=$SQLITE_PATH"
+        echo "DATABASE_URL=$DATABASE_URL"
         npm start > server.log 2>&1 &
         echo $! > server.pid
         sleep 15  # Wait longer for server to start
@@ -64,8 +72,8 @@ jobs:
       env:
         NODE_ENV: production
         PORT: 3001
-        DATABASE_TYPE: sqlite
-        SQLITE_PATH: ./data/avail_explorer_perf.db
+        DATABASE_TYPE: postgresql
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/avail_explorer_perf
         ENABLE_CACHING: false
         ENABLE_WEBSOCKETS: false
         ENABLE_RATE_LIMITING: false
