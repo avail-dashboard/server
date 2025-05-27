@@ -51,8 +51,6 @@ services:
       REDIS_URL: redis://redis:6379
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       AVAIL_RPC_ENDPOINT: ${AVAIL_RPC_ENDPOINT:-wss://mainnet-rpc.avail.so/ws}
-      SUBSCAN_API_KEY: ${SUBSCAN_API_KEY}
-      SUBSCAN_BASE_URL: ${SUBSCAN_BASE_URL:-https://avail.api.subscan.io}
       ENABLE_WEBSOCKETS: ${ENABLE_WEBSOCKETS:-true}
       ENABLE_CACHING: ${ENABLE_CACHING:-true}
       ENABLE_RATE_LIMITING: ${ENABLE_RATE_LIMITING:-true}

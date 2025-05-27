@@ -10,7 +10,7 @@ const mockBlockchainService = {
   getExtrinsicsByBlock: jest.fn().mockResolvedValue([]),
   getAccountDetails: jest.fn().mockResolvedValue(null),
   getChainStats: jest.fn().mockResolvedValue({ blockHeight: BigInt(1000), blockTime: 12 }),
-  getHealth: jest.fn().mockResolvedValue({ rpc: true, subscan: true, subquery: true }),
+  getHealth: jest.fn().mockResolvedValue({ rpc: true }),
   getValidators: jest.fn().mockResolvedValue([]),
 };
 
@@ -56,11 +56,7 @@ describe('Blockchain Service', () => {
       
       expect(result).toBeDefined();
       expect(result).toHaveProperty('rpc');
-      expect(result).toHaveProperty('subscan');
-      expect(result).toHaveProperty('subquery');
       expect(typeof result.rpc).toBe('boolean');
-      expect(typeof result.subscan).toBe('boolean');
-      expect(typeof result.subquery).toBe('boolean');
       expect(mockBlockchainService.getHealth).toHaveBeenCalled();
     });
   });

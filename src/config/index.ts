@@ -19,9 +19,6 @@ const configSchema = Joi.object({
 
   // Blockchain Data Sources
   AVAIL_RPC_ENDPOINT: Joi.string().default('wss://mainnet-rpc.avail.so/ws'),
-  SUBSCAN_API_KEY: Joi.string(),
-  SUBSCAN_BASE_URL: Joi.string().default('https://avail.api.subscan.io'),
-  SUBQUERY_ENDPOINT: Joi.string(),
 
   // External APIs
   COINGECKO_API_KEY: Joi.string(),
@@ -91,11 +88,6 @@ export const config = {
 
   // Blockchain Data Sources
   dataSources: {
-    // subscan: {
-    //   baseURL: env.SUBSCAN_BASE_URL,
-    //   apiKey: env.SUBSCAN_API_KEY,
-    //   rateLimitPerMinute: 100,
-    // },
     rpc: {
       endpoints: [
         env.AVAIL_RPC_ENDPOINT,
@@ -111,10 +103,6 @@ export const config = {
       retryDelay: 5000,
       maxRetryDelay: 30000,
       connectionPoolSize: 5,
-    },
-    subquery: {
-      endpoint: env.SUBQUERY_ENDPOINT,
-      timeout: 10000,
     },
   },
 
