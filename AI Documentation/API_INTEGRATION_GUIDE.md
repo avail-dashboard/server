@@ -157,10 +157,6 @@ useEffect(() => {
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api/v1
 NEXT_PUBLIC_WS_URL=ws://localhost:3001
 
-# External API keys (for Next.js API routes)
-SUBSCAN_API_KEY=your_subscan_api_key_here
-COINGECKO_API_KEY=your_coingecko_api_key_here
-
 # Environment
 NEXT_PUBLIC_NODE_ENV=development
 ```

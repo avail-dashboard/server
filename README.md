@@ -102,7 +102,6 @@ DATABASE_TYPE=sqlite
 SQLITE_PATH=./data/avail_explorer.db
 
 # External APIs
-SUBSCAN_API_KEY=your-subscan-key
 COINGECKO_API_KEY=your-coingecko-key
 
 # Features
@@ -221,8 +220,7 @@ Frontend ──┐
     ┌─────────────┐      │  Database   │
     │  External   │      │   (SQLite/  │
     │    APIs     │      │ PostgreSQL) │
-    │ (Subscan,   │      └─────────────┘
-    │ CoinGecko)  │
+    │ (CoinGecko) │      └─────────────┘
     └─────────────┘
 ```
 

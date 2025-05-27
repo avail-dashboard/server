@@ -24,7 +24,6 @@ Required environment variables:
 ```env
 DATABASE_URL=postgresql://avail_user:your_password@postgres:5432/avail_explorer
 REDIS_URL=redis://redis:6379
-SUBSCAN_API_KEY=your_subscan_api_key
 POSTGRES_PASSWORD=your_secure_password
 JWT_SECRET=your_jwt_secret_at_least_32_characters
 ```

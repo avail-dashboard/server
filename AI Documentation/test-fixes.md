@@ -46,7 +46,7 @@ const mockBlockchainService = {
   getExtrinsicsByBlock: jest.fn().mockResolvedValue([]),
   getAccountDetails: jest.fn().mockResolvedValue(null),
   getChainStats: jest.fn().mockResolvedValue({ blockHeight: BigInt(1000), blockTime: 12 }),
-  getHealth: jest.fn().mockResolvedValue({ rpc: true, subscan: true, subquery: true }),
+  getHealth: jest.fn().mockResolvedValue({ rpc: true }),
   getValidators: jest.fn().mockResolvedValue([]),
 };
 

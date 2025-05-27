@@ -16,7 +16,7 @@ export interface APIResponse<T = any> {
   };
 }
 
-export type DataSource = 'subscan' | 'rpc' | 'subquery' | 'cache' | 'database';
+export type DataSource = 'rpc' | 'cache' | 'database';
 
 // Blockchain Data Types
 export interface Block {
@@ -113,18 +113,9 @@ export interface ChainStats {
 
 // Configuration Types
 export interface DataSourceConfig {
-  subscan: {
-    baseURL: string;
-    apiKey: string;
-    rateLimitPerMinute: number;
-  };
   rpc: {
     endpoint: string;
     reconnectAttempts: number;
-    timeout: number;
-  };
-  subquery: {
-    endpoint: string;
     timeout: number;
   };
 }
