@@ -77,46 +77,10 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  # Optional: PostgreSQL Admin (pgAdmin)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: avail-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@avail.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "${PGADMIN_PORT:-5050}:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    depends_on:
-      - postgres
-    restart: unless-stopped
-    profiles:
-      - admin
-
-  # Optional: Redis Admin (RedisInsight)
-  redis-insight:
-    image: redislabs/redisinsight:latest
-    container_name: avail-redis-insight
-    ports:
-      - "${REDIS_INSIGHT_PORT:-8001}:8001"
-    volumes:
-      - redis_insight_data:/db
-    depends_on:
-      - redis
-    restart: unless-stopped
-    profiles:
-      - admin
-
 volumes:
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  pgadmin_data:
-    driver: local
-  redis_insight_data:
     driver: local
 
 networks:
