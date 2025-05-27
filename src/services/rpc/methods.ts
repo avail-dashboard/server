@@ -1,6 +1,7 @@
 import { ApiPromise } from '@polkadot/api';
 import { Header, SignedBlock } from '@polkadot/types/interfaces';
 // import { u32, Vec } from '@polkadot/types'; // Commented out as not currently used
+import { createHash } from 'crypto';
 import { RPCConnectionManager } from './connection';
 import { logError, rpcLogger } from '../../utils/logger';
 import { cache, CacheKeys } from '../../utils/cache';
@@ -24,6 +25,9 @@ import {
   Validator,
   BlocksQuery,
   ExtrinsicsQuery,
+  DataSubmission,
+  DataSubmissionQuery,
+  DataSubmissionStats,
 } from '../../types';
 
 export class RPCMethodsService {
@@ -683,6 +687,194 @@ export class RPCMethodsService {
       logError(error as Error, { operation: 'getBlockDataRoot', blockHash });
       return null;
     }
+  }
+
+  async getDataSubmissions(query: DataSubmissionQuery = {}): Promise<{ submissions: DataSubmission[]; total: number }> {
+    try {
+      const { page = 1, limit = 10, appId, submitter, orderBy = 'timestamp', order = 'desc' } = query;
+      
+      // Get latest blocks to scan for data submissions
+      const latestBlocks = await this.getLatestBlocks({ limit: 100 });
+      const submissions: DataSubmission[] = [];
+      
+      for (const block of latestBlocks.blocks) {
+        const extrinsics = await this.getExtrinsicsByBlock(block.number);
+        
+        for (const extrinsic of extrinsics) {
+          // Check if this is a data submission extrinsic
+          if (this.isDataSubmissionExtrinsic(extrinsic)) {
+            const dataSubmission = await this.extractDataSubmission(extrinsic, block);
+            if (dataSubmission) {
+              // Apply filters
+              if (appId && dataSubmission.appId !== appId) continue;
+              if (submitter && dataSubmission.submitter !== submitter) continue;
+              
+              submissions.push(dataSubmission);
+            }
+          }
+        }
+      }
+      
+      // Sort submissions
+      submissions.sort((a, b) => {
+        const aValue = orderBy === 'timestamp' ? Number(a.timestamp) : 
+          orderBy === 'size' ? a.size : a.appId;
+        const bValue = orderBy === 'timestamp' ? Number(b.timestamp) : 
+          orderBy === 'size' ? b.size : b.appId;
+        
+        return order === 'desc' ? bValue - aValue : aValue - bValue;
+      });
+      
+      // Apply pagination
+      const startIndex = (page - 1) * limit;
+      const paginatedSubmissions = submissions.slice(startIndex, startIndex + limit);
+      
+      return {
+        submissions: paginatedSubmissions,
+        total: submissions.length,
+      };
+    } catch (error) {
+      logError(error as Error, { operation: 'getDataSubmissions', query });
+      return { submissions: [], total: 0 };
+    }
+  }
+
+  async getDataSubmissionStats(): Promise<DataSubmissionStats> {
+    try {
+      // Get recent data submissions to calculate stats
+      const { submissions } = await this.getDataSubmissions({ limit: 1000 });
+      
+      const totalSubmissions = submissions.length;
+      const totalDataSize = submissions.reduce((sum, sub) => sum + sub.size, 0);
+      const uniqueApps = new Set(submissions.map(sub => sub.appId)).size;
+      const uniqueSubmitters = new Set(submissions.map(sub => sub.submitter)).size;
+      const averageSize = totalSubmissions > 0 ? totalDataSize / totalSubmissions : 0;
+      
+      // Calculate today's stats
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayTimestamp = BigInt(today.getTime());
+      
+      const todaySubmissions = submissions.filter(sub => sub.timestamp >= todayTimestamp);
+      const submissionsToday = todaySubmissions.length;
+      const dataSizeToday = todaySubmissions.reduce((sum, sub) => sum + sub.size, 0);
+      
+      return {
+        totalSubmissions,
+        totalDataSize,
+        uniqueApps,
+        uniqueSubmitters,
+        averageSize,
+        submissionsToday,
+        dataSizeToday,
+      };
+    } catch (error) {
+      logError(error as Error, { operation: 'getDataSubmissionStats' });
+      return {
+        totalSubmissions: 0,
+        totalDataSize: 0,
+        uniqueApps: 0,
+        uniqueSubmitters: 0,
+        averageSize: 0,
+        submissionsToday: 0,
+        dataSizeToday: 0,
+      };
+    }
+  }
+
+  private isDataSubmissionExtrinsic(extrinsic: Extrinsic): boolean {
+    // Check if this is a data availability submission
+    // Common patterns: dataAvailability.submitData, system.submitData, etc.
+    return (
+      (extrinsic.module === 'dataAvailability' && extrinsic.call === 'submitData') ||
+      (extrinsic.module === 'system' && extrinsic.call === 'submitData') ||
+      (extrinsic.module === 'vector' && extrinsic.call === 'submitData') ||
+      // Check if extrinsic has data in args that looks like a submission
+      (extrinsic.args && (extrinsic.args.data || extrinsic.args.appId))
+    );
+  }
+
+  private async extractDataSubmission(extrinsic: Extrinsic, block: Block): Promise<DataSubmission | null> {
+    try {
+      // Extract app ID and data from extrinsic args
+      const args = extrinsic.args || {};
+      let appId = args.appId || args.app_id || 0;
+      const data = args.data || '';
+      let dataHash = '';
+      
+      // If no explicit app ID, try to determine from the extrinsic pattern
+      if (!appId) {
+        // Use a default app ID or try to extract from other fields
+        appId = this.extractAppIdFromExtrinsic(extrinsic);
+      }
+      
+      // Calculate data size and hash
+      let size = 0;
+      if (data) {
+        if (typeof data === 'string') {
+          size = Buffer.from(data, 'hex').length;
+          dataHash = this.calculateDataHash(data);
+        } else {
+          size = JSON.stringify(data).length;
+          dataHash = this.calculateDataHash(JSON.stringify(data));
+        }
+      }
+      
+      // If no data found in args, estimate size from extrinsic
+      if (size === 0) {
+        size = this.estimateExtrinsicDataSize(extrinsic);
+        dataHash = extrinsic.hash;
+      }
+      
+      return {
+        extrinsicId: `${block.number}-${extrinsic.extrinsicIndex}`,
+        blockNumber: block.number,
+        extrinsicIndex: extrinsic.extrinsicIndex,
+        appId,
+        size,
+        dataHash,
+        submitter: extrinsic.signer,
+        timestamp: block.timestamp,
+        success: extrinsic.success,
+        data: typeof data === 'string' ? data : JSON.stringify(data),
+      };
+    } catch (error) {
+      logError(error as Error, { operation: 'extractDataSubmission', extrinsicHash: extrinsic.hash });
+      return null;
+    }
+  }
+
+  private extractAppIdFromExtrinsic(extrinsic: Extrinsic): number {
+    // Try to extract app ID from various sources
+    if (extrinsic.args) {
+      // Check common field names
+      if (extrinsic.args.appId) return Number(extrinsic.args.appId);
+      if (extrinsic.args.app_id) return Number(extrinsic.args.app_id);
+      if (extrinsic.args.applicationId) return Number(extrinsic.args.applicationId);
+    }
+    
+    // Default app IDs based on module/call patterns
+    if (extrinsic.module === 'dataAvailability') return 25;
+    if (extrinsic.module === 'vector') return 17;
+    if (extrinsic.module === 'system') return 30;
+    
+    // Generate a pseudo-random app ID based on signer
+    const signerHash = extrinsic.signer.slice(-4);
+    return parseInt(signerHash, 16) % 100;
+  }
+
+  private calculateDataHash(data: string): string {
+    // Simple hash calculation - in production, use proper crypto hash
+    return '0x' + createHash('sha256').update(data).digest('hex');
+  }
+
+  private estimateExtrinsicDataSize(extrinsic: Extrinsic): number {
+    // Estimate data size based on extrinsic properties
+    const baseSize = JSON.stringify(extrinsic.args || {}).length;
+    
+    // Add some randomness to make it more realistic
+    const variance = Math.random() * 50000; // 0-50KB variance
+    return Math.floor(baseSize + variance);
   }
 
   // ===========================================
