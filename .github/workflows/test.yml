@@ -52,8 +52,8 @@ jobs:
         cat > .env.test << EOF
         NODE_ENV=test
         PORT=3002
-        DATABASE_TYPE=sqlite
-        SQLITE_PATH=:memory:
+        DATABASE_TYPE=postgresql
+        DATABASE_URL=postgresql://postgres:postgres@localhost:5432/avail_explorer_test
         ENABLE_CACHING=false
         ENABLE_WEBSOCKETS=false
         ENABLE_RATE_LIMITING=false
@@ -63,6 +63,14 @@ jobs:
         CORS_ORIGIN=http://localhost:3000
         REDIS_URL=redis://localhost:6379/15
         EOF
+        
+    - name: Setup PostgreSQL
+      uses: harmon758/postgresql-action@v1
+      with:
+        postgresql version: '14'
+        postgresql db: avail_explorer_test
+        postgresql user: postgres
+        postgresql password: postgres
         
     - name: Run linting
       run: npm run lint

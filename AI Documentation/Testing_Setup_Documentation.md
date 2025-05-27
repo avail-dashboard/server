@@ -4,6 +4,15 @@
 
 This document outlines the comprehensive testing setup implemented for the Avail Explorer Backend server. The testing framework uses Jest with TypeScript support and includes unit tests, integration tests, and end-to-end tests.
 
+## Testing Environment
+
+- **Node.js**: Latest LTS version
+- **TypeScript**: For type safety and improved developer experience
+- **Jest**: Testing framework for all test types
+- **Supertest**: For HTTP assertions in API testing
+- **Database**: PostgreSQL for testing
+- **Mocking**: Jest mocks for external dependencies
+
 ## Testing Framework
 
 ### Core Technologies
@@ -43,7 +52,7 @@ tests/
 
 ### Test Environment Setup
 - **Environment Variables**: Isolated test environment
-- **Database**: In-memory SQLite for testing
+- **Database**: PostgreSQL for testing
 - **External Services**: Mocked (Redis, Blockchain RPC, etc.)
 - **Logging**: Error level only during tests
 
@@ -151,8 +160,8 @@ npm run test:ci
 
 ### Environment Variables
 - `NODE_ENV=test`
-- `DATABASE_TYPE=sqlite`
-- `SQLITE_PATH=:memory:`
+- `DATABASE_TYPE=postgresql`
+- `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/avail_explorer_test`
 - Disabled features: caching, websockets, rate limiting
 
 ### Data Isolation
@@ -317,4 +326,26 @@ The testing setup is fully integrated with GitHub Actions for continuous integra
 - Branch protection rules for main/develop branches
 - Required status checks configuration
 
-This comprehensive CI/CD setup ensures that the Avail Explorer Backend maintains high quality, security, and performance standards throughout the development lifecycle. 
+This comprehensive CI/CD setup ensures that the Avail Explorer Backend maintains high quality, security, and performance standards throughout the development lifecycle.
+
+## Database Setup for Testing
+
+Tests should run against a dedicated PostgreSQL database to prevent contaminating the development or production database.
+
+```
+// Example test database connection in test setup
+DATABASE_TYPE=postgresql
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/avail_explorer_test
+```
+
+For GitHub Actions CI, we set up an ephemeral PostgreSQL instance for each test run:
+
+```yml
+- name: Setup PostgreSQL
+  uses: harmon758/postgresql-action@v1
+  with:
+    postgresql version: '14'
+    postgresql db: avail_explorer_test
+    postgresql user: postgres
+    postgresql password: postgres
+``` 

@@ -1,13 +1,9 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { Pool, PoolClient } from 'pg';
 import config from '../config';
 import { logQuery, logError } from './logger';
 
 interface DatabaseConfig {
-  type: 'sqlite' | 'postgresql';
-  path?: string;
+  type: 'postgresql';
   url?: string;
   ssl?: boolean | object;
 }
@@ -19,7 +15,6 @@ interface QueryResult_<T = any> {
 
 class DatabaseService {
   private pgPool?: Pool;
-  private sqliteDb?: Database.Database;
   private isConnected: boolean = false;
   private dbConfig: DatabaseConfig;
 
@@ -29,35 +24,7 @@ class DatabaseService {
   }
 
   private initializeDatabase(): void {
-    if (this.dbConfig.type === 'sqlite') {
-      this.initializeSQLite();
-    } else {
-      this.initializePostgreSQL();
-    }
-  }
-
-  private initializeSQLite(): void {
-    if (!this.dbConfig.path) {
-      throw new Error('SQLite database path is required');
-    }
-
-    // Ensure data directory exists
-    const dbDir = path.dirname(this.dbConfig.path);
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
-
-    try {
-      this.sqliteDb = new Database(this.dbConfig.path);
-      this.sqliteDb.pragma('journal_mode = WAL');
-      this.sqliteDb.pragma('foreign_keys = ON');
-      this.isConnected = true;
-      console.log(`Database: Connected to SQLite at ${this.dbConfig.path}`);
-    } catch (error) {
-      this.isConnected = false;
-      logError(error as Error, { component: 'database', action: 'initializeSQLite' });
-      throw error;
-    }
+    this.initializePostgreSQL();
   }
 
   private initializePostgreSQL(): void {
@@ -87,16 +54,10 @@ class DatabaseService {
 
   async connect(): Promise<void> {
     try {
-      if (this.dbConfig.type === 'sqlite') {
-        // SQLite is already connected during initialization
-        this.isConnected = true;
-        console.log('Database: SQLite ready');
-      } else {
-        const client = await this.pgPool!.connect();
-        client.release();
-        this.isConnected = true;
-        console.log('Database: Connected to PostgreSQL');
-      }
+      const client = await this.pgPool!.connect();
+      client.release();
+      this.isConnected = true;
+      console.log('Database: Connected to PostgreSQL');
     } catch (error) {
       this.isConnected = false;
       logError(error as Error, { component: 'database', action: 'connect' });
@@ -106,18 +67,10 @@ class DatabaseService {
 
   async disconnect(): Promise<void> {
     try {
-      if (this.dbConfig.type === 'sqlite') {
-        if (this.sqliteDb) {
-          this.sqliteDb.close();
-          this.sqliteDb = undefined;
-        }
-        console.log('Database: Disconnected from SQLite');
-      } else {
-        if (this.pgPool) {
-          await this.pgPool.end();
-        }
-        console.log('Database: Disconnected from PostgreSQL');
+      if (this.pgPool) {
+        await this.pgPool.end();
       }
+      console.log('Database: Disconnected from PostgreSQL');
       this.isConnected = false;
     } catch (error) {
       logError(error as Error, { component: 'database', action: 'disconnect' });
@@ -128,13 +81,7 @@ class DatabaseService {
     const start = Date.now();
 
     try {
-      let result: QueryResult_<T>;
-
-      if (this.dbConfig.type === 'sqlite') {
-        result = await this.executeSQLiteQuery<T>(text, params);
-      } else {
-        result = await this.executePostgreSQLQuery<T>(text, params);
-      }
+      const result = await this.executePostgreSQLQuery<T>(text, params);
 
       const duration = Date.now() - start;
       logQuery(text, duration, result.rowCount);
@@ -149,52 +96,6 @@ class DatabaseService {
         duration, 
       });
       throw error;
-    }
-  }
-
-  private async executeSQLiteQuery<T>(text: string, params?: any[]): Promise<QueryResult_<T>> {
-    if (!this.sqliteDb) {
-      throw new Error('SQLite database not initialized');
-    }
-
-    // Convert PostgreSQL-style placeholders ($1, $2) to SQLite-style (?, ?)
-    const sqliteQuery = this.convertPlaceholders(text);
-    
-    try {
-      if (sqliteQuery.trim().toUpperCase().startsWith('SELECT') || 
-          sqliteQuery.trim().toUpperCase().startsWith('WITH')) {
-        const stmt = this.sqliteDb.prepare(sqliteQuery);
-        const rows = params ? stmt.all(...params) : stmt.all();
-        return {
-          rows: rows as T[],
-          rowCount: rows.length,
-        };
-      } else {
-        const stmt = this.sqliteDb.prepare(sqliteQuery);
-        const info = params ? stmt.run(...params) : stmt.run();
-        
-        // For INSERT/UPDATE with RETURNING clause, we need to handle it differently
-        if (sqliteQuery.toUpperCase().includes('RETURNING')) {
-          // For SQLite, we need to do a separate SELECT after INSERT/UPDATE
-          const selectQuery = this.handleReturningClause(sqliteQuery, info.lastInsertRowid);
-          if (selectQuery) {
-            const selectStmt = this.sqliteDb.prepare(selectQuery);
-            const rows = selectStmt.all();
-            return {
-              rows: rows as T[],
-              rowCount: info.changes,
-            };
-          }
-        }
-        
-        return {
-          rows: [] as T[],
-          rowCount: info.changes,
-        };
-      }
-    } catch (error: any) {
-      // Convert SQLite errors to a more standardized format
-      throw new Error(`SQLite Error: ${error.message}`);
     }
   }
 
@@ -216,46 +117,8 @@ class DatabaseService {
     }
   }
 
-  private convertPlaceholders(query: string): string {
-    // Convert PostgreSQL-style placeholders ($1, $2, etc.) to SQLite-style (?, ?)
-    return query.replace(/\$(\d+)/g, '?');
-  }
-
-  private handleReturningClause(query: string, lastInsertRowid?: number | bigint): string | null {
-    // Simple handling for RETURNING * clause in SQLite
-    if (query.toUpperCase().includes('RETURNING *')) {
-      const match = query.match(/INSERT INTO\s+(\w+)/i);
-      if (match && lastInsertRowid) {
-        const tableName = match[1];
-        return `SELECT * FROM ${tableName} WHERE rowid = ${lastInsertRowid}`;
-      }
-    }
-    return null;
-  }
-
-  async transaction<T>(callback: (client?: PoolClient) => Promise<T>): Promise<T> {
-    if (this.dbConfig.type === 'sqlite') {
-      return this.sqliteTransaction(callback);
-    } else {
-      return this.postgresTransaction(callback);
-    }
-  }
-
-  private async sqliteTransaction<T>(callback: () => Promise<T>): Promise<T> {
-    if (!this.sqliteDb) {
-      throw new Error('SQLite database not initialized');
-    }
-
-    const transaction = this.sqliteDb.transaction(async () => {
-      try {
-        return await callback();
-      } catch (error) {
-        logError(error as Error, { component: 'database', action: 'sqliteTransaction' });
-        throw error;
-      }
-    });
-
-    return transaction();
+  async transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
+    return this.postgresTransaction(callback);
   }
 
   private async postgresTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -267,12 +130,14 @@ class DatabaseService {
     
     try {
       await client.query('BEGIN');
+      
       const result = await callback(client);
+      
       await client.query('COMMIT');
       return result;
     } catch (error) {
       await client.query('ROLLBACK');
-      logError(error as Error, { component: 'database', action: 'postgresTransaction' });
+      logError(error as Error, { component: 'database', action: 'transaction' });
       throw error;
     } finally {
       client.release();
@@ -446,37 +311,35 @@ export const db = new DatabaseService();
 
 // Database migration utilities
 export const createTables = async (): Promise<void> => {
-  const isSQLite = config.database.type === 'sqlite';
-  
   const queries = [
-    // Blocks table - with SQLite compatibility
+    // Blocks table
     `CREATE TABLE IF NOT EXISTS blocks (
-      number ${isSQLite ? 'INTEGER' : 'BIGINT'} PRIMARY KEY,
+      number BIGINT PRIMARY KEY,
       hash VARCHAR(66) UNIQUE NOT NULL,
       parent_hash VARCHAR(66),
       state_root VARCHAR(66),
-      timestamp ${isSQLite ? 'INTEGER' : 'BIGINT'} NOT NULL,
+      timestamp BIGINT NOT NULL,
       extrinsics_count INTEGER DEFAULT 0,
-      created_at ${isSQLite ? 'DATETIME DEFAULT CURRENT_TIMESTAMP' : 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'}
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
     // Indexes for blocks table
     'CREATE INDEX IF NOT EXISTS idx_blocks_timestamp ON blocks(timestamp)',
     'CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash)',
 
-    // Extrinsics table - with SQLite compatibility
+    // Extrinsics table
     `CREATE TABLE IF NOT EXISTS extrinsics (
-      id ${isSQLite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'SERIAL PRIMARY KEY'},
+      id SERIAL PRIMARY KEY,
       hash VARCHAR(66) UNIQUE NOT NULL,
-      block_number ${isSQLite ? 'INTEGER' : 'BIGINT'} ${isSQLite ? 'REFERENCES blocks(number)' : 'REFERENCES blocks(number)'},
+      block_number BIGINT REFERENCES blocks(number),
       extrinsic_index INTEGER,
       module VARCHAR(50),
       call VARCHAR(50),
       success BOOLEAN,
-      timestamp ${isSQLite ? 'INTEGER' : 'BIGINT'},
+      timestamp BIGINT,
       signer VARCHAR(48),
-      fee ${isSQLite ? 'INTEGER' : 'BIGINT'},
-      created_at ${isSQLite ? 'DATETIME DEFAULT CURRENT_TIMESTAMP' : 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'}
+      fee BIGINT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
     // Indexes for extrinsics table
@@ -488,9 +351,9 @@ export const createTables = async (): Promise<void> => {
     // Accounts table
     `CREATE TABLE IF NOT EXISTS accounts (
       address VARCHAR(48) PRIMARY KEY,
-      balance ${isSQLite ? 'INTEGER' : 'BIGINT'},
+      balance BIGINT,
       nonce INTEGER,
-      last_updated ${isSQLite ? 'DATETIME DEFAULT CURRENT_TIMESTAMP' : 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'}
+      last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
     // Indexes for accounts table
@@ -498,11 +361,11 @@ export const createTables = async (): Promise<void> => {
 
     // Watchlists table
     `CREATE TABLE IF NOT EXISTS watchlists (
-      id ${isSQLite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'SERIAL PRIMARY KEY'},
+      id SERIAL PRIMARY KEY,
       user_id VARCHAR(255),
       address VARCHAR(48),
       label VARCHAR(100),
-      created_at ${isSQLite ? 'DATETIME DEFAULT CURRENT_TIMESTAMP' : 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'}
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
     // Indexes for watchlists table
@@ -518,7 +381,7 @@ export const createTables = async (): Promise<void> => {
     }
   }
 
-  console.log(`Database: Tables created successfully (${config.database.type})`);
+  console.log('Database: Tables created successfully (PostgreSQL)');
 };
 
 export default db; 
