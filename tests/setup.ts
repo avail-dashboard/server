@@ -43,26 +43,114 @@ jest.mock('../src/utils/cache', () => ({
   }),
 }));
 
-// Mock blockchain service
-const mockBlockchainService = {
-  connectRPC: jest.fn().mockResolvedValue(undefined),
-  disconnectRPC: jest.fn().mockResolvedValue(undefined),
-  getLatestBlocks: jest.fn().mockResolvedValue({ blocks: [], total: 0 }),
-  getBlockByNumber: jest.fn().mockResolvedValue(null),
-  getBlockByHash: jest.fn().mockResolvedValue(null),
-  getLatestExtrinsics: jest.fn().mockResolvedValue({ extrinsics: [], total: 0 }),
-  getExtrinsicByHash: jest.fn().mockResolvedValue(null),
-  getExtrinsicsByBlock: jest.fn().mockResolvedValue([]),
-  getAccountDetails: jest.fn().mockResolvedValue(null),
-  getChainStats: jest.fn().mockResolvedValue({ blockHeight: BigInt(1000), blockTime: 12 }),
-  getHealth: jest.fn().mockResolvedValue({ rpc: true, subscan: true, subquery: true }),
-  getValidators: jest.fn().mockResolvedValue([]),
-};
+// Create comprehensive mock data generators
+const createMockBlock = (blockNumber: number) => ({
+  number: BigInt(blockNumber),
+  hash: `0x${blockNumber.toString(16).padStart(64, '0')}`,
+  parentHash: `0x${(blockNumber - 1).toString(16).padStart(64, '0')}`,
+  stateRoot: `0x${'a'.repeat(64)}`,
+  timestamp: BigInt(Date.now() - ((1000 - blockNumber) * 12000)),
+  extrinsicsCount: 3 + (blockNumber % 5),
+  extrinsicsRoot: `0x${'b'.repeat(64)}`,
+  authorId: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
+  size: 1024 + (blockNumber * 10),
+  weight: '1000000',
+  spec: 1000,
+  finalized: true,
+});
 
-jest.mock('../src/services/blockchain', () => ({
-  default: mockBlockchainService,
-  blockchainService: mockBlockchainService,
-}));
+const createMockExtrinsic = (index: number, blockNumber: bigint) => ({
+  id: index + 1,
+  hash: `0x${index.toString(16).padStart(64, '0')}`,
+  blockNumber,
+  extrinsicIndex: index,
+  module: ['system', 'balances', 'staking'][index % 3],
+  call: ['transfer', 'bond', 'nominate'][index % 3],
+  success: true,
+  timestamp: BigInt(Date.now() - (index * 1000)),
+  signer: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
+  fee: BigInt(1000000),
+  tip: BigInt(0),
+  signature: `0x${'c'.repeat(128)}`,
+  args: {},
+  events: [],
+  isSigned: true,
+  isUserTransaction: true,
+});
+
+// Mock blockchain service with proper implementations
+jest.mock('../src/services/blockchain', () => {
+  const mockService = {
+    getLatestBlocks: jest.fn().mockImplementation(async (query = {}) => {
+      const { limit = 20, page = 1 } = query;
+      const blocks: any[] = [];
+      
+      const startBlock = 1000 - ((page - 1) * limit);
+      for (let i = 0; i < Math.min(limit, 10); i++) {
+        blocks.push(createMockBlock(startBlock - i));
+      }
+      
+      return { blocks, total: 1000 };
+    }),
+    
+    getBlockByNumber: jest.fn().mockImplementation(async (number) => {
+      const blockNum = typeof number === 'bigint' ? Number(number) : number;
+      return createMockBlock(blockNum);
+    }),
+    
+    getBlockByHash: jest.fn().mockImplementation(async (hash) => {
+      const blockNum = parseInt(hash.slice(-8), 16) || 1000;
+      return createMockBlock(blockNum);
+    }),
+    
+    getLatestExtrinsics: jest.fn().mockImplementation(async (query = {}) => {
+      const { limit = 20 } = query;
+      const extrinsics: any[] = [];
+      
+      for (let i = 0; i < Math.min(limit, 10); i++) {
+        const blockNumber = BigInt(1000 - Math.floor(i / 3));
+        extrinsics.push(createMockExtrinsic(i, blockNumber));
+      }
+      
+      return { extrinsics, total: 100 };
+    }),
+    
+    getExtrinsicByHash: jest.fn().mockImplementation(async (_hash) => {
+      return createMockExtrinsic(0, BigInt(1000));
+    }),
+    
+    getExtrinsicsByBlock: jest.fn().mockImplementation(async (blockNumber) => {
+      const extrinsics: any[] = [];
+      for (let i = 0; i < 3; i++) {
+        extrinsics.push(createMockExtrinsic(i, typeof blockNumber === 'bigint' ? blockNumber : BigInt(blockNumber)));
+      }
+      return extrinsics;
+    }),
+    
+    getAccountDetails: jest.fn().mockResolvedValue(null),
+    
+    getChainStats: jest.fn().mockResolvedValue({
+      blockHeight: BigInt(1000),
+      blockTime: 12,
+      totalIssuance: BigInt('1000000000000000000'),
+      activeValidators: 100,
+      nominators: 500,
+      minimumStake: BigInt('1000000000000'),
+      averageStake: BigInt('5000000000000'),
+      inflation: 7.5,
+      stakingRatio: 0.6,
+      lastUpdateTime: BigInt(Date.now()),
+    }),
+    
+    getHealth: jest.fn().mockResolvedValue({ rpc: true, details: { connected: true } }),
+    getValidators: jest.fn().mockResolvedValue([]),
+  };
+
+  return {
+    __esModule: true,
+    default: mockService,
+  };
+});
 
 // Increase timeout for async operations
 jest.setTimeout(30000);
@@ -105,6 +193,7 @@ global.testUtils = {
 
 // Declare global types for TypeScript
 declare global {
+  // eslint-disable-next-line no-var
   var testUtils: {
     createMockBlock: (overrides?: any) => any;
     createMockExtrinsic: (overrides?: any) => any;
