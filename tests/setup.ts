@@ -5,8 +5,8 @@ dotenv.config({ path: '.env.test' });
 
 // Set test environment
 process.env.NODE_ENV = 'test';
-process.env.DATABASE_TYPE = 'sqlite';
-process.env.SQLITE_PATH = ':memory:';
+process.env.DATABASE_TYPE = 'postgresql';
+process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
 process.env.ENABLE_CACHING = 'false';
 process.env.ENABLE_WEBSOCKETS = 'false';
 process.env.ENABLE_RATE_LIMITING = 'false';
