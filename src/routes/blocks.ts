@@ -7,7 +7,7 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/v1/blocks - Get latest blocks
+// GET /api/blocks - Get latest blocks
 router.get('/', 
   pagination, 
   cacheMiddleware(config.cache.ttl.blocks),
@@ -67,7 +67,7 @@ router.get('/',
   },
 );
 
-// GET /api/v1/blocks/:numberOrHash - Get specific block
+// GET /api/blocks/:numberOrHash - Get specific block
 router.get('/:numberOrHash', 
   cacheMiddleware(config.cache.ttl.blockByNumber),
   async (req: Request, res: Response) => {

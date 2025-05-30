@@ -6,7 +6,7 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/v1/extrinsics - Get extrinsics
+// GET /api/extrinsics - Get extrinsics
 router.get('/', 
   pagination,
   async (req: Request, res: Response) => {
@@ -77,7 +77,7 @@ router.get('/',
   },
 );
 
-// GET /api/v1/extrinsics/:hash - Get specific extrinsic
+// GET /api/extrinsics/:hash - Get specific extrinsic
 router.get('/:hash', 
   async (req: Request, res: Response) => {
     try {

@@ -154,7 +154,7 @@ useEffect(() => {
 ### **Development (.env.local)**
 ```bash
 # Backend server (optional)
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api/v1
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api
 NEXT_PUBLIC_WS_URL=ws://localhost:3001
 
 # Environment
@@ -164,7 +164,7 @@ NEXT_PUBLIC_NODE_ENV=development
 ### **Production (.env.production)**
 ```bash
 # Backend server (production)
-NEXT_PUBLIC_API_BASE_URL=https://api.avail-explorer.com/api/v1
+NEXT_PUBLIC_API_BASE_URL=https://api.avail-explorer.com/api
 NEXT_PUBLIC_WS_URL=wss://api.avail-explorer.com
 
 # External API keys (server-side only)
@@ -250,8 +250,8 @@ setTimeout(() => retry(), retryDelay)
 ```typescript
 // Development mode automatically logs all API requests
 // Look for these in browser console:
-🚀 API Request: GET /api/v1/blocks
-✅ API Response: 200 /api/v1/blocks
+🚀 API Request: GET /api/blocks
+✅ API Response: 200 /api/blocks
 ⚠️ Fallback API used for: /api/blocks
 ```
 
@@ -266,44 +266,8 @@ setTimeout(() => retry(), retryDelay)
 ### **Backend Health Check**
 ```bash
 # Manual health check
-curl http://localhost:3001/api/v1/health
+curl http://localhost:3001/api/health
 
 # Expected response
 {"success": true, "data": {"status": "online", "timestamp": "..."}}
 ```
-
-## 🎯 Best Practices
-
-### **1. CORS Safety**
-- ✅ All external API calls must be server-side
-- ✅ Use Next.js API routes for fallback
-- ❌ Never call external APIs directly from frontend
-
-### **2. Error Boundaries**
-```typescript
-// Wrap API calls in error boundaries
-<ErrorBoundary fallback={<ErrorComponent />}>
-  <DataComponent />
-</ErrorBoundary>
-```
-
-### **3. Loading States**
-```typescript
-// Always show loading states
-const { data, loading, error } = useAPIRequest(availAPI.getBlocks)
-
-if (loading) return <Spinner />
-if (error) return <ErrorMessage error={error} />
-return <BlocksList blocks={data} />
-```
-
-### **4. Caching Strategy**
-```typescript
-// Cache API responses appropriately
-const { data } = useSWR('/api/blocks', fetcher, {
-  refreshInterval: 10000, // 10 seconds
-  revalidateOnFocus: false
-})
-```
-
-This architecture ensures zero CORS issues while providing robust fallback capabilities and optimal user experience! 🚀 

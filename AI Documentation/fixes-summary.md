@@ -3,7 +3,7 @@
 ## Issues Fixed
 
 ### 1. Extrinsics API Failing
-**Problem**: The `/api/v1/extrinsics` endpoint was working but returning incomplete data.
+**Problem**: The `/api/extrinsics` endpoint was working but returning incomplete data.
 
 **Root Causes**:
 - Missing `isSigned` and `isUserTransaction` fields in API response

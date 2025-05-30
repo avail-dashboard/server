@@ -7,7 +7,7 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/v1/rollups - Get rollups/app-spaces list
+// GET /api/rollups - Get rollups/app-spaces list
 router.get('/',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -80,7 +80,7 @@ router.get('/',
   },
 );
 
-// GET /api/v1/rollups/:appId - Get specific rollup details
+// GET /api/rollups/:appId - Get specific rollup details
 router.get('/:appId',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -142,7 +142,7 @@ router.get('/:appId',
   },
 );
 
-// GET /api/v1/rollups/:appId/submissions - Get submissions for a specific rollup
+// GET /api/rollups/:appId/submissions - Get submissions for a specific rollup
 router.get('/:appId/submissions',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -205,7 +205,7 @@ router.get('/:appId/submissions',
   },
 );
 
-// GET /api/v1/rollups/:appId/blobs - Get blobs for a specific rollup
+// GET /api/rollups/:appId/blobs - Get blobs for a specific rollup
 router.get('/:appId/blobs',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -266,7 +266,7 @@ router.get('/:appId/blobs',
   },
 );
 
-// GET /api/v1/rollups/:appId/analytics - Get analytics for a specific rollup
+// GET /api/rollups/:appId/analytics - Get analytics for a specific rollup
 router.get('/:appId/analytics',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -329,7 +329,7 @@ router.get('/:appId/analytics',
   },
 );
 
-// GET /api/v1/rollups/leaderboard - Get rollup leaderboard
+// GET /api/rollups/leaderboard - Get rollup leaderboard
 router.get('/leaderboard',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {

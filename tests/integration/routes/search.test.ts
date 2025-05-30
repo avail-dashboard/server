@@ -12,10 +12,10 @@ describe('Search API Routes', () => {
     await testApp.stop();
   });
 
-  describe('GET /api/v1/search', () => {
+  describe('GET /api/search', () => {
     it('should return search results for block number', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/search?q=1000')
+        .get('/api/search?q=1000')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -26,7 +26,7 @@ describe('Search API Routes', () => {
     it('should return search results for hash', async () => {
       const hash = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
       const response = await request(testApp.getApp())
-        .get(`/api/v1/search?q=${hash}`)
+        .get(`/api/search?q=${hash}`)
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -36,7 +36,7 @@ describe('Search API Routes', () => {
     it('should return search results for account address', async () => {
       const address = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY';
       const response = await request(testApp.getApp())
-        .get(`/api/v1/search?q=${address}`)
+        .get(`/api/search?q=${address}`)
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -45,7 +45,7 @@ describe('Search API Routes', () => {
 
     it('should handle empty search query', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/search?q=')
+        .get('/api/search?q=')
         .expect(400);
 
       expect(response.body).toHaveProperty('success', false);
@@ -54,7 +54,7 @@ describe('Search API Routes', () => {
 
     it('should handle missing search query', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/search')
+        .get('/api/search')
         .expect(400);
 
       expect(response.body).toHaveProperty('success', false);
@@ -63,7 +63,7 @@ describe('Search API Routes', () => {
 
     it('should respect search type filter', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/search?q=1000&type=block')
+        .get('/api/search?q=1000&type=block')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -72,7 +72,7 @@ describe('Search API Routes', () => {
 
     it('should respect limit parameter', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/search?q=test&limit=5')
+        .get('/api/search?q=test&limit=5')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -87,7 +87,7 @@ describe('Search API Routes', () => {
   describe('Search result structure', () => {
     it('should return properly structured search results', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/search?q=1000')
+        .get('/api/search?q=1000')
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -106,7 +106,7 @@ describe('Search API Routes', () => {
   describe('Error handling', () => {
     it('should handle invalid search type gracefully', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/search?q=test&type=invalid')
+        .get('/api/search?q=test&type=invalid')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -115,7 +115,7 @@ describe('Search API Routes', () => {
 
     it('should handle invalid limit parameter', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/search?q=test&limit=invalid')
+        .get('/api/search?q=test&limit=invalid')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);

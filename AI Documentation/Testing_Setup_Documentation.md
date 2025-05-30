@@ -77,14 +77,14 @@ tests/
 ### 2. Integration Tests (`tests/integration/`)
 
 #### API Route Tests
-- **Blocks API**: Tests `/api/v1/blocks` endpoints
+- **Blocks API**: Tests `/api/blocks` endpoints
   - Latest blocks with pagination
   - Specific block by number/hash
   - Error handling
-- **Chain API**: Tests `/api/v1/chain` endpoints
+- **Chain API**: Tests `/api/chain` endpoints
   - Chain statistics
   - Chain information
-- **Search API**: Tests `/api/v1/search` endpoints
+- **Search API**: Tests `/api/search` endpoints
   - Search by block number, hash, address
   - Search filters and limits
   - Error handling

@@ -7,7 +7,7 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/v1/validators - Get validators list
+// GET /api/validators - Get validators list
 router.get('/', 
   cacheMiddleware(config.cache.ttl.validators),
   async (req: Request, res: Response) => {
@@ -54,7 +54,7 @@ router.get('/',
   },
 );
 
-// GET /api/v1/validators/:address - Get specific validator details
+// GET /api/validators/:address - Get specific validator details
 router.get('/:address',
   cacheMiddleware(config.cache.ttl.validators),
   async (req: Request, res: Response) => {
@@ -118,7 +118,7 @@ router.get('/:address',
   },
 );
 
-// GET /api/v1/validators/staking/overview - Get staking overview
+// GET /api/validators/staking/overview - Get staking overview
 router.get('/staking/overview',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -176,7 +176,7 @@ router.get('/staking/overview',
   },
 );
 
-// GET /api/v1/validators/nomination-pools - Get nomination pools (placeholder)
+// GET /api/validators/nomination-pools - Get nomination pools (placeholder)
 router.get('/nomination-pools',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {

@@ -5,7 +5,7 @@ import { searchRateLimit } from '../middleware';
 
 const router = Router();
 
-// GET /api/v1/search - Universal search
+// GET /api/search - Universal search
 router.get('/', 
   searchRateLimit,
   async (req: Request, res: Response) => {

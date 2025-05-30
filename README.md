@@ -112,11 +112,11 @@ ENABLE_RATE_LIMITING=true
 The server provides these main endpoints:
 
 ### Core Data
-- `GET /api/v1/blocks` - Latest blocks with pagination
-- `GET /api/v1/blocks/:numberOrHash` - Specific block details
-- `GET /api/v1/chain/stats` - Chain statistics
-- `GET /api/v1/extrinsics` - Extrinsics with filtering
-- `GET /api/v1/search` - Search functionality
+- `GET /api/blocks` - Latest blocks with pagination
+- `GET /api/blocks/:numberOrHash` - Specific block details
+- `GET /api/chain/stats` - Chain statistics
+- `GET /api/extrinsics` - Extrinsics with filtering
+- `GET /api/search` - Search functionality
 
 ### System
 - `GET /health` - Server health check
@@ -147,10 +147,10 @@ sqlite3 ./data/avail_explorer.db
 curl http://localhost:3001/health
 
 # Get latest blocks
-curl http://localhost:3001/api/v1/blocks
+curl http://localhost:3001/api/blocks
 
 # Chain statistics
-curl http://localhost:3001/api/v1/chain/stats
+curl http://localhost:3001/api/chain/stats
 ```
 
 ## Production Deployment

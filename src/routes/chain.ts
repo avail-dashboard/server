@@ -7,7 +7,7 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/v1/chain/stats - Get chain statistics
+// GET /api/chain/stats - Get chain statistics
 router.get('/stats', 
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {

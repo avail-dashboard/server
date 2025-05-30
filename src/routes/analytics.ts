@@ -7,7 +7,7 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/v1/analytics/network - Get network analytics overview
+// GET /api/analytics/network - Get network analytics overview
 router.get('/network',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -65,7 +65,7 @@ router.get('/network',
   },
 );
 
-// GET /api/v1/analytics/gas - Get gas price tracking and fee analytics
+// GET /api/analytics/gas - Get gas price tracking and fee analytics
 router.get('/gas',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -123,7 +123,7 @@ router.get('/gas',
   },
 );
 
-// GET /api/v1/analytics/rollups - Get rollup/app-space analytics
+// GET /api/analytics/rollups - Get rollup/app-space analytics
 router.get('/rollups',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -169,7 +169,7 @@ router.get('/rollups',
   },
 );
 
-// GET /api/v1/analytics/rollups/:appId - Get specific rollup analytics
+// GET /api/analytics/rollups/:appId - Get specific rollup analytics
 router.get('/rollups/:appId',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -238,7 +238,7 @@ router.get('/rollups/:appId',
   },
 );
 
-// GET /api/v1/analytics/data-throughput - Get data throughput analytics
+// GET /api/analytics/data-throughput - Get data throughput analytics
 router.get('/data-throughput',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -293,7 +293,7 @@ router.get('/data-throughput',
   },
 );
 
-// GET /api/v1/analytics/validators - Get validator and staking analytics
+// GET /api/analytics/validators - Get validator and staking analytics
 router.get('/validators',
   cacheMiddleware(config.cache.ttl.validators),
   async (req: Request, res: Response) => {

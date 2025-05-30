@@ -12,10 +12,10 @@ describe('Chain API Routes', () => {
     await testApp.stop();
   });
 
-  describe('GET /api/v1/chain/stats', () => {
+  describe('GET /api/chain/stats', () => {
     it('should return chain statistics', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/chain/stats')
+        .get('/api/chain/stats')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -25,7 +25,7 @@ describe('Chain API Routes', () => {
 
     it('should return stats with proper structure', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/chain/stats')
+        .get('/api/chain/stats')
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -38,10 +38,10 @@ describe('Chain API Routes', () => {
     });
   });
 
-  describe('GET /api/v1/chain/info', () => {
+  describe('GET /api/chain/info', () => {
     it('should return 404 for non-existent chain info endpoint', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/chain/info')
+        .get('/api/chain/info')
         .expect(404);
 
       expect(response.body).toHaveProperty('success', false);
@@ -52,7 +52,7 @@ describe('Chain API Routes', () => {
   describe('Error handling', () => {
     it('should handle invalid routes gracefully', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/chain/nonexistent')
+        .get('/api/chain/nonexistent')
         .expect(404);
 
       expect(response.body).toHaveProperty('success', false);

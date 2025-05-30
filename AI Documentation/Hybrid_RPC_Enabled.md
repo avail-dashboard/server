@@ -39,8 +39,8 @@ Added the following methods to make it compatible with the blockchain service:
 - **Server Running**: Successfully started on port 3001
 - **API Endpoints**: All endpoints responding correctly
 - **Health Check**: `GET /health` returns healthy status
-- **Chain Stats**: `GET /api/v1/chain/stats` working
-- **Blocks API**: `GET /api/v1/blocks` working with hybrid routing
+- **Chain Stats**: `GET /api/chain/stats` working
+- **Blocks API**: `GET /api/blocks` working with hybrid routing
 
 ### 🔧 Detected Capabilities
 ```json
