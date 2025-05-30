@@ -19,6 +19,13 @@ const configSchema = Joi.object({
 
   // Blockchain Data Sources
   AVAIL_RPC_ENDPOINT: Joi.string().default('wss://mainnet-rpc.avail.so/ws'),
+  
+  // NEW: Additional Avail API Endpoints
+  AVAIL_LIGHT_CLIENT_HTTP: Joi.string(),
+  AVAIL_LIGHT_CLIENT_WS: Joi.string(),
+  AVAIL_BRIDGE_API: Joi.string(),
+  AVAIL_NEXUS_API: Joi.string(),
+  AVAIL_TURBO_DA_API: Joi.string(),
 
   // External APIs
   COINGECKO_API_KEY: Joi.string(),
@@ -103,6 +110,24 @@ export const config = {
       retryDelay: 5000,
       maxRetryDelay: 30000,
       connectionPoolSize: 5,
+    },
+    
+    // NEW: Additional Avail APIs
+    lightClient: {
+      httpEndpoint: env.AVAIL_LIGHT_CLIENT_HTTP || 'https://light-client.avail.so',
+      wsEndpoint: env.AVAIL_LIGHT_CLIENT_WS || 'wss://light-client.avail.so',
+    },
+    
+    bridge: {
+      endpoint: env.AVAIL_BRIDGE_API || 'https://bridge-api.avail.so',
+    },
+    
+    nexus: {
+      endpoint: env.AVAIL_NEXUS_API || 'https://nexus-api.avail.so',
+    },
+    
+    turboDA: {
+      endpoint: env.AVAIL_TURBO_DA_API || 'https://turbo-da.avail.so',
     },
   },
 
