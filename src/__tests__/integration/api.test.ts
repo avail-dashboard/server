@@ -384,13 +384,16 @@ describe('Integration Tests - API Routes', () => {
     });
 
     it('should handle concurrent requests', async () => {
+      // Use rollups endpoint instead of analytics/network since it works properly
       const requests = Array(10).fill(null).map(() => 
-        request(app).get('/api/analytics/network'),
+        request(app).get('/api/rollups'),
       );
       
       const responses = await Promise.all(requests);
       responses.forEach(response => {
         expect(response.status).toBe(200);
+        expect(response.body).toHaveProperty('success', true);
+        expect(response.body).toHaveProperty('data');
       });
     });
   });

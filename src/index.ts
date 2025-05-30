@@ -68,8 +68,36 @@ class AvailExplorerServer {
     this.app.use(requestTimer);
     this.app.use(responseLogger);
 
-    // Body parsing middleware
-    this.app.use(express.json({ limit: '10mb' }));
+    // Body parsing middleware with error handling
+    this.app.use(express.json({ 
+      limit: '10mb',
+      verify: (req, res, buf, _encoding) => {
+        // Store raw body for potential debugging
+        (req as any).rawBody = buf;
+      },
+    }));
+    
+    // JSON parsing error handler
+    this.app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (err instanceof SyntaxError && (err as any).status === 400 && 'body' in err) {
+        logger.warn('JSON parsing error', {
+          url: req.url,
+          method: req.method,
+          ip: req.ip,
+          error: err.message,
+        });
+        
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_JSON',
+            message: 'Invalid JSON in request body',
+          },
+        });
+      }
+      next(err);
+    });
+    
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
     // Rate limiting
