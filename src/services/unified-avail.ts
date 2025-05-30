@@ -7,11 +7,8 @@ import { TurboDAService } from './turbo-da';
 import { logError, rpcLogger } from '../utils/logger';
 import {
   Block,
-  Extrinsic,
   Account,
-  ChainStats,
   BlocksQuery,
-  ExtrinsicsQuery,
 } from '../types';
 
 export interface UnifiedHealthStatus {
@@ -134,7 +131,7 @@ export class UnifiedAvailService extends EventEmitter {
             break;
             
           case 'rpc':
-            if (this.rpc.isInitialized) {
+            if (this.rpc.isReady()) {
               return await this.rpc.getLatestBlocks(query);
             }
             break;
@@ -172,8 +169,11 @@ export class UnifiedAvailService extends EventEmitter {
             break;
             
           case 'rpc':
-            if (this.rpc.isInitialized) {
-              return await this.rpc.getBlockByNumber(blockNumber);
+            if (this.rpc.isReady()) {
+              const block = await this.rpc.getBlockByNumber(BigInt(blockNumber));
+              if (block) {
+                return block;
+              }
             }
             break;
         }
@@ -227,8 +227,11 @@ export class UnifiedAvailService extends EventEmitter {
             break;
             
           case 'rpc':
-            if (this.rpc.isInitialized) {
-              return await this.rpc.getAccountDetails(address);
+            if (this.rpc.isReady()) {
+              const account = await this.rpc.getAccountDetails(address);
+              if (account) {
+                return account;
+              }
             }
             break;
         }
@@ -300,7 +303,7 @@ export class UnifiedAvailService extends EventEmitter {
     }
     
     // Fallback to searching through recent blocks via RPC
-    if (this.rpc.isInitialized) {
+    if (this.rpc.isReady()) {
       // Implementation would search recent blocks for the transaction
       // This is a simplified version
       throw new Error('Transaction status lookup via RPC not implemented yet');
@@ -315,41 +318,40 @@ export class UnifiedAvailService extends EventEmitter {
 
   private transformLightClientBlock(blockData: any): Block {
     return {
-      number: parseInt(blockData.block.header.number, 16),
+      number: BigInt(parseInt(blockData.block.header.number, 16)),
       hash: blockData.block.header.parent_hash, // This needs proper hash calculation
       parentHash: blockData.block.header.parent_hash,
       stateRoot: blockData.block.header.state_root,
       extrinsicsRoot: blockData.block.header.extrinsics_root,
-      timestamp: new Date(),
+      timestamp: BigInt(Date.now()), // This should be extracted from block
       extrinsicsCount: blockData.block.extrinsics.length,
-      // Add other required Block properties
-    } as Block;
+    };
   }
 
   private transformNexusBlock(blockData: any): Block {
     return {
-      number: blockData.number,
+      number: BigInt(blockData.number),
       hash: blockData.hash,
       parentHash: blockData.parentHash,
       stateRoot: blockData.stateRoot,
       extrinsicsRoot: blockData.extrinsicsRoot,
-      timestamp: new Date(blockData.timestamp),
+      timestamp: BigInt(new Date(blockData.timestamp).getTime()),
       extrinsicsCount: blockData.extrinsics.length,
-      // Add other required Block properties
-    } as Block;
+    };
   }
 
   private transformNexusAccount(accountState: any): Account {
     return {
       address: accountState.account,
-      balance: {
-        free: accountState.balance.free,
-        reserved: accountState.balance.reserved,
-        frozen: accountState.balance.miscFrozen,
-      },
+      balance: BigInt(accountState.balance.free || 0),
       nonce: accountState.nonce,
-      // Add other required Account properties
-    } as Account;
+      accountInfo: {
+        free: BigInt(accountState.balance.free || 0),
+        reserved: BigInt(accountState.balance.reserved || 0),
+        frozen: BigInt(accountState.balance.miscFrozen || 0),
+        flags: BigInt(0),
+      },
+    };
   }
 
   async getHealthStatus(): Promise<UnifiedHealthStatus> {

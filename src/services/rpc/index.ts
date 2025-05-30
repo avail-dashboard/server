@@ -312,6 +312,10 @@ export class AvailRPCService extends EventEmitter {
   // UTILITY METHODS
   // ===========================================
 
+  public isReady(): boolean {
+    return this.isInitialized;
+  }
+
   private ensureInitialized(): void {
     if (!this.isInitialized) {
       throw new Error('RPC service not initialized. Call initialize() first.');

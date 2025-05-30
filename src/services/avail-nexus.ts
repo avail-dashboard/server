@@ -76,15 +76,19 @@ export interface BlockRange {
 export class AvailNexusService extends EventEmitter {
   private httpClient: AxiosInstance;
   private isInitialized = false;
+  private baseURL: string;
+  private timeout: number;
 
   constructor() {
     super();
     
     const nexusConfig = config.dataSources.nexus;
+    this.baseURL = nexusConfig.apiEndpoint;
+    this.timeout = nexusConfig.timeout;
     
     this.httpClient = axios.create({
-      baseURL: nexusConfig.endpoint,
-      timeout: 30000,
+      baseURL: this.baseURL,
+      timeout: this.timeout,
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Avail-Explorer/1.0.0',
