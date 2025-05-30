@@ -12,6 +12,9 @@ graph TB
         AVAIL[Avail Blockchain Network<br/>WebSocket RPC]
         SUBSCAN[Subscan API<br/>External Data Source]
         COINGECKO[CoinGecko API<br/>Price Data]
+        TURBO_DA[Turbo DA API<br/>Data Availability]
+        NEXUS[Avail Nexus API<br/>Rollup Data]
+        BRIDGE[Avail Bridge API<br/>Cross-chain Data]
     end
 
     %% Client Layer
@@ -22,14 +25,16 @@ graph TB
     end
 
     %% Load Balancer / Reverse Proxy
-    LB[Load Balancer<br/>Nginx/Cloudflare]
+    subgraph "Load Balancer / Reverse Proxy"
+        NGINX[Nginx<br/>Domain Routing<br/>• api.avail.naxatar.com<br/>• pg.avail.naxatar.com<br/>• redis.avail.naxatar.com]
+    end
 
     %% Main Application
     subgraph "Avail Explorer Backend"
         subgraph "API Layer"
             EXPRESS[Express.js Server<br/>Port 3001]
-            WEBSOCKET[WebSocket Server<br/>Socket.io]
-            MIDDLEWARE[Middleware Layer<br/>• CORS<br/>• Rate Limiting<br/>• Security Headers<br/>• Compression]
+            WEBSOCKET_SERVER[WebSocket Server<br/>Socket.io]
+            MIDDLEWARE[Middleware Layer<br/>• CORS<br/>• Rate Limiting<br/>• Security Headers<br/>• Compression<br/>• JWT Auth]
         end
 
         subgraph "Route Handlers"
@@ -38,10 +43,27 @@ graph TB
             EXTRINSICS_ROUTE[Extrinsics Routes<br/>/api/v1/extrinsics]
             SEARCH_ROUTE[Search Routes<br/>/api/v1/search]
             ACCOUNTS_ROUTE[Accounts Routes<br/>/api/v1/accounts]
+            VALIDATORS_ROUTE[Validators Routes<br/>/api/v1/validators]
+            ANALYTICS_ROUTE[Analytics Routes<br/>/api/v1/analytics]
+            ROLLUPS_ROUTE[Rollups Routes<br/>/api/v1/rollups]
+            DATA_SUB_ROUTE[Data Submissions Routes<br/>/api/v1/data-submissions]
         end
 
         subgraph "Service Layer"
+            UNIFIED_AVAIL[Unified Avail Service<br/>• Multi-source Integration<br/>• Unified Data API<br/>• Service Orchestration]
             BLOCKCHAIN_SERVICE[Blockchain Service<br/>• Polkadot API Integration<br/>• Real-time Data Fetching<br/>• Block Processing]
+            HYBRID_RPC[Hybrid RPC Service<br/>• Multi-provider Support<br/>• Failover Logic<br/>• Load Balancing]
+            ANALYTICS_SERVICE[Analytics Service<br/>• Performance Metrics<br/>• Usage Statistics<br/>• Historical Data]
+            WEBSOCKET_SERVICE[WebSocket Service<br/>• Real-time Events<br/>• Client Management<br/>• Event Broadcasting]
+            JOBS_SERVICE[Jobs Service<br/>• Background Processing<br/>• Scheduled Tasks<br/>• Queue Management]
+            
+            subgraph "Specialized Services"
+                TURBO_DA_SERVICE[Turbo DA Service<br/>• DA Layer Integration<br/>• Data Retrieval]
+                NEXUS_SERVICE[Avail Nexus Service<br/>• Rollup Management<br/>• Cross-rollup Data]
+                LIGHT_CLIENT[Avail Light Client<br/>• Light Node Integration<br/>• Minimal Sync]
+                BRIDGE_SERVICE[Avail Bridge Service<br/>• Cross-chain Bridge<br/>• Transfer Tracking]
+            end
+
             DATA_SERVICE[Data Service<br/>• Database Operations<br/>• Caching Logic<br/>• Data Validation]
         end
 
@@ -57,23 +79,24 @@ graph TB
         end
 
         subgraph "Production"
-            POSTGRES[(PostgreSQL<br/>Production Database<br/>• High Performance<br/>• Concurrent Access<br/>• ACID Compliance)]
-            REDIS[(Redis Cache<br/>• Session Storage<br/>• API Caching<br/>• Real-time Data)]
+            POSTGRES[(PostgreSQL 15<br/>Production Database<br/>• High Performance<br/>• Concurrent Access<br/>• ACID Compliance)]
+            REDIS_CACHE[(Redis 7<br/>Cache & Sessions<br/>• IORedis Client<br/>• Session Storage<br/>• API Caching<br/>• Real-time Data)]
+            BULL_QUEUE[Bull Queue<br/>• Job Processing<br/>• Background Tasks<br/>• Redis-backed]
         end
     end
 
     %% Monitoring & Logging
     subgraph "Observability"
         LOGS[Winston Logger<br/>• Daily Rotate Files<br/>• Multiple Log Levels<br/>• Structured Logging]
-        METRICS[Prometheus Metrics<br/>• Performance Monitoring<br/>• Health Checks]
+        METRICS[Prometheus Metrics<br/>• prom-client<br/>• Performance Monitoring<br/>• Health Checks]
         HEALTH[Health Endpoints<br/>/health<br/>/metrics]
     end
 
     %% Data Flow Connections
-    WEB --> LB
-    MOBILE --> LB
-    API_CLIENTS --> LB
-    LB --> EXPRESS
+    WEB --> NGINX
+    MOBILE --> NGINX
+    API_CLIENTS --> NGINX
+    NGINX --> EXPRESS
 
     EXPRESS --> MIDDLEWARE
     MIDDLEWARE --> BLOCKS_ROUTE
@@ -81,29 +104,54 @@ graph TB
     MIDDLEWARE --> EXTRINSICS_ROUTE
     MIDDLEWARE --> SEARCH_ROUTE
     MIDDLEWARE --> ACCOUNTS_ROUTE
+    MIDDLEWARE --> VALIDATORS_ROUTE
+    MIDDLEWARE --> ANALYTICS_ROUTE
+    MIDDLEWARE --> ROLLUPS_ROUTE
+    MIDDLEWARE --> DATA_SUB_ROUTE
 
-    BLOCKS_ROUTE --> BLOCKCHAIN_SERVICE
+    BLOCKS_ROUTE --> UNIFIED_AVAIL
     CHAIN_ROUTE --> BLOCKCHAIN_SERVICE
-    EXTRINSICS_ROUTE --> BLOCKCHAIN_SERVICE
+    EXTRINSICS_ROUTE --> HYBRID_RPC
     SEARCH_ROUTE --> DATA_SERVICE
     ACCOUNTS_ROUTE --> DATA_SERVICE
+    VALIDATORS_ROUTE --> BLOCKCHAIN_SERVICE
+    ANALYTICS_ROUTE --> ANALYTICS_SERVICE
+    ROLLUPS_ROUTE --> NEXUS_SERVICE
+    DATA_SUB_ROUTE --> TURBO_DA_SERVICE
+
+    UNIFIED_AVAIL --> BLOCKCHAIN_SERVICE
+    UNIFIED_AVAIL --> HYBRID_RPC
+    UNIFIED_AVAIL --> TURBO_DA_SERVICE
+    UNIFIED_AVAIL --> NEXUS_SERVICE
+    UNIFIED_AVAIL --> LIGHT_CLIENT
+    UNIFIED_AVAIL --> BRIDGE_SERVICE
 
     BLOCKCHAIN_SERVICE --> AVAIL
-    BLOCKCHAIN_SERVICE --> SUBSCAN
-    DATA_SERVICE --> COINGECKO
+    HYBRID_RPC --> AVAIL
+    HYBRID_RPC --> SUBSCAN
+    TURBO_DA_SERVICE --> TURBO_DA
+    NEXUS_SERVICE --> NEXUS
+    BRIDGE_SERVICE --> BRIDGE
+    ANALYTICS_SERVICE --> COINGECKO
+
+    WEBSOCKET_SERVICE --> WEBSOCKET_SERVER
+    JOBS_SERVICE --> BULL_QUEUE
 
     BLOCKCHAIN_SERVICE --> DATA_SERVICE
+    ANALYTICS_SERVICE --> DATA_SERVICE
     DATA_SERVICE --> SQLITE_STORE
     SQLITE_STORE --> SQLITE_DB
 
     %% Production connections
     DATA_SERVICE -.-> POSTGRES
-    DATA_SERVICE -.-> REDIS
+    DATA_SERVICE -.-> REDIS_CACHE
+    JOBS_SERVICE -.-> BULL_QUEUE
 
     %% WebSocket connections
-    EXPRESS --> WEBSOCKET
-    WEBSOCKET -.-> WEB
-    WEBSOCKET -.-> MOBILE
+    EXPRESS --> WEBSOCKET_SERVER
+    WEBSOCKET_SERVER -.-> WEB
+    WEBSOCKET_SERVER -.-> MOBILE
+    WEBSOCKET_SERVICE --> WEBSOCKET_SERVER
 
     %% Monitoring connections
     EXPRESS --> LOGS
@@ -113,18 +161,22 @@ graph TB
     %% Styling
     classDef external fill:#e1f5fe
     classDef client fill:#f3e5f5
+    classDef proxy fill:#e8f5e8
     classDef api fill:#e8f5e8
     classDef service fill:#fff3e0
+    classDef specialized fill:#f3e5f5
     classDef data fill:#fce4ec
     classDef infra fill:#f1f8e9
     classDef monitoring fill:#fff8e1
 
-    class AVAIL,SUBSCAN,COINGECKO external
+    class AVAIL,SUBSCAN,COINGECKO,TURBO_DA,NEXUS,BRIDGE external
     class WEB,MOBILE,API_CLIENTS client
-    class EXPRESS,WEBSOCKET,MIDDLEWARE,BLOCKS_ROUTE,CHAIN_ROUTE,EXTRINSICS_ROUTE,SEARCH_ROUTE,ACCOUNTS_ROUTE api
-    class BLOCKCHAIN_SERVICE,DATA_SERVICE service
+    class NGINX proxy
+    class EXPRESS,WEBSOCKET_SERVER,MIDDLEWARE,BLOCKS_ROUTE,CHAIN_ROUTE,EXTRINSICS_ROUTE,SEARCH_ROUTE,ACCOUNTS_ROUTE,VALIDATORS_ROUTE,ANALYTICS_ROUTE,ROLLUPS_ROUTE,DATA_SUB_ROUTE api
+    class UNIFIED_AVAIL,BLOCKCHAIN_SERVICE,HYBRID_RPC,ANALYTICS_SERVICE,WEBSOCKET_SERVICE,JOBS_SERVICE,DATA_SERVICE service
+    class TURBO_DA_SERVICE,NEXUS_SERVICE,LIGHT_CLIENT,BRIDGE_SERVICE specialized
     class SQLITE_STORE data
-    class SQLITE_DB,POSTGRES,REDIS infra
+    class SQLITE_DB,POSTGRES,REDIS_CACHE,BULL_QUEUE infra
     class LOGS,METRICS,HEALTH monitoring
 ```
 
@@ -133,17 +185,23 @@ graph TB
 ```mermaid
 graph TB
     subgraph "Development Environment"
-        DEV_APP[Node.js Application<br/>npm run dev]
+        DEV_APP[Node.js Application<br/>tsx watch src/index.ts]
         DEV_DB[(SQLite Database<br/>./data/avail_explorer.db)]
         DEV_APP --> DEV_DB
     end
 
     subgraph "Production Environment"
+        subgraph "Domain Configuration"
+            DOMAIN_API[api.avail.naxatar.com<br/>Port 80/443]
+            DOMAIN_PG[pg.avail.naxatar.com<br/>Port 80/443]
+            DOMAIN_REDIS[redis.avail.naxatar.com<br/>Port 80/443]
+        end
+
         subgraph "Docker Compose Stack"
-            NGINX[Nginx Reverse Proxy<br/>Port 80/443]
-            BACKEND[Backend Container<br/>avail-backend<br/>Port 3001]
-            PG_CONTAINER[PostgreSQL Container<br/>avail-postgres<br/>Port 5432]
-            REDIS_CONTAINER[Redis Container<br/>avail-redis<br/>Port 6379]
+            NGINX[Nginx Reverse Proxy<br/>Multi-domain Routing<br/>SSL Termination]
+            BACKEND[Backend Container<br/>avail-backend<br/>Port 3001<br/>Health Checks]
+            PG_CONTAINER[PostgreSQL 15 Container<br/>avail-postgres<br/>Port 5432<br/>Init Scripts]
+            REDIS_CONTAINER[Redis 7 Container<br/>avail-redis<br/>Port 6379<br/>Persistence Enabled]
             
             %% Optional Admin Tools
             PGADMIN[pgAdmin Container<br/>Port 5050<br/>Profile: admin]
@@ -155,6 +213,10 @@ graph TB
             REDIS_VOLUME[(redis_data<br/>Volume)]
             LOG_VOLUME[(./logs<br/>Host Mount)]
         end
+
+        subgraph "Environment Configuration"
+            ENV_VARS[Environment Variables<br/>• DATABASE_URL<br/>• REDIS_URL<br/>• AVAIL_RPC_ENDPOINT<br/>• JWT_SECRET<br/>• CORS_ORIGIN<br/>• Feature Flags]
+        end
     end
 
     subgraph "Cloud Deployment Options"
@@ -163,10 +225,20 @@ graph TB
         AZURE[Azure Container Instances<br/>• Container Groups<br/>• Azure Database<br/>• Azure Cache]
     end
 
+    %% Domain routing
+    DOMAIN_API --> NGINX
+    DOMAIN_PG --> NGINX
+    DOMAIN_REDIS --> NGINX
+
     %% Connections
     NGINX --> BACKEND
+    NGINX --> PG_CONTAINER
+    NGINX --> REDIS_CONTAINER
+    
     BACKEND --> PG_CONTAINER
     BACKEND --> REDIS_CONTAINER
+    BACKEND --> ENV_VARS
+    
     PG_CONTAINER --> PG_VOLUME
     REDIS_CONTAINER --> REDIS_VOLUME
     BACKEND --> LOG_VOLUME
@@ -181,14 +253,18 @@ graph TB
     DEV_APP -.-> AZURE
 
     classDef dev fill:#e3f2fd
+    classDef domain fill:#e8f5e8
     classDef prod fill:#e8f5e8
     classDef cloud fill:#fff3e0
     classDef storage fill:#fce4ec
+    classDef config fill:#f3e5f5
 
     class DEV_APP,DEV_DB dev
+    class DOMAIN_API,DOMAIN_PG,DOMAIN_REDIS domain
     class NGINX,BACKEND,PG_CONTAINER,REDIS_CONTAINER,PGADMIN,REDIS_INSIGHT prod
     class AWS,GCP,AZURE cloud
     class PG_VOLUME,REDIS_VOLUME,LOG_VOLUME storage
+    class ENV_VARS config
 ```
 
 ## API Flow Diagram
@@ -235,49 +311,79 @@ mindmap
   root((Avail Explorer Backend))
     Runtime
       Node.js 18+
-      TypeScript
-      Express.js
+      TypeScript 5.3+
+      Express.js 4.18+
+      tsx (Development)
     API Layer
       RESTful APIs
-      WebSocket (Socket.io)
+      WebSocket (Socket.io 4.7+)
       Rate Limiting
       CORS
+      JWT Authentication
+      Express Validator
     Data Layer
       SQLite (Development)
-      PostgreSQL (Production)
-      Redis (Caching)
+      PostgreSQL 15 (Production)
+      Redis 7 (IORedis 5.3+)
+      Bull Queue (Job Processing)
     Blockchain Integration
-      Polkadot API
+      Polkadot API 10.11+
+      Smoldot 2.0+ (Light Client)
       WebSocket RPC
+      Hybrid RPC Service
+      Multiple Provider Support
+    External APIs
       Subscan API
+      CoinGecko API
+      Turbo DA API
+      Avail Nexus API
+      Avail Bridge API
+    Services Architecture
+      Unified Avail Service
+      Specialized Services
+      Analytics Service
+      WebSocket Service
+      Jobs Service
     Security
-      Helmet.js
-      Input Validation
-      JWT (Future)
+      Helmet.js 7.1+
+      Input Validation (Joi 17.11+)
+      JWT (Future Implementation)
+      Rate Limiting
     Monitoring
-      Winston Logging
-      Prometheus Metrics
+      Winston Logging 3.11+
+      Daily Rotate Files
+      Prometheus Metrics (prom-client 15.1+)
       Health Checks
     Testing
-      Jest
-      Supertest
+      Jest 29.7+
+      Supertest 7.1+
       Unit & Integration Tests
+      Coverage Reports
     DevOps
-      Docker
-      Docker Compose
+      Docker & Docker Compose
+      Nginx (Multi-domain)
       GitHub Actions
-      ESLint & Prettier
+      ESLint 8.55+ & Prettier 3.1+
+      TypeScript Strict Mode
 ```
 
 ## Key Features
 
-1. **Dual Database Support**: SQLite for development, PostgreSQL for production
-2. **Real-time Updates**: WebSocket integration for live blockchain data
-3. **API Fallback**: Direct blockchain integration with external API fallbacks
-4. **Comprehensive Monitoring**: Health checks, metrics, and structured logging
-5. **Development-friendly**: Zero-config setup with SQLite
-6. **Production-ready**: Docker containerization with orchestration
-7. **Scalable Architecture**: Microservice-ready design with clear separation of concerns
+1. **Unified Service Architecture**: Centralized service orchestration through unified-avail.ts for seamless multi-source integration
+2. **Hybrid RPC Support**: Multi-provider RPC service with automatic failover and load balancing capabilities
+3. **Specialized Data Sources**: Integration with Turbo DA, Avail Nexus, Avail Bridge, and Light Client services
+4. **Dual Database Support**: SQLite for development, PostgreSQL 15 for production with automatic migration
+5. **Advanced Caching**: Redis 7 with IORedis client for high-performance caching and session management
+6. **Real-time Updates**: WebSocket integration with Socket.io for live blockchain data and analytics
+7. **Background Job Processing**: Bull queue system for asynchronous task processing and scheduled operations
+8. **Comprehensive API Coverage**: Full REST API with blocks, chain, extrinsics, validators, rollups, analytics, and search endpoints
+9. **Production-Ready Infrastructure**: Docker containerization with multi-domain nginx configuration
+10. **Advanced Monitoring**: Prometheus metrics, Winston logging with daily rotation, and health endpoints
+11. **Analytics & Performance Tracking**: Dedicated analytics service for usage statistics and performance metrics
+12. **Multi-Environment Support**: Development-friendly setup with production-grade deployment options
+13. **Type-Safe Development**: Full TypeScript implementation with strict type checking
+14. **Comprehensive Testing**: Jest-based testing with unit, integration, and E2E test coverage
+15. **Domain-Based Deployment**: Multi-domain nginx setup with api.avail.naxatar.com routing
 
 ## File Structure Diagram
 
@@ -291,13 +397,27 @@ graph TD
         TSCONFIG[tsconfig.json]
         ESLINT[.eslintrc.js]
         JEST[jest.config.js]
-        ENV[.env.example]
+        ENV[env.example]
         README[README.md]
+        DEPLOYMENT[DEPLOYMENT.md]
+        INSTALL[install.sh]
+        SETUP_DEV[setup-dev.js]
+        NGINX_CONF[nginx.conf]
+        AVAIL_NGINX[avail-nginx.conf]
+        API_CONF[api-avail.conf]
+        PG_CONF[pg-avail.conf]
+        REDIS_CONF[redis-avail.conf]
+        INIT_SQL[init.sql]
+        SCHEMA_V2[database-schema-v2.sql]
+        GITIGNORE[.gitignore]
+        DOCKERIGNORE[.dockerignore]
     end
 
     subgraph "Source Code (/src)"
         SRC[src/]
         INDEX[index.ts<br/>Main Entry Point]
+        TEST_RUNNER[test-runner.ts<br/>Test Utilities]
+        TEST_AVAIL[test-avail-apis.ts<br/>API Testing]
         
         subgraph "Configuration"
             CONFIG_DIR[config/]
@@ -311,11 +431,28 @@ graph TD
             EXTRINSICS_ROUTE[extrinsics.ts<br/>Transaction Data]
             SEARCH_ROUTE[search.ts<br/>Search Functionality]
             ACCOUNTS_ROUTE[accounts.ts<br/>Account Data]
+            VALIDATORS_ROUTE[validators.ts<br/>Validator Information]
+            ANALYTICS_ROUTE[analytics.ts<br/>Analytics Endpoints]
+            ROLLUPS_ROUTE[rollups.ts<br/>Rollup Data]
+            DATA_SUB_ROUTE[data-submissions.ts<br/>Data Submission Tracking]
         end
         
         subgraph "Business Logic"
             SERVICES_DIR[services/]
-            BLOCKCHAIN_SERVICE[blockchain.ts<br/>Main Service Layer]
+            BLOCKCHAIN_SERVICE[blockchain.ts<br/>Main Blockchain Service]
+            UNIFIED_AVAIL[unified-avail.ts<br/>Unified Service Layer]
+            HYBRID_RPC[hybrid-rpc.ts<br/>Multi-provider RPC]
+            HYBRID_RPC_TEST[hybrid-rpc-test.ts<br/>RPC Testing]
+            ANALYTICS_SERVICE[analytics.ts<br/>Analytics Service]
+            WEBSOCKET_SERVICE[websocket.ts<br/>WebSocket Management]
+            JOBS_SERVICE[jobs.ts<br/>Background Jobs]
+            
+            subgraph "Specialized Services"
+                TURBO_DA[turbo-da.ts<br/>Turbo DA Integration]
+                AVAIL_NEXUS[avail-nexus.ts<br/>Nexus API Service]
+                LIGHT_CLIENT[avail-light-client.ts<br/>Light Client Service]
+                BRIDGE_SERVICE[avail-bridge.ts<br/>Bridge Service]
+            end
             
             subgraph "RPC Layer"
                 RPC_DIR[rpc/]
@@ -356,7 +493,8 @@ graph TD
         GLOBAL_SETUP[globalSetup.ts]
         GLOBAL_TEARDOWN[globalTeardown.ts]
         
-        subgraph "Test Types"
+        subgraph "Test Organization"
+            SRC_TESTS[src/__tests__/<br/>Source Tests]
             UNIT_TESTS[unit/<br/>Unit Tests]
             INTEGRATION_TESTS[integration/<br/>Integration Tests]
             E2E_TESTS[e2e/<br/>End-to-End Tests]
@@ -368,7 +506,9 @@ graph TD
     subgraph "Data & Logs"
         DATA_FOLDER[data/<br/>SQLite Database]
         LOGS_FOLDER[logs/<br/>Application Logs]
+        DIST_FOLDER[dist/<br/>Compiled JavaScript]
         NODE_MODULES[node_modules/<br/>Dependencies]
+        DUMP_RDB[dump.rdb<br/>Redis Dump]
     end
 
     subgraph "CI/CD"
@@ -377,7 +517,9 @@ graph TD
     end
 
     subgraph "Documentation"
-        AI_DOCS[AI Documentation/<br/>Project Notes]
+        AI_DOCS[AI Documentation/<br/>Project Notes & Architecture]
+        SCOPE_DOC[Avail DA Explorer Scope.md]
+        DEPLOYMENT_STATUS[deployment-status.md]
     end
 
     %% Connections
@@ -385,10 +527,13 @@ graph TD
     ROOT --> TESTS
     ROOT --> DATA_FOLDER
     ROOT --> LOGS_FOLDER
+    ROOT --> DIST_FOLDER
     ROOT --> GITHUB_DIR
     ROOT --> AI_DOCS
     
     SRC --> INDEX
+    SRC --> TEST_RUNNER
+    SRC --> TEST_AVAIL
     SRC --> CONFIG_DIR
     SRC --> ROUTES_DIR
     SRC --> SERVICES_DIR
@@ -402,8 +547,22 @@ graph TD
     ROUTES_DIR --> EXTRINSICS_ROUTE
     ROUTES_DIR --> SEARCH_ROUTE
     ROUTES_DIR --> ACCOUNTS_ROUTE
+    ROUTES_DIR --> VALIDATORS_ROUTE
+    ROUTES_DIR --> ANALYTICS_ROUTE
+    ROUTES_DIR --> ROLLUPS_ROUTE
+    ROUTES_DIR --> DATA_SUB_ROUTE
     
     SERVICES_DIR --> BLOCKCHAIN_SERVICE
+    SERVICES_DIR --> UNIFIED_AVAIL
+    SERVICES_DIR --> HYBRID_RPC
+    SERVICES_DIR --> HYBRID_RPC_TEST
+    SERVICES_DIR --> ANALYTICS_SERVICE
+    SERVICES_DIR --> WEBSOCKET_SERVICE
+    SERVICES_DIR --> JOBS_SERVICE
+    SERVICES_DIR --> TURBO_DA
+    SERVICES_DIR --> AVAIL_NEXUS
+    SERVICES_DIR --> LIGHT_CLIENT
+    SERVICES_DIR --> BRIDGE_SERVICE
     SERVICES_DIR --> RPC_DIR
     SERVICES_DIR --> DATA_DIR
     
@@ -423,6 +582,7 @@ graph TD
     TYPES_DIR --> RPC_TYPES
     
     TESTS --> TEST_SETUP
+    TESTS --> SRC_TESTS
     TESTS --> UNIT_TESTS
     TESTS --> INTEGRATION_TESTS
     TESTS --> E2E_TESTS
@@ -434,17 +594,19 @@ graph TD
     classDef config fill:#e3f2fd
     classDef routes fill:#fff3e0
     classDef services fill:#f3e5f5
-    classDef utils fill:#fce4ec
-    classDef tests fill:#f1f8e9
-    classDef data fill:#fff8e1
+    classDef specialized fill:#fce4ec
+    classDef utils fill:#f1f8e9
+    classDef tests fill:#fff8e1
+    classDef data fill:#e1f5fe
 
-    class INDEX,PACKAGE,DOCKER entry
-    class CONFIG_DIR,CONFIG_INDEX,TSCONFIG,ESLINT config
-    class ROUTES_DIR,BLOCKS_ROUTE,CHAIN_ROUTE,EXTRINSICS_ROUTE,SEARCH_ROUTE,ACCOUNTS_ROUTE routes
-    class SERVICES_DIR,BLOCKCHAIN_SERVICE,RPC_DIR,RPC_INDEX,RPC_CONNECTION,RPC_METHODS,RPC_SUBSCRIPTIONS,DATA_DIR,SQLITE_STORE services
+    class INDEX,TEST_RUNNER,TEST_AVAIL,PACKAGE,DOCKER entry
+    class CONFIG_DIR,CONFIG_INDEX,TSCONFIG,ESLINT,ENV,NGINX_CONF config
+    class ROUTES_DIR,BLOCKS_ROUTE,CHAIN_ROUTE,EXTRINSICS_ROUTE,SEARCH_ROUTE,ACCOUNTS_ROUTE,VALIDATORS_ROUTE,ANALYTICS_ROUTE,ROLLUPS_ROUTE,DATA_SUB_ROUTE routes
+    class SERVICES_DIR,BLOCKCHAIN_SERVICE,UNIFIED_AVAIL,HYBRID_RPC,ANALYTICS_SERVICE,WEBSOCKET_SERVICE,JOBS_SERVICE,RPC_DIR,RPC_INDEX,RPC_CONNECTION,RPC_METHODS,RPC_SUBSCRIPTIONS,DATA_DIR,SQLITE_STORE services
+    class TURBO_DA,AVAIL_NEXUS,LIGHT_CLIENT,BRIDGE_SERVICE specialized
     class UTILS_DIR,LOGGER,DATABASE,CACHE,MIDDLEWARE_DIR,MIDDLEWARE_INDEX,TYPES_DIR,TYPES_INDEX,RPC_TYPES utils
-    class TESTS,TEST_SETUP,UNIT_TESTS,INTEGRATION_TESTS,E2E_TESTS,FIXTURES,HELPERS tests
-    class DATA_FOLDER,LOGS_FOLDER data
+    class TESTS,TEST_SETUP,SRC_TESTS,UNIT_TESTS,INTEGRATION_TESTS,E2E_TESTS,FIXTURES,HELPERS tests
+    class DATA_FOLDER,LOGS_FOLDER,DIST_FOLDER,NODE_MODULES,DUMP_RDB data
 ```
 
 ## Code Flow Diagram
@@ -643,84 +805,159 @@ sequenceDiagram
 ```mermaid
 graph LR
     subgraph "Core Dependencies"
-        EXPRESS[Express.js<br/>Web Framework]
-        TYPESCRIPT[TypeScript<br/>Type Safety]
-        POLKADOT[Polkadot API<br/>Blockchain Integration]
+        EXPRESS[Express.js 4.18+<br/>Web Framework]
+        TYPESCRIPT[TypeScript 5.3+<br/>Type Safety]
+        POLKADOT[Polkadot API 10.11+<br/>Blockchain Integration]
+        SMOLDOT[Smoldot 2.0+<br/>Light Client]
     end
 
     subgraph "Database Layer"
         SQLITE[SQLite<br/>Development DB]
         POSTGRES[PostgreSQL<br/>Production DB]
+        PG_DRIVER[pg 8.11+<br/>PostgreSQL Driver]
         REDIS[Redis<br/>Caching]
+        IOREDIS[IORedis 5.3+<br/>Redis Client]
+    end
+
+    subgraph "Job Processing"
+        BULL[Bull 4.12+<br/>Job Queue]
+        NODE_CRON[Node-cron 3.0+<br/>Scheduled Tasks]
     end
 
     subgraph "Middleware & Security"
-        HELMET[Helmet<br/>Security Headers]
-        CORS[CORS<br/>Cross-Origin]
-        COMPRESSION[Compression<br/>Gzip]
-        RATE_LIMIT[Rate Limiting<br/>API Protection]
+        HELMET[Helmet 7.1+<br/>Security Headers]
+        CORS[CORS 2.8+<br/>Cross-Origin]
+        COMPRESSION[Compression 1.7+<br/>Gzip]
+        RATE_LIMIT[Express Rate Limit 7.1+<br/>API Protection]
+        JOI[Joi 17.11+<br/>Schema Validation]
+        EXPRESS_VALIDATOR[Express Validator 7.0+<br/>Input Validation]
     end
 
     subgraph "Real-time & Communication"
-        SOCKETIO[Socket.io<br/>WebSocket]
-        BULL[Bull<br/>Job Queue]
+        SOCKETIO[Socket.io 4.7+<br/>WebSocket]
+        AXIOS[Axios 1.6+<br/>HTTP Client]
     end
 
     subgraph "Monitoring & Logging"
-        WINSTON[Winston<br/>Logging]
-        PROMETHEUS[Prometheus<br/>Metrics]
-        CRON[Node-cron<br/>Scheduled Tasks]
+        WINSTON[Winston 3.11+<br/>Logging]
+        DAILY_ROTATE[Winston Daily Rotate 4.7+<br/>Log Rotation]
+        PROMETHEUS[prom-client 15.1+<br/>Metrics]
     end
 
     subgraph "Testing & Quality"
-        JEST[Jest<br/>Testing Framework]
-        ESLINT[ESLint<br/>Code Quality]
-        PRETTIER[Prettier<br/>Code Formatting]
+        JEST[Jest 29.7+<br/>Testing Framework]
+        SUPERTEST[Supertest 7.1+<br/>API Testing]
+        TS_JEST[ts-jest 29.1+<br/>TypeScript Testing]
+        ESLINT[ESLint 8.55+<br/>Code Quality]
+        PRETTIER[Prettier 3.1+<br/>Code Formatting]
+        TYPESCRIPT_ESLINT[TypeScript ESLint 6.13+<br/>TS Linting]
     end
 
-    subgraph "Validation & Utilities"
-        JOI[Joi<br/>Schema Validation]
-        AXIOS[Axios<br/>HTTP Client]
-        DOTENV[Dotenv<br/>Environment]
+    subgraph "Development Tools"
+        TSX[tsx 4.6+<br/>TypeScript Execution]
+        NODEMON[Nodemon 3.0+<br/>Development Server]
+        DOTENV[Dotenv 16.3+<br/>Environment Variables]
+        JS_YAML[js-yaml 4.1+<br/>YAML Processing]
     end
 
-    %% Dependencies flow
+    subgraph "Polkadot Ecosystem"
+        POLKADOT_AUGMENT[@polkadot/api-augment 16.1+]
+        POLKADOT_KEYRING[@polkadot/keyring 13.5+]
+        POLKADOT_RPC_CORE[@polkadot/rpc-core 16.1+]
+        POLKADOT_RPC_PROVIDER[@polkadot/rpc-provider 10.11+]
+        POLKADOT_TYPES[@polkadot/types 16.1+]
+        POLKADOT_UTIL[@polkadot/util 13.5+]
+        POLKADOT_UTIL_CRYPTO[@polkadot/util-crypto 13.5+]
+    end
+
+    %% Core framework dependencies
     EXPRESS --> HELMET
     EXPRESS --> CORS
     EXPRESS --> COMPRESSION
     EXPRESS --> RATE_LIMIT
+    EXPRESS --> EXPRESS_VALIDATOR
     EXPRESS --> SOCKETIO
     
-    POLKADOT --> SQLITE
-    POLKADOT --> POSTGRES
-    POLKADOT --> REDIS
+    %% Database connections
+    POSTGRES --> PG_DRIVER
+    REDIS --> IOREDIS
     
-    WINSTON --> PROMETHEUS
-    JEST --> ESLINT
+    %% Job processing
+    BULL --> IOREDIS
+    
+    %% Blockchain dependencies
+    POLKADOT --> POLKADOT_AUGMENT
+    POLKADOT --> POLKADOT_KEYRING
+    POLKADOT --> POLKADOT_RPC_CORE
+    POLKADOT --> POLKADOT_RPC_PROVIDER
+    POLKADOT --> POLKADOT_TYPES
+    POLKADOT --> POLKADOT_UTIL
+    POLKADOT --> POLKADOT_UTIL_CRYPTO
+    
+    %% Monitoring
+    WINSTON --> DAILY_ROTATE
+    
+    %% Testing
+    JEST --> TS_JEST
+    JEST --> SUPERTEST
+    ESLINT --> TYPESCRIPT_ESLINT
     ESLINT --> PRETTIER
+    
+    %% Development
+    TYPESCRIPT --> TSX
+    TSX --> NODEMON
 
     classDef core fill:#e8f5e8
     classDef database fill:#e3f2fd
+    classDef jobs fill:#f3e5f5
     classDef middleware fill:#fff3e0
-    classDef realtime fill:#f3e5f5
-    classDef monitoring fill:#fce4ec
-    classDef testing fill:#f1f8e9
-    classDef utils fill:#fff8e1
+    classDef realtime fill:#fce4ec
+    classDef monitoring fill:#f1f8e9
+    classDef testing fill:#fff8e1
+    classDef dev fill:#e1f5fe
+    classDef polkadot fill:#f9f9f9
 
-    class EXPRESS,TYPESCRIPT,POLKADOT core
-    class SQLITE,POSTGRES,REDIS database
-    class HELMET,CORS,COMPRESSION,RATE_LIMIT middleware
-    class SOCKETIO,BULL realtime
-    class WINSTON,PROMETHEUS,CRON monitoring
-    class JEST,ESLINT,PRETTIER testing
-    class JOI,AXIOS,DOTENV utils
+    class EXPRESS,TYPESCRIPT,POLKADOT,SMOLDOT core
+    class SQLITE,POSTGRES,PG_DRIVER,REDIS,IOREDIS database
+    class BULL,NODE_CRON jobs
+    class HELMET,CORS,COMPRESSION,RATE_LIMIT,JOI,EXPRESS_VALIDATOR middleware
+    class SOCKETIO,AXIOS realtime
+    class WINSTON,DAILY_ROTATE,PROMETHEUS monitoring
+    class JEST,SUPERTEST,TS_JEST,ESLINT,PRETTIER,TYPESCRIPT_ESLINT testing
+    class TSX,NODEMON,DOTENV,JS_YAML dev
+    class POLKADOT_AUGMENT,POLKADOT_KEYRING,POLKADOT_RPC_CORE,POLKADOT_RPC_PROVIDER,POLKADOT_TYPES,POLKADOT_UTIL,POLKADOT_UTIL_CRYPTO polkadot
 ```
 
 ## Future Enhancements
 
-- Authentication & Authorization (JWT)
-- Advanced Analytics Routes
-- Validator Information
-- Enhanced Caching Strategies
-- Kubernetes Deployment
-- API Documentation (Swagger/OpenAPI) 
+### Planned Features
+- **Advanced Authentication**: JWT-based authentication system with role-based access control
+- **GraphQL API**: GraphQL endpoint for more flexible data querying alongside REST APIs
+- **Advanced Analytics Dashboard**: Real-time analytics visualization with custom metrics
+- **Validator Staking Information**: Comprehensive validator data including staking rewards and performance
+- **Cross-Chain Bridge Monitoring**: Enhanced bridge transaction tracking and status monitoring
+- **API Rate Limiting Tiers**: Tiered rate limiting based on user authentication levels
+- **Data Export Features**: CSV/JSON export capabilities for historical data
+- **Enhanced Search**: Full-text search with advanced filtering and sorting options
+
+### Infrastructure Improvements
+- **Kubernetes Deployment**: K8s manifests for cloud-native deployment
+- **Auto-Scaling**: Horizontal pod autoscaling based on metrics
+- **CDN Integration**: Content delivery network for static assets and API responses
+- **Advanced Monitoring**: Grafana dashboards with custom alerts and notifications
+- **Backup & Recovery**: Automated database backup and disaster recovery procedures
+- **Multi-Region Deployment**: Geographic distribution for improved performance
+
+### Technical Enhancements
+- **API Versioning Strategy**: Comprehensive API versioning with backward compatibility
+- **Enhanced Error Handling**: Detailed error responses with correlation IDs
+- **Performance Optimization**: Query optimization and advanced caching strategies
+- **Real-time Subscriptions**: GraphQL subscriptions for real-time data updates
+- **Mobile SDK**: Native mobile SDKs for iOS and Android applications
+- **Advanced Testing**: Property-based testing and performance testing suites
+
+### Documentation & Developer Experience
+- **Interactive API Documentation**: Swagger/OpenAPI 3.0 with interactive testing
+- **SDK Generation**: Auto-generated SDKs for multiple programming languages
+- **Developer Portal**: Comprehensive developer documentation and tutorials
+- **Postman Collections**: Pre-configured API collections for testing and development 
