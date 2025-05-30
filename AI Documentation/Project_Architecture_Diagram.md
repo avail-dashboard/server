@@ -861,13 +861,13 @@ graph LR
     end
 
     subgraph "Polkadot Ecosystem"
-        POLKADOT_AUGMENT[@polkadot/api-augment 16.1+]
-        POLKADOT_KEYRING[@polkadot/keyring 13.5+]
-        POLKADOT_RPC_CORE[@polkadot/rpc-core 16.1+]
-        POLKADOT_RPC_PROVIDER[@polkadot/rpc-provider 10.11+]
-        POLKADOT_TYPES[@polkadot/types 16.1+]
-        POLKADOT_UTIL[@polkadot/util 13.5+]
-        POLKADOT_UTIL_CRYPTO[@polkadot/util-crypto 13.5+]
+        POLKADOT_AUGMENT[API Augment 16.1+<br/>Type Augmentation]
+        POLKADOT_KEYRING[Keyring 13.5+<br/>Key Management]
+        POLKADOT_RPC_CORE[RPC Core 16.1+<br/>RPC Framework]
+        POLKADOT_RPC_PROVIDER[RPC Provider 10.11+<br/>Connection Layer]
+        POLKADOT_TYPES[Types 16.1+<br/>Type Definitions]
+        POLKADOT_UTIL[Util 13.5+<br/>Utility Functions]
+        POLKADOT_UTIL_CRYPTO[Util Crypto 13.5+<br/>Cryptography]
     end
 
     %% Core framework dependencies
