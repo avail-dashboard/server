@@ -6,6 +6,61 @@ import config from '../config';
 
 const router = Router();
 
+// GET /api/rollups/leaderboard - Get rollup leaderboard (must be before /:appId route)
+router.get('/leaderboard',
+  cacheMiddleware(config.cache.ttl.chainStats),
+  async (req: Request, res: Response) => {
+    try {
+      const period = req.query.period as string || '24h';
+      const metric = req.query.metric as string || 'data_size';
+
+      // TODO: Implement leaderboard calculation
+      const leaderboard = [
+        {
+          rank: 1,
+          app_id: 1,
+          name: 'Top Rollup',
+          metric_value: 52428800,
+          percentage_of_total: 45.2,
+          change_24h: 12.5,
+        },
+        {
+          rank: 2,
+          app_id: 2,
+          name: 'Second Rollup',
+          metric_value: 31457280,
+          percentage_of_total: 27.1,
+          change_24h: -5.2,
+        },
+      ];
+
+      const response: APIResponse = {
+        success: true,
+        data: {
+          leaderboard,
+          total_rollups: leaderboard.length,
+          metric,
+        },
+        meta: {
+          source: 'rpc',
+          period,
+        },
+      };
+
+      res.json(response);
+    } catch (error) {
+      logError(error as Error, { component: 'rollups-route', action: 'getLeaderboard' });
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch rollup leaderboard',
+        },
+      });
+    }
+  },
+);
+
 // GET /api/rollups - Get rollups/app-spaces list
 router.get('/',
   cacheMiddleware(config.cache.ttl.chainStats),
@@ -328,61 +383,6 @@ router.get('/:appId/analytics',
         error: {
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch rollup analytics',
-        },
-      });
-    }
-  },
-);
-
-// GET /api/rollups/leaderboard - Get rollup leaderboard
-router.get('/leaderboard',
-  cacheMiddleware(config.cache.ttl.chainStats),
-  async (req: Request, res: Response) => {
-    try {
-      const period = req.query.period as string || '24h';
-      const metric = req.query.metric as string || 'data_size';
-
-      // TODO: Implement leaderboard calculation
-      const leaderboard = [
-        {
-          rank: 1,
-          app_id: 1,
-          name: 'Top Rollup',
-          metric_value: 52428800,
-          percentage_of_total: 45.2,
-          change_24h: 12.5,
-        },
-        {
-          rank: 2,
-          app_id: 2,
-          name: 'Second Rollup',
-          metric_value: 31457280,
-          percentage_of_total: 27.1,
-          change_24h: -5.2,
-        },
-      ];
-
-      const response: APIResponse = {
-        success: true,
-        data: {
-          leaderboard,
-          total_rollups: leaderboard.length,
-          metric,
-        },
-        meta: {
-          source: 'rpc',
-          period,
-        },
-      };
-
-      res.json(response);
-    } catch (error) {
-      logError(error as Error, { component: 'rollups-route', action: 'getLeaderboard' });
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch rollup leaderboard',
         },
       });
     }

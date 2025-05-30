@@ -1,10 +1,4 @@
-import Bull from 'bull';
-import config from '../config';
-import { logError, logger } from '../utils/logger';
-import blockchainService from './blockchain';
-// import { db } from '../utils/database'; // TODO: Implement database integration
-import { EventEmitter } from 'events';
-import { cache } from '../utils/cache';
+import { logger } from '../utils/logger';
 
 interface JobData {
   type: string;
