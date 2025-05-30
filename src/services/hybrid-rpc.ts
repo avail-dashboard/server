@@ -671,7 +671,7 @@ export class HybridRPCService extends EventEmitter {
       logError(error as Error, { operation: 'getHealth' });
       return { 
         healthy: false, 
-        details: { error: (error as Error).message } 
+        details: { error: (error as Error).message }, 
       };
     }
   }

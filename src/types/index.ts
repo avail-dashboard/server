@@ -222,12 +222,11 @@ export interface RequestUser {
   address?: string;
 }
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: RequestUser;
-      startTime?: number;
-    }
+// Extend Express Request interface
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: RequestUser;
+    startTime?: number;
   }
 }
 
