@@ -21,7 +21,8 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "lint:check": "eslint src/**/*.ts --max-warnings 0",
     "format": "prettier --write src/**/*.ts",
-    "validate:workflows": "node .github/validate-workflows.js"
+    "validate:workflows": "node .github/validate-workflows.js",
+    "pre-commit": "npm run lint && npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
     "@polkadot/api": "^10.11.2",
