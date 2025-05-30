@@ -89,18 +89,6 @@ class AvailExplorerServer {
     // Health endpoint under API versioning
     apiRouter.get('/health', healthCheck);
 
-    // Temporary basic routes for testing
-    apiRouter.get('/', (req, res) => {
-      res.json({
-        success: true,
-        data: {
-          message: 'Avail Blockchain Explorer API',
-          version: '1.0.0',
-          timestamp: new Date().toISOString(),
-        },
-      });
-    });
-
     // Mount API routes
     this.app.use(config.api.prefix, apiRouter);
 
