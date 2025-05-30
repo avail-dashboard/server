@@ -53,7 +53,11 @@ class AvailExplorerServer {
 
     // CORS configuration
     this.app.use(cors({
-      origin: config.server.corsOrigin,
+      origin: [
+        'http://localhost:3000',
+        'http://localhost:3001', 
+        'http://localhost:3002',
+      ],
       credentials: false,
       methods: ['GET', 'POST'],
       allowedHeaders: ['Content-Type', 'Authorization'],
