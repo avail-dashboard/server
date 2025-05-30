@@ -1,6 +1,8 @@
 import request from 'supertest';
-import { app } from '../../index';
+import { server } from '../../index';
 import { jest } from '@jest/globals';
+
+const app = server.getApp();
 
 // Mock services to avoid actual blockchain/database calls during testing
 jest.mock('../../services/blockchain');
@@ -405,11 +407,6 @@ describe('Integration Tests - API Routes', () => {
       );
       
       const responses = await Promise.allSettled(requests);
-      
-      // Check if some requests were rate limited (status 429)
-      const hasRateLimiting = responses.some(result => 
-        result.status === 'fulfilled' && result.value.status === 429,
-      );
       
       // Note: This test depends on rate limiting configuration
       // In development, rate limiting might be disabled
