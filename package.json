@@ -16,6 +16,7 @@
     "test:e2e": "jest tests/e2e",
     "test:ci": "jest --coverage --watchAll=false --passWithNoTests",
     "test:all": "npm run build && npm run lint && npm test",
+    "test:critical": "npm run build && npm run lint && npm run test:unit && npm run test:e2e",
     "migrate": "node dist/database/migrate.js",
     "seed": "node dist/database/seed.js",
     "lint": "eslint src/**/*.ts",
@@ -23,7 +24,7 @@
     "lint:check": "eslint src/**/*.ts --max-warnings 0",
     "format": "prettier --write src/**/*.ts",
     "validate:workflows": "node .github/validate-workflows.js",
-    "pre-commit": "npm run test:all",
+    "pre-commit": "npm run test:critical",
     "prepare": "husky install"
   },
   "dependencies": {
