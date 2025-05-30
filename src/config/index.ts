@@ -27,9 +27,6 @@ const configSchema = Joi.object({
   AVAIL_NEXUS_API: Joi.string(),
   AVAIL_TURBO_DA_API: Joi.string(),
 
-  // External APIs
-  COINGECKO_API_KEY: Joi.string(),
-
   // Feature Flags
   ENABLE_WEBSOCKETS: Joi.boolean().default(true),
   ENABLE_CACHING: Joi.boolean().default(true),
@@ -150,14 +147,6 @@ export const config = {
     turboDA: {
       apiEndpoint: process.env.TURBO_DA_API_URL || 'https://api.turbo.avail.so',
       timeout: 30000,
-    },
-  },
-
-  // External APIs
-  external: {
-    coingecko: {
-      apiKey: env.COINGECKO_API_KEY,
-      baseURL: 'https://api.coingecko.com/api/v3',
     },
   },
 
