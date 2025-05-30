@@ -581,6 +581,149 @@ export class HybridRPCService extends EventEmitter {
     return this.availRPC ? true : false;
   }
 
+  // ===========================================
+  // RUNTIME OPERATIONS
+  // ===========================================
+
+  async getRuntimeVersion(): Promise<any> {
+    this.ensureInitialized();
+    
+    if (this.capabilities.standardRPC.runtime && this.api) {
+      try {
+        return await this.api.rpc.state.getRuntimeVersion();
+      } catch (error) {
+        rpcLogger.warn('Polkadot API runtime version failed, falling back to Avail RPC', { error });
+      }
+    }
+    
+    return this.availRPC.getRuntimeVersion();
+  }
+
+  async getRuntimeMetadata(): Promise<any> {
+    this.ensureInitialized();
+    
+    if (this.capabilities.standardRPC.runtime && this.api) {
+      try {
+        return await this.api.rpc.state.getMetadata();
+      } catch (error) {
+        rpcLogger.warn('Polkadot API runtime metadata failed, falling back to Avail RPC', { error });
+      }
+    }
+    
+    return this.availRPC.getRuntimeMetadata();
+  }
+
+  // ===========================================
+  // SUBSCRIPTION OPERATIONS
+  // ===========================================
+
+  async subscribeToNewBlocks(callback: (block: any) => void): Promise<string> {
+    this.ensureInitialized();
+    return this.availRPC.subscribeToNewBlocks(callback);
+  }
+
+  async subscribeToFinalizedBlocks(callback: (block: any) => void): Promise<string> {
+    this.ensureInitialized();
+    return this.availRPC.subscribeToFinalizedBlocks(callback);
+  }
+
+  async subscribeToAccountBalance(address: string, callback: (balance: any) => void): Promise<string> {
+    this.ensureInitialized();
+    return this.availRPC.subscribeToAccountBalance(address, callback);
+  }
+
+  async subscribeToDataAvailability(callback: (data: any) => void): Promise<string> {
+    this.ensureInitialized();
+    return this.availRPC.subscribeToDataAvailability(callback);
+  }
+
+  async subscribeToApplicationData(appId: number, callback: (data: any) => void): Promise<string> {
+    this.ensureInitialized();
+    return this.availRPC.subscribeToApplicationData(appId, callback);
+  }
+
+  async unsubscribe(subscriptionId: string): Promise<boolean> {
+    this.ensureInitialized();
+    return this.availRPC.unsubscribe(subscriptionId);
+  }
+
+  // ===========================================
+  // HEALTH AND MONITORING
+  // ===========================================
+
+  async getHealth(): Promise<{ healthy: boolean; details?: any }> {
+    this.ensureInitialized();
+    
+    try {
+      // Check both APIs if available
+      const availHealth = await this.availRPC.getHealth();
+      const polkadotHealth = this.isPolkadotAPIAvailable();
+      
+      return {
+        healthy: availHealth.healthy && (polkadotHealth || !this.capabilities.standardRPC.blocks),
+        details: {
+          availRPC: availHealth,
+          polkadotAPI: polkadotHealth,
+          capabilities: this.capabilities,
+        },
+      };
+    } catch (error) {
+      logError(error as Error, { operation: 'getHealth' });
+      return { 
+        healthy: false, 
+        details: { error: (error as Error).message } 
+      };
+    }
+  }
+
+  async getMetrics() {
+    this.ensureInitialized();
+    
+    try {
+      const availMetrics = await this.availRPC.getMetrics();
+      const capabilities = this.getCapabilities();
+      
+      return {
+        ...availMetrics,
+        hybrid: {
+          polkadotAPIAvailable: this.isPolkadotAPIAvailable(),
+          availRPCAvailable: this.isAvailRPCAvailable(),
+          capabilities,
+        },
+      };
+    } catch (error) {
+      logError(error as Error, { operation: 'getMetrics' });
+      return {
+        hybrid: {
+          polkadotAPIAvailable: this.isPolkadotAPIAvailable(),
+          availRPCAvailable: this.isAvailRPCAvailable(),
+          capabilities: this.getCapabilities(),
+          error: (error as Error).message,
+        },
+      };
+    }
+  }
+
+  getConnectionStats() {
+    this.ensureInitialized();
+    
+    const availStats = this.availRPC.getConnectionStats();
+    
+    return {
+      ...availStats,
+      hybrid: {
+        polkadotConnected: this.isPolkadotAPIAvailable(),
+        availConnected: this.isAvailRPCAvailable(),
+        capabilities: this.getCapabilities(),
+      },
+    };
+  }
+
+  getSubscriptionStats() {
+    this.ensureInitialized();
+    return this.availRPC.getSubscriptionStats();
+  }
+
   private ensureInitialized(): void {
     if (!this.isInitialized) {
       throw new Error('Hybrid RPC Service not initialized. Call initialize() first.');
