@@ -36,15 +36,15 @@ graph TB
         end
 
         subgraph "Route Handlers"
-            BLOCKS_ROUTE[Blocks Routes<br/>/api/v1/blocks]
-            CHAIN_ROUTE[Chain Routes<br/>/api/v1/chain]
-            EXTRINSICS_ROUTE[Extrinsics Routes<br/>/api/v1/extrinsics]
-            SEARCH_ROUTE[Search Routes<br/>/api/v1/search]
-            ACCOUNTS_ROUTE[Accounts Routes<br/>/api/v1/accounts]
-            VALIDATORS_ROUTE[Validators Routes<br/>/api/v1/validators]
-            ANALYTICS_ROUTE[Analytics Routes<br/>/api/v1/analytics]
-            ROLLUPS_ROUTE[Rollups Routes<br/>/api/v1/rollups]
-            DATA_SUB_ROUTE[Data Submissions Routes<br/>/api/v1/data-submissions]
+            BLOCKS_ROUTE[Blocks Routes<br/>/api/blocks]
+            CHAIN_ROUTE[Chain Routes<br/>/api/chain]
+            EXTRINSICS_ROUTE[Extrinsics Routes<br/>/api/extrinsics]
+            SEARCH_ROUTE[Search Routes<br/>/api/search]
+            ACCOUNTS_ROUTE[Accounts Routes<br/>/api/accounts]
+            VALIDATORS_ROUTE[Validators Routes<br/>/api/validators]
+            ANALYTICS_ROUTE[Analytics Routes<br/>/api/analytics]
+            ROLLUPS_ROUTE[Rollups Routes<br/>/api/rollups]
+            DATA_SUB_ROUTE[Data Submissions Routes<br/>/api/data-submissions]
         end
 
         subgraph "Service Layer"
@@ -755,7 +755,7 @@ sequenceDiagram
 
     Note over Client,Cache: Complete Request Lifecycle
 
-    Client->>Express: GET /api/v1/blocks
+    Client->>Express: GET /api/blocks
     Express->>Middleware: Apply Security Headers
     Middleware->>Middleware: Rate Limiting Check
     Middleware->>Middleware: Compression Setup

@@ -231,7 +231,7 @@ export const config = {
 
   // API Configuration
   api: {
-    prefix: '/api/v1',
+    prefix: '/api',
     defaultPageSize: 20,
     maxPageSize: 100,
     searchResultsLimit: 50,

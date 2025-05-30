@@ -140,17 +140,17 @@ jobs:
             weight: 30
             flow:
               - get:
-                  url: "/api/v1/blocks"
+                  url: "/api/blocks"
           - name: "Search Functionality"
             weight: 25
             flow:
               - get:
-                  url: "/api/v1/search?q=1000"
+                  url: "/api/search?q=1000"
           - name: "Chain Stats"
             weight: 25
             flow:
               - get:
-                  url: "/api/v1/chain/stats"
+                  url: "/api/chain/stats"
         EOF
         
         # Create processor file

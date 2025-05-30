@@ -6,7 +6,7 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/v1/data-submissions - Get data submissions
+// GET /api/data-submissions - Get data submissions
 router.get('/', 
   pagination,
   async (req: Request, res: Response) => {
@@ -66,7 +66,7 @@ router.get('/',
   },
 );
 
-// GET /api/v1/data-submissions/stats - Get data submission statistics
+// GET /api/data-submissions/stats - Get data submission statistics
 router.get('/stats', 
   async (req: Request, res: Response) => {
     try {

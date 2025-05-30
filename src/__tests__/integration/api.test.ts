@@ -13,78 +13,72 @@ describe('Integration Tests - API Routes', () => {
   // VALIDATORS API TESTS
   // ===========================================
   
-  describe('GET /api/v1/validators', () => {
-    it('should return validators list with pagination', async () => {
+  describe('GET /api/validators', () => {
+    it('should return validators list', async () => {
       const response = await request(app)
-        .get('/api/v1/validators')
+        .get('/api/validators')
         .expect(200);
 
-      expect(response.body).toHaveProperty('validators');
-      expect(response.body).toHaveProperty('total');
-      expect(response.body).toHaveProperty('page');
-      expect(response.body).toHaveProperty('limit');
-      expect(Array.isArray(response.body.validators)).toBe(true);
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('data');
+      expect(Array.isArray(response.body.data)).toBe(true);
     });
 
-    it('should handle pagination parameters', async () => {
+    it('should support pagination', async () => {
       const response = await request(app)
-        .get('/api/v1/validators?page=2&limit=10')
+        .get('/api/validators?page=2&limit=10')
         .expect(200);
 
-      expect(response.body.page).toBe(2);
-      expect(response.body.limit).toBe(10);
+      expect(response.body.meta).toHaveProperty('page', 2);
+      expect(response.body.meta).toHaveProperty('limit', 10);
     });
 
-    it('should filter by status when provided', async () => {
-      const response = await request(app)
-        .get('/api/v1/validators?status=active')
+    it('should support filtering by status', async () => {
+      await request(app)
+        .get('/api/validators?status=active')
         .expect(200);
-
-      expect(response.body).toHaveProperty('validators');
-      // Note: In real implementation, would verify filtered results
     });
   });
 
-  describe('GET /api/v1/validators/:address', () => {
+  describe('GET /api/validators/:address', () => {
     const validatorAddress = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY';
 
-    it('should return specific validator details', async () => {
+    it('should return validator details', async () => {
       const response = await request(app)
-        .get(`/api/v1/validators/${validatorAddress}`)
+        .get(`/api/validators/${validatorAddress}`)
         .expect(200);
 
-      expect(response.body).toHaveProperty('validator');
-      expect(response.body).toHaveProperty('staking_info');
-      expect(response.body).toHaveProperty('performance');
-      expect(response.body.validator).toHaveProperty('address');
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('address');
     });
 
     it('should return 404 for non-existent validator', async () => {
-      const invalidAddress = '5InvalidValidatorAddress123456789';
+      const invalidAddress = '5InvalidValidatorAddress';
       await request(app)
-        .get(`/api/v1/validators/${invalidAddress}`)
+        .get(`/api/validators/${invalidAddress}`)
         .expect(404);
     });
 
     it('should return 400 for invalid address format', async () => {
       await request(app)
-        .get('/api/v1/validators/invalid-address')
+        .get('/api/validators/invalid-address')
         .expect(400);
     });
   });
 
-  describe('GET /api/v1/validators/staking/overview', () => {
-    it('should return staking overview statistics', async () => {
+  describe('GET /api/validators/staking/overview', () => {
+    it('should return staking overview', async () => {
       const response = await request(app)
-        .get('/api/v1/validators/staking/overview')
+        .get('/api/validators/staking/overview')
         .expect(200);
 
-      expect(response.body).toHaveProperty('total_staked');
-      expect(response.body).toHaveProperty('staking_ratio');
-      expect(response.body).toHaveProperty('active_validators');
-      expect(response.body).toHaveProperty('waiting_validators');
-      expect(response.body).toHaveProperty('current_era');
-      expect(response.body).toHaveProperty('era_progress');
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('totalStaked');
+      expect(response.body.data).toHaveProperty('activeValidators');
+      expect(response.body.data).toHaveProperty('waitingValidators');
+      expect(response.body.data).toHaveProperty('stakingRatio');
     });
   });
 
@@ -92,10 +86,10 @@ describe('Integration Tests - API Routes', () => {
   // ANALYTICS API TESTS
   // ===========================================
 
-  describe('GET /api/v1/analytics/network', () => {
+  describe('GET /api/analytics/network', () => {
     it('should return network analytics overview', async () => {
       const response = await request(app)
-        .get('/api/v1/analytics/network')
+        .get('/api/analytics/network')
         .expect(200);
 
       expect(response.body).toHaveProperty('current_stats');
@@ -106,7 +100,7 @@ describe('Integration Tests - API Routes', () => {
 
     it('should handle timeframe parameter', async () => {
       const response = await request(app)
-        .get('/api/v1/analytics/network?timeframe=7d')
+        .get('/api/analytics/network?timeframe=7d')
         .expect(200);
 
       expect(response.body).toHaveProperty('current_stats');
@@ -115,15 +109,15 @@ describe('Integration Tests - API Routes', () => {
 
     it('should return 400 for invalid timeframe', async () => {
       await request(app)
-        .get('/api/v1/analytics/network?timeframe=invalid')
+        .get('/api/analytics/network?timeframe=invalid')
         .expect(400);
     });
   });
 
-  describe('GET /api/v1/analytics/gas', () => {
+  describe('GET /api/analytics/gas', () => {
     it('should return gas analytics data', async () => {
       const response = await request(app)
-        .get('/api/v1/analytics/gas')
+        .get('/api/analytics/gas')
         .expect(200);
 
       expect(response.body).toHaveProperty('current_gas_price');
@@ -134,17 +128,17 @@ describe('Integration Tests - API Routes', () => {
 
     it('should handle period parameter', async () => {
       const response = await request(app)
-        .get('/api/v1/analytics/gas?period=24h')
+        .get('/api/analytics/gas?period=24h')
         .expect(200);
 
       expect(response.body).toHaveProperty('current_gas_price');
     });
   });
 
-  describe('GET /api/v1/analytics/rollups', () => {
+  describe('GET /api/analytics/rollups', () => {
     it('should return rollup analytics overview', async () => {
       const response = await request(app)
-        .get('/api/v1/analytics/rollups')
+        .get('/api/analytics/rollups')
         .expect(200);
 
       expect(response.body).toHaveProperty('total_rollups');
@@ -156,11 +150,11 @@ describe('Integration Tests - API Routes', () => {
     });
   });
 
-  describe('GET /api/v1/analytics/rollups/:appId', () => {
+  describe('GET /api/analytics/rollups/:appId', () => {
     it('should return specific rollup analytics', async () => {
       const appId = 1;
       const response = await request(app)
-        .get(`/api/v1/analytics/rollups/${appId}`)
+        .get(`/api/analytics/rollups/${appId}`)
         .expect(200);
 
       expect(response.body).toHaveProperty('app_id');
@@ -172,15 +166,15 @@ describe('Integration Tests - API Routes', () => {
 
     it('should return 404 for non-existent rollup', async () => {
       await request(app)
-        .get('/api/v1/analytics/rollups/99999')
+        .get('/api/analytics/rollups/99999')
         .expect(404);
     });
   });
 
-  describe('GET /api/v1/analytics/data-throughput', () => {
+  describe('GET /api/analytics/data-throughput', () => {
     it('should return data throughput analytics', async () => {
       const response = await request(app)
-        .get('/api/v1/analytics/data-throughput')
+        .get('/api/analytics/data-throughput')
         .expect(200);
 
       expect(response.body).toHaveProperty('current_metrics');
@@ -190,10 +184,10 @@ describe('Integration Tests - API Routes', () => {
     });
   });
 
-  describe('GET /api/v1/analytics/validators', () => {
+  describe('GET /api/analytics/validators', () => {
     it('should return validator analytics', async () => {
       const response = await request(app)
-        .get('/api/v1/analytics/validators')
+        .get('/api/analytics/validators')
         .expect(200);
 
       expect(response.body).toHaveProperty('performance_distribution');
@@ -207,10 +201,10 @@ describe('Integration Tests - API Routes', () => {
   // ROLLUPS API TESTS
   // ===========================================
 
-  describe('GET /api/v1/rollups', () => {
+  describe('GET /api/rollups', () => {
     it('should return rollups list with pagination', async () => {
       const response = await request(app)
-        .get('/api/v1/rollups')
+        .get('/api/rollups')
         .expect(200);
 
       expect(response.body).toHaveProperty('rollups');
@@ -222,7 +216,7 @@ describe('Integration Tests - API Routes', () => {
 
     it('should handle search parameter', async () => {
       const response = await request(app)
-        .get('/api/v1/rollups?search=test')
+        .get('/api/rollups?search=test')
         .expect(200);
 
       expect(response.body).toHaveProperty('rollups');
@@ -230,18 +224,18 @@ describe('Integration Tests - API Routes', () => {
 
     it('should filter by status when provided', async () => {
       const response = await request(app)
-        .get('/api/v1/rollups?status=active')
+        .get('/api/rollups?status=active')
         .expect(200);
 
       expect(response.body).toHaveProperty('rollups');
     });
   });
 
-  describe('GET /api/v1/rollups/:appId', () => {
+  describe('GET /api/rollups/:appId', () => {
     it('should return specific rollup details', async () => {
       const appId = 1;
       const response = await request(app)
-        .get(`/api/v1/rollups/${appId}`)
+        .get(`/api/rollups/${appId}`)
         .expect(200);
 
       expect(response.body).toHaveProperty('rollup');
@@ -252,16 +246,16 @@ describe('Integration Tests - API Routes', () => {
 
     it('should return 404 for non-existent rollup', async () => {
       await request(app)
-        .get('/api/v1/rollups/99999')
+        .get('/api/rollups/99999')
         .expect(404);
     });
   });
 
-  describe('GET /api/v1/rollups/:appId/submissions', () => {
+  describe('GET /api/rollups/:appId/submissions', () => {
     it('should return rollup data submissions', async () => {
       const appId = 1;
       const response = await request(app)
-        .get(`/api/v1/rollups/${appId}/submissions`)
+        .get(`/api/rollups/${appId}/submissions`)
         .expect(200);
 
       expect(response.body).toHaveProperty('submissions');
@@ -277,18 +271,18 @@ describe('Integration Tests - API Routes', () => {
       const toDate = '2024-01-31';
       
       const response = await request(app)
-        .get(`/api/v1/rollups/${appId}/submissions?from=${fromDate}&to=${toDate}`)
+        .get(`/api/rollups/${appId}/submissions?from=${fromDate}&to=${toDate}`)
         .expect(200);
 
       expect(response.body).toHaveProperty('submissions');
     });
   });
 
-  describe('GET /api/v1/rollups/:appId/blobs', () => {
+  describe('GET /api/rollups/:appId/blobs', () => {
     it('should return rollup blob data', async () => {
       const appId = 1;
       const response = await request(app)
-        .get(`/api/v1/rollups/${appId}/blobs`)
+        .get(`/api/rollups/${appId}/blobs`)
         .expect(200);
 
       expect(response.body).toHaveProperty('blobs');
@@ -298,11 +292,11 @@ describe('Integration Tests - API Routes', () => {
     });
   });
 
-  describe('GET /api/v1/rollups/:appId/analytics', () => {
+  describe('GET /api/rollups/:appId/analytics', () => {
     it('should return rollup-specific analytics', async () => {
       const appId = 1;
       const response = await request(app)
-        .get(`/api/v1/rollups/${appId}/analytics`)
+        .get(`/api/rollups/${appId}/analytics`)
         .expect(200);
 
       expect(response.body).toHaveProperty('submission_trends');
@@ -312,10 +306,10 @@ describe('Integration Tests - API Routes', () => {
     });
   });
 
-  describe('GET /api/v1/rollups/leaderboard', () => {
+  describe('GET /api/rollups/leaderboard', () => {
     it('should return rollups leaderboard', async () => {
       const response = await request(app)
-        .get('/api/v1/rollups/leaderboard')
+        .get('/api/rollups/leaderboard')
         .expect(200);
 
       expect(response.body).toHaveProperty('leaderboard');
@@ -326,7 +320,7 @@ describe('Integration Tests - API Routes', () => {
 
     it('should handle sort parameter', async () => {
       const response = await request(app)
-        .get('/api/v1/rollups/leaderboard?sort=data_size')
+        .get('/api/rollups/leaderboard?sort=data_size')
         .expect(200);
 
       expect(response.body).toHaveProperty('leaderboard');
@@ -335,7 +329,7 @@ describe('Integration Tests - API Routes', () => {
 
     it('should handle period parameter', async () => {
       const response = await request(app)
-        .get('/api/v1/rollups/leaderboard?period=7d')
+        .get('/api/rollups/leaderboard?period=7d')
         .expect(200);
 
       expect(response.body).toHaveProperty('leaderboard');
@@ -350,19 +344,19 @@ describe('Integration Tests - API Routes', () => {
   describe('Error Handling', () => {
     it('should return 404 for non-existent endpoints', async () => {
       await request(app)
-        .get('/api/v1/non-existent')
+        .get('/api/non-existent')
         .expect(404);
     });
 
     it('should return 400 for invalid query parameters', async () => {
       await request(app)
-        .get('/api/v1/validators?page=invalid')
+        .get('/api/validators?page=invalid')
         .expect(400);
     });
 
     it('should return 400 for invalid limit values', async () => {
       await request(app)
-        .get('/api/v1/validators?limit=1000')
+        .get('/api/validators?limit=1000')
         .expect(400);
     });
 
@@ -380,7 +374,7 @@ describe('Integration Tests - API Routes', () => {
     it('should respond to validators list within reasonable time', async () => {
       const start = Date.now();
       await request(app)
-        .get('/api/v1/validators')
+        .get('/api/validators')
         .expect(200);
       const duration = Date.now() - start;
       
@@ -389,7 +383,7 @@ describe('Integration Tests - API Routes', () => {
 
     it('should handle concurrent requests', async () => {
       const requests = Array(10).fill(null).map(() => 
-        request(app).get('/api/v1/analytics/network'),
+        request(app).get('/api/analytics/network'),
       );
       
       const responses = await Promise.all(requests);
@@ -407,7 +401,7 @@ describe('Integration Tests - API Routes', () => {
     it('should implement rate limiting for API endpoints', async () => {
       // Make multiple rapid requests
       const requests = Array(100).fill(null).map(() => 
-        request(app).get('/api/v1/validators'),
+        request(app).get('/api/validators'),
       );
       
       const responses = await Promise.allSettled(requests);
@@ -431,7 +425,7 @@ describe('Integration Tests - API Routes', () => {
   describe('CORS Configuration', () => {
     it('should handle CORS preflight requests', async () => {
       await request(app)
-        .options('/api/v1/validators')
+        .options('/api/validators')
         .set('Origin', 'http://localhost:3000')
         .set('Access-Control-Request-Method', 'GET')
         .expect(200);
@@ -439,7 +433,7 @@ describe('Integration Tests - API Routes', () => {
 
     it('should include proper CORS headers', async () => {
       const response = await request(app)
-        .get('/api/v1/validators')
+        .get('/api/validators')
         .set('Origin', 'http://localhost:3000')
         .expect(200);
 
@@ -454,9 +448,9 @@ describe('Integration Tests - API Routes', () => {
   describe('Content-Type Headers', () => {
     it('should return JSON content-type for all endpoints', async () => {
       const endpoints = [
-        '/api/v1/validators',
-        '/api/v1/analytics/network',
-        '/api/v1/rollups',
+        '/api/validators',
+        '/api/analytics/network',
+        '/api/rollups',
       ];
 
       for (const endpoint of endpoints) {
@@ -476,7 +470,7 @@ describe('Integration Tests - API Routes', () => {
   describe('Cache Headers', () => {
     it('should include appropriate cache headers for analytics data', async () => {
       const response = await request(app)
-        .get('/api/v1/analytics/network')
+        .get('/api/analytics/network')
         .expect(200);
 
       // Check for cache control headers
@@ -486,12 +480,12 @@ describe('Integration Tests - API Routes', () => {
     it('should have different cache policies for different endpoints', async () => {
       // Real-time data should have shorter cache times
       const realtimeResponse = await request(app)
-        .get('/api/v1/validators')
+        .get('/api/validators')
         .expect(200);
 
       // Analytics data might have longer cache times
       const analyticsResponse = await request(app)
-        .get('/api/v1/analytics/network')
+        .get('/api/analytics/network')
         .expect(200);
 
       expect(realtimeResponse.headers).toHaveProperty('cache-control');

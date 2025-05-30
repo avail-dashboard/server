@@ -15,7 +15,7 @@ describe('API End-to-End Tests', () => {
   describe('Health Endpoints', () => {
     it('should return health status', async () => {
       const response = await request(testApp.getApp())
-        .get('/health')
+        .get('/api/health')
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
@@ -24,7 +24,7 @@ describe('API End-to-End Tests', () => {
 
     it('should return API health under versioned endpoint', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/health')
+        .get('/api/health')
         .expect(200);
 
       expect(response.body).toHaveProperty('data');
@@ -35,7 +35,7 @@ describe('API End-to-End Tests', () => {
   describe('API Root', () => {
     it('should return API information', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/')
+        .get('/api/')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -49,7 +49,7 @@ describe('API End-to-End Tests', () => {
   describe('CORS Headers', () => {
     it('should include proper CORS headers', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/')
+        .get('/api/')
         .expect(200);
 
       expect(response.headers).toHaveProperty('access-control-allow-origin');
@@ -59,7 +59,7 @@ describe('API End-to-End Tests', () => {
   describe('Security Headers', () => {
     it('should include security headers', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/')
+        .get('/api/')
         .expect(200);
 
       // Check for common security headers
@@ -71,7 +71,7 @@ describe('API End-to-End Tests', () => {
   describe('Error Handling', () => {
     it('should return 404 for non-existent routes', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/nonexistent')
+        .get('/api/nonexistent')
         .expect(404);
 
       expect(response.body).toHaveProperty('success', false);
@@ -80,7 +80,7 @@ describe('API End-to-End Tests', () => {
 
     it('should handle invalid JSON gracefully', async () => {
       const response = await request(testApp.getApp())
-        .post('/api/v1/blocks')
+        .post('/api/blocks')
         .send('invalid json')
         .set('Content-Type', 'application/json')
         .expect(400);
@@ -93,14 +93,14 @@ describe('API End-to-End Tests', () => {
     it('should complete a typical user workflow', async () => {
       // 1. Get API info
       const apiInfo = await request(testApp.getApp())
-        .get('/api/v1/')
+        .get('/api/')
         .expect(200);
 
       expect(apiInfo.body.success).toBe(true);
 
       // 2. Get latest blocks
       const blocks = await request(testApp.getApp())
-        .get('/api/v1/blocks')
+        .get('/api/blocks')
         .expect(200);
 
       expect(blocks.body.success).toBe(true);
@@ -110,7 +110,7 @@ describe('API End-to-End Tests', () => {
       if (blocks.body.data.length > 0) {
         const blockNumber = blocks.body.data[0].number;
         const specificBlock = await request(testApp.getApp())
-          .get(`/api/v1/blocks/${blockNumber}`)
+          .get(`/api/blocks/${blockNumber}`)
           .expect(200);
 
         expect(specificBlock.body.success).toBe(true);
@@ -119,14 +119,14 @@ describe('API End-to-End Tests', () => {
 
       // 4. Search for something
       const searchResults = await request(testApp.getApp())
-        .get('/api/v1/search?q=1000')
+        .get('/api/search?q=1000')
         .expect(200);
 
       expect(searchResults.body.success).toBe(true);
 
       // 5. Get chain stats
       const chainStats = await request(testApp.getApp())
-        .get('/api/v1/chain/stats')
+        .get('/api/chain/stats')
         .expect(200);
 
       expect(chainStats.body.success).toBe(true);
@@ -138,7 +138,7 @@ describe('API End-to-End Tests', () => {
       const start = Date.now();
       
       await request(testApp.getApp())
-        .get('/api/v1/')
+        .get('/api/')
         .expect(200);
       
       const duration = Date.now() - start;

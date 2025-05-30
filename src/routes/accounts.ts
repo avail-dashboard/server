@@ -7,7 +7,7 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/v1/accounts/:address - Get account details
+// GET /api/accounts/:address - Get account details
 router.get('/:address', 
   cacheMiddleware(config.cache.ttl.accountBalance),
   async (req: Request, res: Response) => {

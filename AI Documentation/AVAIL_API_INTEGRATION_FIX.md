@@ -113,6 +113,8 @@ export class AvailBridgeService {
     return await axios.get(`${this.baseUrl}/versions`);
   }
 
+  // NOTE: The following endpoints are external Avail bridge service APIs
+  // These v1 paths should NOT be changed as they belong to external services
   async getBridgeInfo(): Promise<any> {
     return await axios.get(`${this.baseUrl}/v1/info`);
   }

@@ -12,10 +12,10 @@ describe('Blocks API Routes', () => {
     await testApp.stop();
   });
 
-  describe('GET /api/v1/blocks', () => {
+  describe('GET /api/blocks', () => {
     it('should return latest blocks with default pagination', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/blocks')
+        .get('/api/blocks')
         .expect(200);
 
       expect(response.body).toHaveProperty('success', true);
@@ -28,7 +28,7 @@ describe('Blocks API Routes', () => {
 
     it('should return blocks with custom pagination', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/blocks?page=2&limit=5')
+        .get('/api/blocks?page=2&limit=5')
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -39,7 +39,7 @@ describe('Blocks API Routes', () => {
 
     it('should handle invalid pagination parameters', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/blocks?page=invalid&limit=invalid')
+        .get('/api/blocks?page=invalid&limit=invalid')
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -49,7 +49,7 @@ describe('Blocks API Routes', () => {
 
     it('should return blocks with proper structure', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/blocks')
+        .get('/api/blocks')
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -66,10 +66,10 @@ describe('Blocks API Routes', () => {
     });
   });
 
-  describe('GET /api/v1/blocks/:numberOrHash', () => {
+  describe('GET /api/blocks/:numberOrHash', () => {
     it('should return specific block by number', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/blocks/1000')
+        .get('/api/blocks/1000')
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -81,7 +81,7 @@ describe('Blocks API Routes', () => {
     it('should return specific block by hash', async () => {
       const blockHash = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
       const response = await request(testApp.getApp())
-        .get(`/api/v1/blocks/${blockHash}`)
+        .get(`/api/blocks/${blockHash}`)
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -91,7 +91,7 @@ describe('Blocks API Routes', () => {
 
     it('should return block with extrinsics array', async () => {
       const response = await request(testApp.getApp())
-        .get('/api/v1/blocks/1000')
+        .get('/api/blocks/1000')
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -114,7 +114,7 @@ describe('Blocks API Routes', () => {
       // This would require mocking the database to throw an error
       // For now, we'll test that the route exists and responds
       const response = await request(testApp.getApp())
-        .get('/api/v1/blocks')
+        .get('/api/blocks')
         .expect(200);
 
       expect(response.body).toHaveProperty('success');
