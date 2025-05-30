@@ -7,7 +7,7 @@ This document outlines the comprehensive integration with Avail RPC as the prima
 - Basic RPC connection exists in `src/services/blockchain.ts`
 - Uses `@polkadot/api` v10.11.2
 - Limited RPC methods implemented
-- Fallback system: Subscan → RPC → Error
+- Fallback system: RPC → Error handling
 
 ## New Architecture
 - **Primary Source**: Avail RPC only

@@ -101,9 +101,6 @@ CORS_ORIGIN=http://localhost:3000
 DATABASE_TYPE=sqlite
 SQLITE_PATH=./data/avail_explorer.db
 
-# External APIs
-COINGECKO_API_KEY=your-coingecko-key
-
 # Features
 ENABLE_WEBSOCKETS=true
 ENABLE_CACHING=false  # Redis required if true
@@ -214,14 +211,13 @@ Frontend ──┐
     │   Next.js   │────▶│   Backend   │
     │ API Routes  │     │   Server    │
     └─────────────┘     └─────────────┘
-           │                     │
-           │ (fallback)          ▼
-           ▼              ┌─────────────┐
-    ┌─────────────┐      │  Database   │
-    │  External   │      │   (SQLite/  │
-    │    APIs     │      │ PostgreSQL) │
-    │ (CoinGecko) │      └─────────────┘
-    └─────────────┘
+                               │
+                               ▼
+                        ┌─────────────┐
+                        │  Database   │
+                        │   (SQLite/  │
+                        │ PostgreSQL) │
+                        └─────────────┘
 ```
 
 ## Troubleshooting

@@ -18,7 +18,6 @@ A production environment file (`.env.production`) has been created with the foll
 - PostgreSQL connection: `postgresql://avail_user:<REDACTED>@pg.avail.naxatar.com:5432/avail_explorer`
 - Redis connection: `redis://redis.avail.naxatar.com:6379`
 - JWT Secret: A secure 32+ character string
-- SUBSCAN API Key: A valid API key for Subscan
 
 ### NGINX Configuration
 
