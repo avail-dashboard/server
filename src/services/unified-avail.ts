@@ -116,25 +116,25 @@ export class UnifiedAvailService extends EventEmitter {
     for (const serviceKey of services) {
       try {
         switch (serviceKey) {
-          case 'lightClient':
-            if (this.lightClient.isConnected()) {
-              // Use light client for latest blocks (more reliable)
-              const status = await this.lightClient.getStatus();
-              const latestBlockNumber = status.blocks.latest;
-              const blockData = await this.lightClient.getBlockData(latestBlockNumber);
+        case 'lightClient':
+          if (this.lightClient.isConnected()) {
+            // Use light client for latest blocks (more reliable)
+            const status = await this.lightClient.getStatus();
+            const latestBlockNumber = status.blocks.latest;
+            const blockData = await this.lightClient.getBlockData(latestBlockNumber);
               
-              return {
-                blocks: [this.transformLightClientBlock(blockData)],
-                total: 1,
-              };
-            }
-            break;
+            return {
+              blocks: [this.transformLightClientBlock(blockData)],
+              total: 1,
+            };
+          }
+          break;
             
-          case 'rpc':
-            if (this.rpc.isReady()) {
-              return await this.rpc.getLatestBlocks(query);
-            }
-            break;
+        case 'rpc':
+          if (this.rpc.isReady()) {
+            return await this.rpc.getLatestBlocks(query);
+          }
+          break;
         }
       } catch (error) {
         logError(error as Error, { 
@@ -154,28 +154,28 @@ export class UnifiedAvailService extends EventEmitter {
     for (const serviceKey of services) {
       try {
         switch (serviceKey) {
-          case 'nexus':
-            if (this.nexus.isReady()) {
-              const blockData = await this.nexus.getBlockByHeight(blockNumber);
-              return this.transformNexusBlock(blockData);
-            }
-            break;
+        case 'nexus':
+          if (this.nexus.isReady()) {
+            const blockData = await this.nexus.getBlockByHeight(blockNumber);
+            return this.transformNexusBlock(blockData);
+          }
+          break;
             
-          case 'lightClient':
-            if (this.lightClient.isConnected()) {
-              const blockData = await this.lightClient.getBlockData(blockNumber);
-              return this.transformLightClientBlock(blockData);
-            }
-            break;
+        case 'lightClient':
+          if (this.lightClient.isConnected()) {
+            const blockData = await this.lightClient.getBlockData(blockNumber);
+            return this.transformLightClientBlock(blockData);
+          }
+          break;
             
-          case 'rpc':
-            if (this.rpc.isReady()) {
-              const block = await this.rpc.getBlockByNumber(BigInt(blockNumber));
-              if (block) {
-                return block;
-              }
+        case 'rpc':
+          if (this.rpc.isReady()) {
+            const block = await this.rpc.getBlockByNumber(BigInt(blockNumber));
+            if (block) {
+              return block;
             }
-            break;
+          }
+          break;
         }
       } catch (error) {
         logError(error as Error, { 
@@ -219,21 +219,21 @@ export class UnifiedAvailService extends EventEmitter {
     for (const serviceKey of services) {
       try {
         switch (serviceKey) {
-          case 'nexus':
-            if (this.nexus.isReady()) {
-              const accountState = await this.nexus.getAccountState(address);
-              return this.transformNexusAccount(accountState);
-            }
-            break;
+        case 'nexus':
+          if (this.nexus.isReady()) {
+            const accountState = await this.nexus.getAccountState(address);
+            return this.transformNexusAccount(accountState);
+          }
+          break;
             
-          case 'rpc':
-            if (this.rpc.isReady()) {
-              const account = await this.rpc.getAccountDetails(address);
-              if (account) {
-                return account;
-              }
+        case 'rpc':
+          if (this.rpc.isReady()) {
+            const account = await this.rpc.getAccountDetails(address);
+            if (account) {
+              return account;
             }
-            break;
+          }
+          break;
         }
       } catch (error) {
         logError(error as Error, { 
@@ -254,23 +254,23 @@ export class UnifiedAvailService extends EventEmitter {
     for (const serviceKey of services) {
       try {
         switch (serviceKey) {
-          case 'turboDA':
-            if (this.turboDA.isReady()) {
-              if (typeof data === 'object') {
-                return await this.turboDA.submitJsonData(data, appId);
-              } else if (typeof data === 'string') {
-                return await this.turboDA.submitTextData(data, appId);
-              } else if (Buffer.isBuffer(data)) {
-                return await this.turboDA.submitRawData(data, appId);
-              }
+        case 'turboDA':
+          if (this.turboDA.isReady()) {
+            if (typeof data === 'object') {
+              return await this.turboDA.submitJsonData(data, appId);
+            } else if (typeof data === 'string') {
+              return await this.turboDA.submitTextData(data, appId);
+            } else if (Buffer.isBuffer(data)) {
+              return await this.turboDA.submitRawData(data, appId);
             }
-            break;
+          }
+          break;
             
-          case 'lightClient':
-            if (this.lightClient.isConnected()) {
-              return await this.lightClient.submitData(data, appId);
-            }
-            break;
+        case 'lightClient':
+          if (this.lightClient.isConnected()) {
+            return await this.lightClient.submitData(data, appId);
+          }
+          break;
         }
       } catch (error) {
         logError(error as Error, { 

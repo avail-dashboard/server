@@ -31,7 +31,7 @@ export const errorHandler = (
   err: Error | APIError,
   req: Request,
   res: Response,
-  next: NextFunction,
+  _next: NextFunction,
 ): void => {
   // Log the error
   logError(err, {

@@ -3,7 +3,6 @@ import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import blockchainService from '../services/blockchain';
 
 const router = Router();
 
@@ -13,9 +12,15 @@ router.get('/',
   async (req: Request, res: Response) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 50;
-      const sortBy = req.query.sort_by as string || 'total_data_size';
-      const sortOrder = req.query.sort_order as 'asc' | 'desc' || 'desc';
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _search = req.query.search as string;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _status = req.query.status as string;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _sortBy = req.query.sortBy as string || 'submissions';
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _sortOrder = req.query.sortOrder as string || 'desc';
 
       // TODO: Implement rollup registry and database queries
       // For now, return placeholder data structure
@@ -57,12 +62,12 @@ router.get('/',
           rollups: paginatedRollups,
           total_count: rollups.length,
           active_count: rollups.length, // TODO: Calculate based on recent activity
-        },
-        meta: {
           page,
           limit,
-          total: rollups.length,
+        },
+        meta: {
           source: 'rpc',
+          note: 'Mock data - database integration pending',
         },
       };
 
@@ -366,6 +371,7 @@ router.get('/leaderboard',
         },
         meta: {
           source: 'rpc',
+          period,
         },
       };
 

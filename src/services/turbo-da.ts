@@ -266,17 +266,17 @@ export class TurboDAService extends EventEmitter {
         let result: TurboSubmissionResponse;
         
         switch (item.type) {
-          case 'raw':
-            result = await this.submitRawData(item.data as Buffer, item.appId);
-            break;
-          case 'json':
-            result = await this.submitJsonData(item.data as object, item.appId);
-            break;
-          case 'text':
-            result = await this.submitTextData(item.data as string, item.appId, item.encoding);
-            break;
-          default:
-            throw new Error(`Unsupported data type: ${item.type}`);
+        case 'raw':
+          result = await this.submitRawData(item.data as Buffer, item.appId);
+          break;
+        case 'json':
+          result = await this.submitJsonData(item.data as object, item.appId);
+          break;
+        case 'text':
+          result = await this.submitTextData(item.data as string, item.appId, item.encoding);
+          break;
+        default:
+          throw new Error(`Unsupported data type: ${item.type}`);
         }
         
         results.push(result);
