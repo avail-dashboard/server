@@ -6,7 +6,7 @@ dotenv.config({ path: '.env.test' });
 // Set test environment
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_TYPE = 'postgresql';
-process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
+process.env.DATABASE_URL = 'postgresql://avail_user:<REDACTED>@pg.avail.naxatar.com:5432/avail_explorer_test';
 process.env.ENABLE_CACHING = 'false';
 process.env.ENABLE_WEBSOCKETS = 'false';
 process.env.ENABLE_RATE_LIMITING = 'false';
