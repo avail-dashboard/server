@@ -48,6 +48,7 @@ router.get('/network',
         data: networkAnalytics,
         meta: {
           source: 'rpc',
+          period,
         },
       };
 
@@ -219,7 +220,7 @@ router.get('/rollups/:appId',
         meta: {
           source: 'rpc',
           period,
-          app_id: appId,
+          app_id: appId.toString(),
           note: 'Specific rollup analytics implementation in progress',
         },
       };

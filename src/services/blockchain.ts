@@ -101,17 +101,10 @@ class BlockchainService {
     this.ensureInitialized();
     try {
       // Note: This would need to be implemented in the Hybrid RPC service
-      // For now, we'll search through recent blocks
-      const latestBlocks = await this.hybridRPC.getLatestBlocks({ limit: 10 });
-      
-      for (const block of latestBlocks.blocks) {
-        // Note: getExtrinsicsByBlock doesn't exist in HybridRPCService
-        // We'll need to implement this or use a different approach
-        // For now, return null to avoid errors
-        rpcLogger.warn('getExtrinsicByHash: getExtrinsicsByBlock not implemented in HybridRPCService');
-        return null;
-      }
-      
+      // For now, we'll search through recent blocks but getExtrinsicsByBlock doesn't exist
+      // We'll need to implement this or use a different approach
+      // For now, return null to avoid errors
+      rpcLogger.warn('getExtrinsicByHash: getExtrinsicsByBlock not implemented in HybridRPCService');
       return null;
     } catch (error) {
       logError(error as Error, { operation: 'getExtrinsicByHash', hash });
@@ -207,16 +200,43 @@ class BlockchainService {
   async getDataSubmissionStats() {
     this.ensureInitialized();
     try {
-      // Note: This method doesn't exist in HybridRPCService yet
-      // We'll need to implement it or return default stats
-      rpcLogger.warn('getDataSubmissionStats: Method not implemented in HybridRPCService');
+      // Get data submissions from the hybrid RPC service
+      const { submissions } = await this.hybridRPC.getDataSubmissions({ limit: 1000 });
+      
+      const totalSubmissions = submissions.length;
+      const totalDataSize = submissions.reduce((sum, sub) => sum + sub.size, 0);
+      const uniqueApps = new Set(submissions.map(sub => sub.appId)).size;
+      const uniqueSubmitters = new Set(submissions.map(sub => sub.submitter)).size;
+      const averageSize = totalSubmissions > 0 ? totalDataSize / totalSubmissions : 0;
+      
+      // Calculate today's stats
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayTimestamp = BigInt(today.getTime());
+      
+      const todaySubmissions = submissions.filter(sub => sub.timestamp >= todayTimestamp);
+      const submissionsToday = todaySubmissions.length;
+      const dataSizeToday = todaySubmissions.reduce((sum, sub) => sum + sub.size, 0);
+      
+      // Find the most recent submission
+      const lastSubmission = submissions.length > 0 ? 
+        submissions.reduce((latest, current) => 
+          current.timestamp > latest.timestamp ? current : latest,
+        ) : null;
+
       return {
-        totalSubmissions: 0,
-        totalDataSize: 0,
-        uniqueApps: 0,
-        uniqueSubmitters: 0,
-        averageSize: 0,
-        lastSubmission: null,
+        totalSubmissions,
+        totalDataSize,
+        uniqueApps,
+        uniqueSubmitters,
+        averageSize,
+        submissionsToday,
+        dataSizeToday,
+        lastSubmission: lastSubmission ? {
+          timestamp: lastSubmission.timestamp,
+          appId: lastSubmission.appId,
+          size: lastSubmission.size,
+        } : null,
       };
     } catch (error) {
       logError(error as Error, { operation: 'getDataSubmissionStats' });
@@ -226,6 +246,8 @@ class BlockchainService {
         uniqueApps: 0,
         uniqueSubmitters: 0,
         averageSize: 0,
+        submissionsToday: 0,
+        dataSizeToday: 0,
         lastSubmission: null,
       };
     }
