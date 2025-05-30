@@ -10,8 +10,6 @@ graph TB
     %% External Services
     subgraph "External Services"
         AVAIL[Avail Blockchain Network<br/>WebSocket RPC]
-        SUBSCAN[Subscan API<br/>External Data Source]
-        COINGECKO[CoinGecko API<br/>Price Data]
         TURBO_DA[Turbo DA API<br/>Data Availability]
         NEXUS[Avail Nexus API<br/>Rollup Data]
         BRIDGE[Avail Bridge API<br/>Cross-chain Data]
@@ -128,11 +126,10 @@ graph TB
 
     BLOCKCHAIN_SERVICE --> AVAIL
     HYBRID_RPC --> AVAIL
-    HYBRID_RPC --> SUBSCAN
+    HYBRID_RPC --> TURBO_DA
     TURBO_DA_SERVICE --> TURBO_DA
     NEXUS_SERVICE --> NEXUS
     BRIDGE_SERVICE --> BRIDGE
-    ANALYTICS_SERVICE --> COINGECKO
 
     WEBSOCKET_SERVICE --> WEBSOCKET_SERVER
     JOBS_SERVICE --> BULL_QUEUE
@@ -169,7 +166,7 @@ graph TB
     classDef infra fill:#f1f8e9
     classDef monitoring fill:#fff8e1
 
-    class AVAIL,SUBSCAN,COINGECKO,TURBO_DA,NEXUS,BRIDGE external
+    class AVAIL,TURBO_DA,NEXUS,BRIDGE external
     class WEB,MOBILE,API_CLIENTS client
     class NGINX proxy
     class EXPRESS,WEBSOCKET_SERVER,MIDDLEWARE,BLOCKS_ROUTE,CHAIN_ROUTE,EXTRINSICS_ROUTE,SEARCH_ROUTE,ACCOUNTS_ROUTE,VALIDATORS_ROUTE,ANALYTICS_ROUTE,ROLLUPS_ROUTE,DATA_SUB_ROUTE api
@@ -333,8 +330,6 @@ mindmap
       Hybrid RPC Service
       Multiple Provider Support
     External APIs
-      Subscan API
-      CoinGecko API
       Turbo DA API
       Avail Nexus API
       Avail Bridge API

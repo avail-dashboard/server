@@ -182,7 +182,7 @@ src/services/
 ## Migration from Previous Implementation
 
 ### Removed Dependencies
-- **Subscan API**: No longer used as fallback
+- **External APIs**: No longer used as fallback
 - **SubQuery API**: Removed dependency
 - **Axios**: No longer needed for HTTP calls
 

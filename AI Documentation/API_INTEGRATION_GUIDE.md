@@ -12,7 +12,7 @@ Frontend → Next.js API Routes → External APIs (fallback)
 ### **Response Flow**
 1. **Primary**: Frontend calls backend server at `localhost:3001`
 2. **Fallback**: Frontend calls Next.js API routes at `/api/*`
-3. **Server-side only**: Next.js routes call external APIs (Subscan, CoinGecko)
+3. **Server-side only**: Next.js routes call external APIs as needed
 
 ## 🚀 Quick Start
 
@@ -60,17 +60,17 @@ export class AvailAPI {
 
 All external API calls happen server-side in Next.js routes:
 
-- **`/api/blocks`** → Subscan API (server-side)
-- **`/api/chain`** → Subscan + CoinGecko (server-side)  
-- **`/api/extrinsics`** → Subscan API (server-side)
-- **`/api/search`** → Subscan API (server-side)
+- **`/api/blocks`** → External APIs (server-side)
+- **`/api/chain`** → External APIs (server-side)  
+- **`/api/extrinsics`** → External APIs (server-side)
+- **`/api/search`** → External APIs (server-side)
 
 ```typescript
 // Example: /api/blocks/route.ts
 export async function GET() {
   try {
     // ✅ Server-side call to external API
-    const response = await axios.post('https://avail.api.subscan.io/api/scan/blocks', ...)
+    const response = await axios.post('https://external-api.example.com/blocks', ...)
     return NextResponse.json({ success: true, data: response.data })
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message })
@@ -106,15 +106,15 @@ if (isBackendAvailable) {
 ### **❌ Wrong (Causes CORS Errors)**
 ```typescript
 // DON'T DO THIS - Direct external API calls from browser
-const response = await axios.get('https://avail.api.subscan.io/api/scan/blocks')
-const priceData = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=avail')
+const response = await axios.get('https://external-api.example.com/blocks')
+const priceData = await fetch('https://external-price-api.example.com/price')
 ```
 
 ### **✅ Correct (CORS-Safe)**
 ```typescript
 // Frontend calls own Next.js API routes
-const response = await fetch('/api/blocks')  // → Next.js API → Subscan (server-side)
-const chainData = await fetch('/api/chain')  // → Next.js API → Subscan + CoinGecko (server-side)
+const response = await fetch('/api/blocks')  // → Next.js API → External APIs (server-side)
+const chainData = await fetch('/api/chain')  // → Next.js API → External APIs (server-side)
 ```
 
 ## 🔌 Real-Time Features
@@ -168,8 +168,7 @@ NEXT_PUBLIC_API_BASE_URL=https://api.avail-explorer.com/api/v1
 NEXT_PUBLIC_WS_URL=wss://api.avail-explorer.com
 
 # External API keys (server-side only)
-SUBSCAN_API_KEY=your_production_subscan_key
-COINGECKO_API_KEY=your_production_coingecko_key
+# Add any required external API keys here
 
 # Environment
 NEXT_PUBLIC_NODE_ENV=production
