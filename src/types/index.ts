@@ -13,6 +13,10 @@ export interface APIResponse<T = any> {
     total?: number;
     cached?: boolean;
     source?: DataSource;
+    period?: string;
+    granularity?: string;
+    note?: string;
+    app_id?: string;
   };
 }
 

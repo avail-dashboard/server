@@ -1,4 +1,3 @@
-import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -11,8 +10,8 @@ export default async function globalSetup() {
     const testEnvContent = `
 NODE_ENV=test
 PORT=3002
-DATABASE_TYPE=sqlite
-SQLITE_PATH=:memory:
+DATABASE_TYPE=postgresql
+DATABASE_URL=postgresql://avail_user:ni_vineet_21@pg.avail.naxatar.com:5432/avail_explorer_test
 ENABLE_CACHING=false
 ENABLE_WEBSOCKETS=false
 ENABLE_RATE_LIMITING=false
