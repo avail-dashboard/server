@@ -48,15 +48,19 @@ export interface TurboDAStats {
 export class TurboDAService extends EventEmitter {
   private httpClient: AxiosInstance;
   private isInitialized = false;
+  private baseURL: string;
+  private timeout: number;
 
   constructor() {
     super();
     
     const turboDAConfig = config.dataSources.turboDA;
+    this.baseURL = turboDAConfig.apiEndpoint;
+    this.timeout = turboDAConfig.timeout;
     
     this.httpClient = axios.create({
-      baseURL: turboDAConfig.endpoint,
-      timeout: 60000, // Longer timeout for data submissions
+      baseURL: this.baseURL,
+      timeout: this.timeout,
       headers: {
         'User-Agent': 'Avail-Explorer/1.0.0',
       },

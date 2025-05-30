@@ -84,15 +84,22 @@ export interface BridgeTransactions {
 export class AvailBridgeService extends EventEmitter {
   private httpClient: AxiosInstance;
   private isInitialized = false;
+  private baseURL: string;
+  private timeout: number;
+  private ethereumRpcUrl: string;
+  private contracts: any;
 
   constructor() {
     super();
     
-    const bridgeConfig = config.dataSources.bridge;
+    this.baseURL = config.dataSources.bridge.apiEndpoint;
+    this.timeout = config.dataSources.bridge.timeout;
+    this.ethereumRpcUrl = config.dataSources.bridge.ethereumRpcUrl;
+    this.contracts = config.dataSources.bridge.contracts;
     
     this.httpClient = axios.create({
-      baseURL: bridgeConfig.endpoint,
-      timeout: 30000,
+      baseURL: this.baseURL,
+      timeout: this.timeout,
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Avail-Explorer/1.0.0',

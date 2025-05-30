@@ -97,37 +97,59 @@ export const config = {
   dataSources: {
     rpc: {
       endpoints: [
-        env.AVAIL_RPC_ENDPOINT,
-        'wss://mainnet-rpc.avail.so/ws',
-        'wss://avail-rpc.dwellir.com',
-      ].filter(Boolean),
-      reconnectAttempts: 10,
+        // Official Avail endpoints
+        'wss://mainnet.avail-rpc.com/',
+        'https://mainnet-rpc.avail.so/rpc',
+        // Third-party provider endpoints for redundancy
+        'https://rpc.ankr.com/avail',
+        'https://avail-mainnet.public.blastapi.io/',
+        'wss://avail-mainnet.public.blastapi.io/',
+      ],
+      retryAttempts: 3,
+      retryDelay: 1000,
       timeout: 30000,
+      enableSubscriptions: true,
+      reconnectAttempts: 10,
       maxConnections: 3,
       healthCheckInterval: 30000,
       subscriptionTimeout: 60000,
       batchSize: 100,
-      retryDelay: 5000,
       maxRetryDelay: 30000,
       connectionPoolSize: 5,
     },
     
     // NEW: Additional Avail APIs
     lightClient: {
-      httpEndpoint: env.AVAIL_LIGHT_CLIENT_HTTP || 'https://light-client.avail.so',
-      wsEndpoint: env.AVAIL_LIGHT_CLIENT_WS || 'wss://light-client.avail.so',
+      httpEndpoint: 'https://mainnet-rpc.avail.so',
+      wsEndpoint: 'wss://mainnet.avail-rpc.com/ws',
+      appId: 0,
+      timeout: 30000,
     },
     
     bridge: {
-      endpoint: env.AVAIL_BRIDGE_API || 'https://bridge-api.avail.so',
+      apiEndpoint: 'https://bridge-api.avail.so',
+      ethereumRpcUrl: process.env.ETHEREUM_RPC_URL || 'https://eth.llamarpc.com',
+      contracts: {
+        mainnet: {
+          vectorX: '0x02993cdC11213985b9B13224f3aF289F03bf298d',
+          bridge: '0x054fd961708d8e2b9c10a63f6157c74458889f0a',
+        },
+        testnet: {
+          vectorX: '0xe542db219a7e2b29c7aeaeace242c9a2cd528f96',
+          bridge: '0x967F7DdC4ec508462231849AE81eeaa68Ad01389',
+        },
+      },
+      timeout: 30000,
     },
     
     nexus: {
-      endpoint: env.AVAIL_NEXUS_API || 'https://nexus-api.avail.so',
+      apiEndpoint: process.env.AVAIL_NEXUS_API_URL || 'https://api.nexus.avail.so',
+      timeout: 30000,
     },
     
     turboDA: {
-      endpoint: env.AVAIL_TURBO_DA_API || 'https://turbo-da.avail.so',
+      apiEndpoint: process.env.TURBO_DA_API_URL || 'https://api.turbo.avail.so',
+      timeout: 30000,
     },
   },
 

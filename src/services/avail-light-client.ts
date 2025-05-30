@@ -47,22 +47,28 @@ export class AvailLightClientService extends EventEmitter {
   private wsEndpoint: string;
   private ws?: WebSocket;
   private isInitialized = false;
+  private httpEndpoint: string;
+  private appId: number;
+  private timeout: number;
 
   constructor() {
     super();
     
     const lightClientConfig = config.dataSources.lightClient;
+    this.httpEndpoint = lightClientConfig.httpEndpoint;
+    this.wsEndpoint = lightClientConfig.wsEndpoint;
+    this.appId = lightClientConfig.appId;
+    this.timeout = lightClientConfig.timeout;
     
     this.httpClient = axios.create({
-      baseURL: lightClientConfig.httpEndpoint,
-      timeout: 30000,
+      baseURL: this.httpEndpoint,
+      timeout: this.timeout,
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Avail-Explorer/1.0.0',
       },
     });
 
-    this.wsEndpoint = lightClientConfig.wsEndpoint;
     this.setupHttpInterceptors();
   }
 
