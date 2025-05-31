@@ -77,7 +77,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install only production dependencies with optimized flags
-RUN npm install --only=production --no-audit --no-fund --ignore-scripts && \
+RUN npm install --omit=dev --no-audit --no-fund --ignore-scripts && \
     npm cache clean --force && \
     # Remove npm to reduce attack surface
     npm uninstall -g npm
