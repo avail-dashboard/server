@@ -313,4 +313,208 @@ export const logJobFailed = (jobName: string, jobId: string, error: Error) => {
   });
 };
 
+// ===========================================
+// AVAIL-SPECIFIC LOGGING FUNCTIONS
+// ===========================================
+
+// HTTP Request/Response logging for Avail services
+export const logAvailHttpRequest = (
+  service: string,
+  method: string,
+  endpoint: string,
+  params?: any,
+  headers?: Record<string, string>,
+) => {
+  rpcLogger.info('Avail HTTP Request', {
+    service,
+    method,
+    endpoint,
+    params: params ? JSON.stringify(params).substring(0, 500) : undefined,
+    headers: headers ? Object.keys(headers) : undefined,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+export const logAvailHttpResponse = (
+  service: string,
+  method: string,
+  endpoint: string,
+  statusCode: number,
+  duration: number,
+  responseSize?: number,
+  success: boolean = true,
+  error?: string,
+) => {
+  const logLevel = success ? 'info' : 'error';
+  rpcLogger[logLevel]('Avail HTTP Response', {
+    service,
+    method,
+    endpoint,
+    statusCode,
+    duration: `${duration}ms`,
+    responseSize: responseSize ? `${responseSize} bytes` : undefined,
+    success,
+    error,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+// WebSocket message logging for Avail services
+export const logAvailWebSocketSend = (
+  service: string,
+  endpoint: string,
+  method: string,
+  messageId: string | number,
+  params?: any,
+  messageSize?: number,
+) => {
+  wsLogger.info('Avail WebSocket Send', {
+    service,
+    endpoint,
+    method,
+    messageId,
+    params: params ? JSON.stringify(params).substring(0, 300) : undefined,
+    messageSize: messageSize ? `${messageSize} bytes` : undefined,
+    direction: 'outgoing',
+    timestamp: new Date().toISOString(),
+  });
+};
+
+export const logAvailWebSocketReceive = (
+  service: string,
+  endpoint: string,
+  method: string,
+  messageId: string | number,
+  duration: number,
+  messageSize?: number,
+  success: boolean = true,
+  error?: string,
+) => {
+  const logLevel = success ? 'info' : 'error';
+  wsLogger[logLevel]('Avail WebSocket Receive', {
+    service,
+    endpoint,
+    method,
+    messageId,
+    duration: `${duration}ms`,
+    messageSize: messageSize ? `${messageSize} bytes` : undefined,
+    direction: 'incoming',
+    success,
+    error,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+// Connection state logging
+export const logAvailConnectionState = (
+  service: string,
+  endpoint: string,
+  state: 'connecting' | 'connected' | 'disconnected' | 'error' | 'reconnecting',
+  details?: Record<string, any>,
+) => {
+  const logLevel = state === 'error' ? 'error' : state === 'disconnected' ? 'warn' : 'info';
+  rpcLogger[logLevel]('Avail Connection State', {
+    service,
+    endpoint,
+    state,
+    ...details,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+// Performance and metrics logging
+export const logAvailPerformanceMetric = (
+  service: string,
+  operation: string,
+  duration: number,
+  success: boolean,
+  metadata?: Record<string, any>,
+) => {
+  rpcLogger.info('Avail Performance Metric', {
+    service,
+    operation,
+    duration: `${duration}ms`,
+    success,
+    ...metadata,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+// Service health and status logging
+export const logAvailServiceHealth = (
+  service: string,
+  healthy: boolean,
+  details: Record<string, any>,
+) => {
+  const logLevel = healthy ? 'info' : 'warn';
+  rpcLogger[logLevel]('Avail Service Health', {
+    service,
+    healthy,
+    details,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+// Data submission logging
+export const logAvailDataSubmission = (
+  service: string,
+  appId: number,
+  dataSize: number,
+  txHash?: string,
+  blockHash?: string,
+  success: boolean = true,
+  error?: string,
+) => {
+  const logLevel = success ? 'info' : 'error';
+  rpcLogger[logLevel]('Avail Data Submission', {
+    service,
+    appId,
+    dataSize: `${dataSize} bytes`,
+    txHash,
+    blockHash,
+    success,
+    error,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+// Fallback and retry logging
+export const logAvailFallback = (
+  operation: string,
+  failedEndpoint: string,
+  fallbackEndpoint: string,
+  reason: string,
+  attempt: number,
+) => {
+  rpcLogger.warn('Avail Service Fallback', {
+    operation,
+    failedEndpoint,
+    fallbackEndpoint,
+    reason,
+    attempt,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+export const logAvailRetry = (
+  service: string,
+  operation: string,
+  endpoint: string,
+  attempt: number,
+  maxAttempts: number,
+  delay: number,
+  lastError?: string,
+) => {
+  rpcLogger.warn('Avail Operation Retry', {
+    service,
+    operation,
+    endpoint,
+    attempt,
+    maxAttempts,
+    delay: `${delay}ms`,
+    lastError,
+    timestamp: new Date().toISOString(),
+  });
+};
+
 export default logger; 

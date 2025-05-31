@@ -1,7 +1,15 @@
 import axios, { AxiosInstance } from 'axios';
 import { EventEmitter } from 'events';
 import config from '../config';
-import { logError, rpcLogger } from '../utils/logger';
+import { 
+  logError, 
+  rpcLogger,
+  logAvailHttpRequest,
+  logAvailHttpResponse,
+  logAvailConnectionState,
+  logAvailPerformanceMetric,
+  logAvailServiceHealth,
+} from '../utils/logger';
 
 export interface BridgeInfo {
   availChainName: string;
@@ -113,11 +121,13 @@ export class AvailBridgeService extends EventEmitter {
     // Request interceptor
     this.httpClient.interceptors.request.use(
       (config) => {
-        rpcLogger.debug('Bridge API HTTP request', {
-          method: config.method,
-          url: config.url,
-          params: config.params,
-        });
+        logAvailHttpRequest(
+          'bridge',
+          config.method?.toUpperCase() || 'GET',
+          `${this.baseURL}${config.url}`,
+          config.params || config.data,
+          config.headers as Record<string, string>,
+        );
         return config;
       },
       (error) => {
@@ -129,14 +139,30 @@ export class AvailBridgeService extends EventEmitter {
     // Response interceptor
     this.httpClient.interceptors.response.use(
       (response) => {
-        rpcLogger.debug('Bridge API HTTP response', {
-          status: response.status,
-          url: response.config.url,
-          dataSize: JSON.stringify(response.data).length,
-        });
+        const responseSize = JSON.stringify(response.data).length;
+        logAvailHttpResponse(
+          'bridge',
+          response.config.method?.toUpperCase() || 'GET',
+          `${this.baseURL}${response.config.url}`,
+          response.status,
+          0, // Duration will be calculated in individual methods
+          responseSize,
+          true,
+        );
         return response;
       },
       (error) => {
+        const responseSize = error.response?.data ? JSON.stringify(error.response.data).length : 0;
+        logAvailHttpResponse(
+          'bridge',
+          error.config?.method?.toUpperCase() || 'GET',
+          `${this.baseURL}${error.config?.url}`,
+          error.response?.status || 0,
+          0,
+          responseSize,
+          false,
+          error.message,
+        );
         logError(error, {
           component: 'bridge-api-http',
           action: 'response',
@@ -149,16 +175,25 @@ export class AvailBridgeService extends EventEmitter {
   }
 
   async initialize(): Promise<void> {
+    const startTime = Date.now();
     try {
-      // Test connection by checking health
-      await this.checkHealth();
+      logAvailConnectionState('bridge', this.baseURL, 'connecting');
+      
+      // Test connection with a simple API call
+      await this.getHealth();
       
       this.isInitialized = true;
       this.emit('initialized');
       
+      const duration = Date.now() - startTime;
+      logAvailConnectionState('bridge', this.baseURL, 'connected');
+      logAvailPerformanceMetric('bridge', 'initialize', duration, true);
       rpcLogger.info('Avail Bridge Service initialized successfully');
     } catch (error) {
-      logError(error as Error, { component: 'bridge-api', action: 'initialize' });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('bridge', 'initialize', duration, false);
+      logAvailConnectionState('bridge', this.baseURL, 'error', { error: (error as Error).message });
+      logError(error as Error, { component: 'bridge', action: 'initialize' });
       throw error;
     }
   }
@@ -299,35 +334,232 @@ export class AvailBridgeService extends EventEmitter {
     return this.isInitialized;
   }
 
-  async getHealth(): Promise<{ healthy: boolean; details: any }> {
+  async getHealth(): Promise<{ status: string; timestamp: string }> {
+    const startTime = Date.now();
     try {
-      const health = await this.checkHealth();
-      const versions = await this.getVersions();
-      const bridgeInfo = await this.getBridgeInfo();
+      logAvailHttpRequest('bridge', 'GET', `${this.baseURL}/health`);
+      
+      const response = await this.httpClient.get('/health');
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('bridge', 'GET', `${this.baseURL}/health`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('bridge', 'getHealth', duration, true, { responseSize });
+      
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('bridge', 'getHealth', duration, false);
+      logError(error as Error, { method: 'getHealth' });
+      throw error;
+    }
+  }
 
+  async getBridgeStats(): Promise<any> {
+    const startTime = Date.now();
+    try {
+      logAvailHttpRequest('bridge', 'GET', `${this.baseURL}/stats`);
+      
+      const response = await this.httpClient.get('/stats');
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('bridge', 'GET', `${this.baseURL}/stats`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('bridge', 'getBridgeStats', duration, true, { responseSize });
+      
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('bridge', 'getBridgeStats', duration, false);
+      logError(error as Error, { method: 'getBridgeStats' });
+      throw error;
+    }
+  }
+
+  async getTransactions(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    from?: string;
+    to?: string;
+  } = {}): Promise<any> {
+    const startTime = Date.now();
+    try {
+      logAvailHttpRequest('bridge', 'GET', `${this.baseURL}/transactions`, params);
+      
+      const response = await this.httpClient.get('/transactions', { params });
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('bridge', 'GET', `${this.baseURL}/transactions`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('bridge', 'getTransactions', duration, true, { 
+        responseSize,
+        transactionCount: response.data.transactions?.length || 0,
+        ...params,
+      });
+      
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('bridge', 'getTransactions', duration, false, params);
+      logError(error as Error, { method: 'getTransactions', params });
+      throw error;
+    }
+  }
+
+  async getTransactionById(txId: string): Promise<any> {
+    const startTime = Date.now();
+    try {
+      logAvailHttpRequest('bridge', 'GET', `${this.baseURL}/transactions/${txId}`, { txId });
+      
+      const response = await this.httpClient.get(`/transactions/${txId}`);
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('bridge', 'GET', `${this.baseURL}/transactions/${txId}`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('bridge', 'getTransactionById', duration, true, { 
+        responseSize,
+        txId,
+        status: response.data.status,
+      });
+      
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('bridge', 'getTransactionById', duration, false, { txId });
+      logError(error as Error, { method: 'getTransactionById', txId });
+      throw error;
+    }
+  }
+
+  async getValidatorSet(): Promise<any> {
+    const startTime = Date.now();
+    try {
+      logAvailHttpRequest('bridge', 'GET', `${this.baseURL}/validator-set`);
+      
+      const response = await this.httpClient.get('/validator-set');
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('bridge', 'GET', `${this.baseURL}/validator-set`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('bridge', 'getValidatorSet', duration, true, { 
+        responseSize,
+        validatorCount: response.data.validators?.length || 0,
+      });
+      
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('bridge', 'getValidatorSet', duration, false);
+      logError(error as Error, { method: 'getValidatorSet' });
+      throw error;
+    }
+  }
+
+  async getProofs(blockHash: string, transactionIndex: number): Promise<any> {
+    const startTime = Date.now();
+    const params = { blockHash, transactionIndex };
+    try {
+      logAvailHttpRequest('bridge', 'GET', `${this.baseURL}/proofs`, params);
+      
+      const response = await this.httpClient.get('/proofs', { params });
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('bridge', 'GET', `${this.baseURL}/proofs`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('bridge', 'getProofs', duration, true, { 
+        responseSize,
+        blockHash,
+        transactionIndex,
+      });
+      
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('bridge', 'getProofs', duration, false, params);
+      logError(error as Error, { method: 'getProofs', params });
+      throw error;
+    }
+  }
+
+  async submitBridgeTransaction(transaction: any): Promise<any> {
+    const startTime = Date.now();
+    const transactionSize = JSON.stringify(transaction).length;
+    try {
+      logAvailHttpRequest('bridge', 'POST', `${this.baseURL}/submit`, transaction);
+      
+      const response = await this.httpClient.post('/submit', transaction);
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('bridge', 'POST', `${this.baseURL}/submit`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('bridge', 'submitBridgeTransaction', duration, true, { 
+        responseSize,
+        transactionSize,
+        txHash: response.data.txHash,
+      });
+      
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('bridge', 'submitBridgeTransaction', duration, false, { transactionSize });
+      logError(error as Error, { method: 'submitBridgeTransaction' });
+      throw error;
+    }
+  }
+
+  async getServiceHealth(): Promise<{ healthy: boolean; details: any }> {
+    const startTime = Date.now();
+    try {
+      const health = await this.getHealth();
+      const stats = await this.getBridgeStats();
+      const duration = Date.now() - startTime;
+
+      const healthDetails = {
+        apiStatus: health.status,
+        bridgeStats: stats,
+        endpoint: this.baseURL,
+        contracts: this.contracts,
+        responseTime: `${duration}ms`,
+      };
+
+      logAvailServiceHealth('bridge', true, healthDetails);
+      
       return {
         healthy: true,
-        details: {
-          service: health.name,
-          versions,
-          bridgeInfo,
-          initialized: this.isInitialized,
-        },
+        details: healthDetails,
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
+      const healthDetails = { 
+        error: (error as Error).message,
+        endpoint: this.baseURL,
+        responseTime: `${duration}ms`,
+      };
+
+      logAvailServiceHealth('bridge', false, healthDetails);
+      
       return {
         healthy: false,
-        details: { error: (error as Error).message },
+        details: healthDetails,
       };
     }
   }
 
   async shutdown(): Promise<void> {
+    const startTime = Date.now();
     try {
+      // No persistent connections to close for HTTP-only service
       this.isInitialized = false;
+      
+      const duration = Date.now() - startTime;
+      logAvailConnectionState('bridge', this.baseURL, 'disconnected', { reason: 'shutdown' });
+      logAvailPerformanceMetric('bridge', 'shutdown', duration, true);
       rpcLogger.info('Avail Bridge Service shutdown complete');
     } catch (error) {
-      logError(error as Error, { component: 'bridge-api', action: 'shutdown' });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('bridge', 'shutdown', duration, false);
+      logError(error as Error, { component: 'bridge', action: 'shutdown' });
     }
   }
 } 

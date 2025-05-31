@@ -6,6 +6,7 @@ import { RPCConnectionManager } from './connection';
 import {
   logError,
   rpcLogger,
+  logAvailPerformanceMetric,
   logDetailedRpcCall,
 } from '../../utils/logger';
 import { cache, CacheKeys } from '../../utils/cache';
@@ -240,41 +241,96 @@ export class RPCMethodsService {
   }
 
   async getBlockByNumber(blockNumber: bigint): Promise<Block | null> {
-    const cacheKey = CacheKeys.blockByNumber(blockNumber);
-    
-    const response = await this.executeRPCCall<SignedBlock>(
-      {
-        method: 'chain.getBlock',
-        params: [await this.getBlockHashByNumber(blockNumber)],
-      },
-      cacheKey,
-      config.cache.ttl.blockByNumber,
-    );
+    const startTime = Date.now();
+    try {
+      const connection = this.connectionManager.getActiveConnection();
+      if (!connection) {
+        throw new Error('No active RPC connection available');
+      }
 
-    if (!response.success || !response.data) {
-      return null;
+      const blockHash = await connection.api.rpc.chain.getBlockHash(blockNumber);
+      if (blockHash.isEmpty) {
+        const duration = Date.now() - startTime;
+        logAvailPerformanceMetric('rpc', 'getBlockByNumber', duration, true, {
+          blockNumber: Number(blockNumber),
+          found: false,
+        });
+        return null;
+      }
+
+      const block = await connection.api.rpc.chain.getBlock(blockHash);
+      const header = await connection.api.rpc.chain.getHeader(blockHash);
+      
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(block.toJSON()).length;
+      
+      logDetailedRpcCall(
+        'chain.getBlock',
+        connection.endpoint,
+        [blockNumber.toString()],
+        duration,
+        true,
+        responseSize,
+        false,
+        'rpc',
+      );
+      
+      logAvailPerformanceMetric('rpc', 'getBlockByNumber', duration, true, {
+        blockNumber: Number(blockNumber),
+        blockHash: blockHash.toString(),
+        responseSize,
+        found: true,
+      });
+
+      return this.formatBlock(block, header);
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('rpc', 'getBlockByNumber', duration, false, {
+        blockNumber: Number(blockNumber),
+      });
+      logError(error as Error, { method: 'getBlockByNumber', blockNumber: Number(blockNumber) });
+      throw error;
     }
-
-    return this.transformSignedBlockToBlock(response.data);
   }
 
   async getBlockByHash(blockHash: string): Promise<Block | null> {
-    const cacheKey = CacheKeys.blockByHash(blockHash);
-    
-    const response = await this.executeRPCCall<SignedBlock>(
-      {
-        method: 'chain.getBlock',
-        params: [blockHash],
-      },
-      cacheKey,
-      config.cache.ttl.blockByHash,
-    );
+    const startTime = Date.now();
+    try {
+      const connection = this.connectionManager.getActiveConnection();
+      if (!connection) {
+        throw new Error('No active RPC connection available');
+      }
 
-    if (!response.success || !response.data) {
-      return null;
+      const block = await connection.api.rpc.chain.getBlock(blockHash);
+      const header = await connection.api.rpc.chain.getHeader(blockHash);
+      
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(block.toJSON()).length;
+      
+      logDetailedRpcCall(
+        'chain.getBlock',
+        connection.endpoint,
+        [blockHash],
+        duration,
+        true,
+        responseSize,
+        false,
+        'rpc',
+      );
+      
+      logAvailPerformanceMetric('rpc', 'getBlockByHash', duration, true, {
+        blockHash,
+        blockNumber: header.number.toNumber(),
+        responseSize,
+      });
+
+      return this.formatBlock(block, header);
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('rpc', 'getBlockByHash', duration, false, { blockHash });
+      logError(error as Error, { method: 'getBlockByHash', blockHash });
+      throw error;
     }
-
-    return this.transformSignedBlockToBlock(response.data);
   }
 
   private async getBlockHashByNumber(blockNumber: bigint): Promise<string> {
@@ -492,41 +548,56 @@ export class RPCMethodsService {
   // ===========================================
 
   async getChainStats(): Promise<ChainStats> {
+    const startTime = Date.now();
     try {
-      const header = await this.executeRPCCall<Header>({ 
-        method: 'chain.getHeader', 
-        params: [],
-      });
-
-      if (!header.success || !header.data) {
-        throw new Error('Failed to get chain header');
+      const connection = this.connectionManager.getActiveConnection();
+      if (!connection) {
+        throw new Error('No active RPC connection available');
       }
 
-      const blockHeight = BigInt(header.data.number.toString());
-      
-      // Use default values for now since the complex queries are failing
-      const totalIssuance = BigInt('1000000000000000000000000'); // 1M AVAIL default
-      const activeValidators = 50; // Default estimate
-      const nominators = 200; // Default estimate
-      const minimumStake = BigInt('1000000000000000000'); // 1 AVAIL
-      const averageStake = BigInt('10000000000000000000'); // 10 AVAIL
-      const inflation = 8.5;
-      const stakingRatio = 0.6; // 60% staked
-      
-      return {
-        blockHeight,
-        blockTime: 6, // Avail block time in seconds
+      const [
+        finalizedHead,
+        bestHead,
         totalIssuance,
-        activeValidators,
-        nominators,
-        minimumStake,
-        averageStake,
-        inflation,
-        stakingRatio,
-        lastUpdateTime: BigInt(Date.now()),
+        validatorCount,
+      ] = await Promise.all([
+        connection.api.rpc.chain.getFinalizedHead(),
+        connection.api.rpc.chain.getHeader(),
+        connection.api.query.balances.totalIssuance(),
+        connection.api.query.session.validators(),
+      ]);
+
+      const finalizedHeader = await connection.api.rpc.chain.getHeader(finalizedHead);
+      
+      const duration = Date.now() - startTime;
+      
+      logDetailedRpcCall(
+        'chain.getChainStats',
+        connection.endpoint,
+        [],
+        duration,
+        true,
+        undefined,
+        false,
+        'rpc',
+      );
+      
+      logAvailPerformanceMetric('rpc', 'getChainStats', duration, true, {
+        finalizedBlock: finalizedHeader.number.toNumber(),
+        bestBlock: bestHead.number.toNumber(),
+        validatorCount: validatorCount.length,
+      });
+
+      return {
+        bestBlock: bestHead.number.toBigInt(),
+        finalizedBlock: finalizedHeader.number.toBigInt(),
+        totalIssuance: totalIssuance.toBigInt(),
+        validatorCount: validatorCount.length,
       };
     } catch (error) {
-      logError(error as Error, { operation: 'getChainStats' });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('rpc', 'getChainStats', duration, false);
+      logError(error as Error, { method: 'getChainStats' });
       throw error;
     }
   }
@@ -587,25 +658,44 @@ export class RPCMethodsService {
   // ===========================================
 
   async getValidators(): Promise<Validator[]> {
+    const startTime = Date.now();
     try {
-      // Return mock validators for now since the complex queries are failing
-      const mockValidators: Validator[] = [];
-      for (let i = 0; i < 50; i++) {
-        mockValidators.push({
-          address: `5${Math.random().toString(36).substring(2, 48)}`,
-          commission: '5',
-          selfStake: BigInt('10000000000000000000'), // 10 AVAIL
-          totalStake: BigInt('100000000000000000000'), // 100 AVAIL
-          active: true,
-          nominators: 10,
-          ownStake: BigInt('10000000000000000000'),
-          othersStake: BigInt('90000000000000000000'),
-        });
+      const connection = this.connectionManager.getActiveConnection();
+      if (!connection) {
+        throw new Error('No active RPC connection available');
       }
-      return mockValidators;
+
+      const validators = await connection.api.query.session.validators();
+      
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(validators.toJSON()).length;
+      
+      logDetailedRpcCall(
+        'session.validators',
+        connection.endpoint,
+        [],
+        duration,
+        true,
+        responseSize,
+        false,
+        'rpc',
+      );
+      
+      logAvailPerformanceMetric('rpc', 'getValidators', duration, true, {
+        validatorCount: validators.length,
+        responseSize,
+      });
+
+      return validators.map((validator, index) => ({
+        address: validator.toString(),
+        index,
+        isActive: true, // All validators in the session are active
+      }));
     } catch (error) {
-      logError(error as Error, { operation: 'getValidators' });
-      return [];
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('rpc', 'getValidators', duration, false);
+      logError(error as Error, { method: 'getValidators' });
+      throw error;
     }
   }
 

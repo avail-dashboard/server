@@ -1,7 +1,16 @@
 import axios, { AxiosInstance } from 'axios';
 import { EventEmitter } from 'events';
 import config from '../config';
-import { logError, rpcLogger } from '../utils/logger';
+import { 
+  logError, 
+  rpcLogger,
+  logAvailHttpRequest,
+  logAvailHttpResponse,
+  logAvailConnectionState,
+  logAvailPerformanceMetric,
+  logAvailServiceHealth,
+  logAvailDataSubmission,
+} from '../utils/logger';
 
 export interface TurboSubmissionResponse {
   submission_id: string;
@@ -73,12 +82,13 @@ export class TurboDAService extends EventEmitter {
     // Request interceptor
     this.httpClient.interceptors.request.use(
       (config) => {
-        rpcLogger.debug('Turbo DA HTTP request', {
-          method: config.method,
-          url: config.url,
-          contentType: config.headers?.['Content-Type'],
-          dataSize: config.data ? (typeof config.data === 'string' ? config.data.length : Buffer.byteLength(config.data)) : 0,
-        });
+        logAvailHttpRequest(
+          'turboDA',
+          config.method?.toUpperCase() || 'GET',
+          `${this.baseURL}${config.url}`,
+          config.params || config.data,
+          config.headers as Record<string, string>,
+        );
         return config;
       },
       (error) => {
@@ -90,14 +100,30 @@ export class TurboDAService extends EventEmitter {
     // Response interceptor
     this.httpClient.interceptors.response.use(
       (response) => {
-        rpcLogger.debug('Turbo DA HTTP response', {
-          status: response.status,
-          url: response.config.url,
-          dataSize: JSON.stringify(response.data).length,
-        });
+        const responseSize = JSON.stringify(response.data).length;
+        logAvailHttpResponse(
+          'turboDA',
+          response.config.method?.toUpperCase() || 'GET',
+          `${this.baseURL}${response.config.url}`,
+          response.status,
+          0, // Duration will be calculated in individual methods
+          responseSize,
+          true,
+        );
         return response;
       },
       (error) => {
+        const responseSize = error.response?.data ? JSON.stringify(error.response.data).length : 0;
+        logAvailHttpResponse(
+          'turboDA',
+          error.config?.method?.toUpperCase() || 'GET',
+          `${this.baseURL}${error.config?.url}`,
+          error.response?.status || 0,
+          0,
+          responseSize,
+          false,
+          error.message,
+        );
         logError(error, {
           component: 'turbo-da-http',
           action: 'response',
@@ -110,20 +136,32 @@ export class TurboDAService extends EventEmitter {
   }
 
   async initialize(): Promise<void> {
+    const startTime = Date.now();
     try {
-      // Test connection by getting stats (if available)
+      logAvailConnectionState('turboDA', this.baseURL, 'connecting');
+      
+      // Test connection with stats endpoint (optional)
       try {
         await this.getStats();
-      } catch {
-        // If stats endpoint doesn't exist, just log and continue
+        logAvailConnectionState('turboDA', this.baseURL, 'connected');
+      } catch (error) {
+        // Stats endpoint might not be available, but service can still work
+        logAvailConnectionState('turboDA', this.baseURL, 'connected', { 
+          note: 'Stats endpoint not available, but service is functional',
+        });
         rpcLogger.info('Turbo DA stats endpoint not available, continuing with basic initialization');
       }
       
       this.isInitialized = true;
       this.emit('initialized');
       
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('turboDA', 'initialize', duration, true);
       rpcLogger.info('Turbo DA Service initialized successfully');
     } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('turboDA', 'initialize', duration, false);
+      logAvailConnectionState('turboDA', this.baseURL, 'error', { error: (error as Error).message });
       logError(error as Error, { component: 'turbo-da', action: 'initialize' });
       throw error;
     }
@@ -133,78 +171,107 @@ export class TurboDAService extends EventEmitter {
   // TURBO DA API METHODS
   // ===========================================
 
-  async submitRawData(data: Buffer, appId = 0): Promise<TurboSubmissionResponse> {
+  async submitRawData(data: Buffer): Promise<{ submissionId: string; status: string }> {
+    const startTime = Date.now();
+    const dataSize = data.length;
     try {
+      logAvailHttpRequest('turboDA', 'POST', `${this.baseURL}/submit/raw`, { dataSize });
+      
       const response = await this.httpClient.post('/submit/raw', data, {
         headers: {
           'Content-Type': 'application/octet-stream',
         },
-        params: {
-          app_id: appId,
-        },
+      });
+      
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('turboDA', 'POST', `${this.baseURL}/submit/raw`, 200, duration, responseSize, true);
+      logAvailDataSubmission('turboDA', 0, dataSize, response.data.submissionId, undefined, true);
+      logAvailPerformanceMetric('turboDA', 'submitRawData', duration, true, { 
+        dataSize,
+        submissionId: response.data.submissionId,
       });
       
       rpcLogger.info('Raw data submitted to Turbo DA', {
-        submission_id: response.data.submission_id,
-        data_size: data.length,
-        app_id: appId,
+        submissionId: response.data.submissionId,
+        dataSize,
+        duration: `${duration}ms`,
       });
       
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'submitRawData', dataSize: data.length, appId });
+      const duration = Date.now() - startTime;
+      logAvailDataSubmission('turboDA', 0, dataSize, undefined, undefined, false, (error as Error).message);
+      logAvailPerformanceMetric('turboDA', 'submitRawData', duration, false, { dataSize });
+      logError(error as Error, { method: 'submitRawData', dataSize });
       throw error;
     }
   }
 
-  async submitJsonData(data: object, appId = 0): Promise<TurboSubmissionResponse> {
+  async submitJsonData(data: any): Promise<{ submissionId: string; status: string }> {
+    const startTime = Date.now();
+    const dataString = JSON.stringify(data);
+    const dataSize = Buffer.byteLength(dataString, 'utf8');
     try {
-      const response = await this.httpClient.post('/submit/json', data, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        params: {
-          app_id: appId,
-        },
+      logAvailHttpRequest('turboDA', 'POST', `${this.baseURL}/submit/json`, data);
+      
+      const response = await this.httpClient.post('/submit/json', data);
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('turboDA', 'POST', `${this.baseURL}/submit/json`, 200, duration, responseSize, true);
+      logAvailDataSubmission('turboDA', 0, dataSize, response.data.submissionId, undefined, true);
+      logAvailPerformanceMetric('turboDA', 'submitJsonData', duration, true, { 
+        dataSize,
+        submissionId: response.data.submissionId,
       });
       
       rpcLogger.info('JSON data submitted to Turbo DA', {
-        submission_id: response.data.submission_id,
-        data_size: JSON.stringify(data).length,
-        app_id: appId,
+        submissionId: response.data.submissionId,
+        dataSize,
+        duration: `${duration}ms`,
       });
       
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'submitJsonData', dataSize: JSON.stringify(data).length, appId });
+      const duration = Date.now() - startTime;
+      logAvailDataSubmission('turboDA', 0, dataSize, undefined, undefined, false, (error as Error).message);
+      logAvailPerformanceMetric('turboDA', 'submitJsonData', duration, false, { dataSize });
+      logError(error as Error, { method: 'submitJsonData', dataSize });
       throw error;
     }
   }
 
-  async submitTextData(data: string, appId = 0, encoding: 'utf8' | 'base64' = 'utf8'): Promise<TurboSubmissionResponse> {
+  async submitTextData(text: string): Promise<{ submissionId: string; status: string }> {
+    const startTime = Date.now();
+    const dataSize = Buffer.byteLength(text, 'utf8');
     try {
-      const buffer = Buffer.from(data, encoding);
+      logAvailHttpRequest('turboDA', 'POST', `${this.baseURL}/submit/text`, { text });
       
-      const response = await this.httpClient.post('/submit/text', data, {
-        headers: {
-          'Content-Type': 'text/plain',
-        },
-        params: {
-          app_id: appId,
-          encoding,
-        },
+      const response = await this.httpClient.post('/submit/text', { text });
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('turboDA', 'POST', `${this.baseURL}/submit/text`, 200, duration, responseSize, true);
+      logAvailDataSubmission('turboDA', 0, dataSize, response.data.submissionId, undefined, true);
+      logAvailPerformanceMetric('turboDA', 'submitTextData', duration, true, { 
+        dataSize,
+        submissionId: response.data.submissionId,
       });
       
       rpcLogger.info('Text data submitted to Turbo DA', {
-        submission_id: response.data.submission_id,
-        data_size: buffer.length,
-        app_id: appId,
-        encoding,
+        submissionId: response.data.submissionId,
+        dataSize,
+        duration: `${duration}ms`,
       });
       
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'submitTextData', dataSize: data.length, appId, encoding });
+      const duration = Date.now() - startTime;
+      logAvailDataSubmission('turboDA', 0, dataSize, undefined, undefined, false, (error as Error).message);
+      logAvailPerformanceMetric('turboDA', 'submitTextData', duration, false, { dataSize });
+      logError(error as Error, { method: 'submitTextData', dataSize });
       throw error;
     }
   }
@@ -229,22 +296,101 @@ export class TurboDAService extends EventEmitter {
     }
   }
 
-  async getSubmissionStatus(submissionId: string): Promise<{ status: string; block_number?: number }> {
+  async getSubmissionStatus(submissionId: string): Promise<any> {
+    const startTime = Date.now();
     try {
-      const response = await this.httpClient.get(`/submission/${submissionId}/status`);
+      logAvailHttpRequest('turboDA', 'GET', `${this.baseURL}/status/${submissionId}`, { submissionId });
+      
+      const response = await this.httpClient.get(`/status/${submissionId}`);
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('turboDA', 'GET', `${this.baseURL}/status/${submissionId}`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('turboDA', 'getSubmissionStatus', duration, true, { 
+        submissionId,
+        status: response.data.status,
+        responseSize,
+      });
+      
       return response.data;
     } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('turboDA', 'getSubmissionStatus', duration, false, { submissionId });
       logError(error as Error, { method: 'getSubmissionStatus', submissionId });
       throw error;
     }
   }
 
-  async getStats(): Promise<TurboDAStats> {
+  async getSubmissionData(submissionId: string): Promise<any> {
+    const startTime = Date.now();
     try {
-      const response = await this.httpClient.get('/stats');
+      logAvailHttpRequest('turboDA', 'GET', `${this.baseURL}/data/${submissionId}`, { submissionId });
+      
+      const response = await this.httpClient.get(`/data/${submissionId}`);
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('turboDA', 'GET', `${this.baseURL}/data/${submissionId}`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('turboDA', 'getSubmissionData', duration, true, { 
+        submissionId,
+        responseSize,
+      });
+      
       return response.data;
     } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('turboDA', 'getSubmissionData', duration, false, { submissionId });
+      logError(error as Error, { method: 'getSubmissionData', submissionId });
+      throw error;
+    }
+  }
+
+  async getStats(): Promise<any> {
+    const startTime = Date.now();
+    try {
+      logAvailHttpRequest('turboDA', 'GET', `${this.baseURL}/stats`);
+      
+      const response = await this.httpClient.get('/stats');
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('turboDA', 'GET', `${this.baseURL}/stats`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('turboDA', 'getStats', duration, true, { responseSize });
+      
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('turboDA', 'getStats', duration, false);
       logError(error as Error, { method: 'getStats' });
+      throw error;
+    }
+  }
+
+  async getSubmissions(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  } = {}): Promise<any> {
+    const startTime = Date.now();
+    try {
+      logAvailHttpRequest('turboDA', 'GET', `${this.baseURL}/submissions`, params);
+      
+      const response = await this.httpClient.get('/submissions', { params });
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('turboDA', 'GET', `${this.baseURL}/submissions`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('turboDA', 'getSubmissions', duration, true, { 
+        responseSize,
+        submissionCount: response.data.submissions?.length || 0,
+        ...params,
+      });
+      
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('turboDA', 'getSubmissions', duration, false, params);
+      logError(error as Error, { method: 'getSubmissions', params });
       throw error;
     }
   }
@@ -267,13 +413,13 @@ export class TurboDAService extends EventEmitter {
         
         switch (item.type) {
         case 'raw':
-          result = await this.submitRawData(item.data as Buffer, item.appId);
+          result = await this.submitRawData(item.data as Buffer);
           break;
         case 'json':
-          result = await this.submitJsonData(item.data as object, item.appId);
+          result = await this.submitJsonData(item.data as object);
           break;
         case 'text':
-          result = await this.submitTextData(item.data as string, item.appId, item.encoding);
+          result = await this.submitTextData(item.data as string);
           break;
         default:
           throw new Error(`Unsupported data type: ${item.type}`);
@@ -289,40 +435,64 @@ export class TurboDAService extends EventEmitter {
     return results;
   }
 
-  async pollSubmissionUntilFinalized(submissionId: string, maxAttempts = 30, intervalMs = 5000): Promise<SubmissionInfo> {
+  async pollSubmissionStatus(
+    submissionId: string,
+    maxAttempts: number = 10,
+    intervalMs: number = 5000,
+  ): Promise<any> {
+    const startTime = Date.now();
     let attempts = 0;
     
     while (attempts < maxAttempts) {
       try {
-        const info = await this.getSubmissionInfo(submissionId);
-        
-        if (info.status === 'finalized') {
-          return info;
-        }
-        
-        if (info.status === 'failed') {
-          throw new Error(`Submission ${submissionId} failed`);
-        }
-        
-        rpcLogger.debug('Polling submission status', {
-          submission_id: submissionId,
-          status: info.status,
-          attempt: attempts + 1,
+        attempts++;
+        logAvailPerformanceMetric('turboDA', 'pollSubmissionStatus', 0, true, { 
+          submissionId,
+          attempt: attempts,
+          maxAttempts,
         });
         
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
-        attempts++;
-      } catch (error) {
-        if (attempts === maxAttempts - 1) {
-          throw error;
+        rpcLogger.debug('Polling submission status', {
+          submissionId,
+          attempt: attempts,
+          maxAttempts,
+        });
+        
+        const status = await this.getSubmissionStatus(submissionId);
+        
+        if (status.status === 'completed' || status.status === 'failed') {
+          const duration = Date.now() - startTime;
+          logAvailPerformanceMetric('turboDA', 'pollSubmissionStatusComplete', duration, true, { 
+            submissionId,
+            finalStatus: status.status,
+            attempts,
+          });
+          return status;
         }
         
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
-        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, intervalMs));
+        }
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        logAvailPerformanceMetric('turboDA', 'pollSubmissionStatusComplete', duration, false, { 
+          submissionId,
+          attempts,
+          error: (error as Error).message,
+        });
+        logError(error as Error, { method: 'pollSubmissionStatus', submissionId, attempts });
+        throw error;
       }
     }
     
-    throw new Error(`Submission ${submissionId} did not finalize within ${maxAttempts} attempts`);
+    const duration = Date.now() - startTime;
+    const timeoutError = new Error(`Polling timeout after ${maxAttempts} attempts`);
+    logAvailPerformanceMetric('turboDA', 'pollSubmissionStatusComplete', duration, false, { 
+      submissionId,
+      attempts,
+      error: 'timeout',
+    });
+    throw timeoutError;
   }
 
   // ===========================================
@@ -333,31 +503,54 @@ export class TurboDAService extends EventEmitter {
     return this.isInitialized;
   }
 
-  async getHealth(): Promise<{ healthy: boolean; details: any }> {
+  async getServiceHealth(): Promise<{ healthy: boolean; details: any }> {
+    const startTime = Date.now();
     try {
       const stats = await this.getStats();
+      const duration = Date.now() - startTime;
 
+      const healthDetails = {
+        stats,
+        endpoint: this.baseURL,
+        responseTime: `${duration}ms`,
+      };
+
+      logAvailServiceHealth('turboDA', true, healthDetails);
+      
       return {
         healthy: true,
-        details: {
-          service: 'Turbo DA',
-          stats,
-          initialized: this.isInitialized,
-        },
+        details: healthDetails,
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
+      const healthDetails = { 
+        error: (error as Error).message,
+        endpoint: this.baseURL,
+        responseTime: `${duration}ms`,
+      };
+
+      logAvailServiceHealth('turboDA', false, healthDetails);
+      
       return {
         healthy: false,
-        details: { error: (error as Error).message },
+        details: healthDetails,
       };
     }
   }
 
   async shutdown(): Promise<void> {
+    const startTime = Date.now();
     try {
+      // No persistent connections to close for HTTP-only service
       this.isInitialized = false;
+      
+      const duration = Date.now() - startTime;
+      logAvailConnectionState('turboDA', this.baseURL, 'disconnected', { reason: 'shutdown' });
+      logAvailPerformanceMetric('turboDA', 'shutdown', duration, true);
       rpcLogger.info('Turbo DA Service shutdown complete');
     } catch (error) {
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('turboDA', 'shutdown', duration, false);
       logError(error as Error, { component: 'turbo-da', action: 'shutdown' });
     }
   }
