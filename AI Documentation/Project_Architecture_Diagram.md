@@ -66,18 +66,15 @@ graph TB
         end
 
         subgraph "Data Layer"
-            SQLITE_STORE[SQLite Store<br/>Development Database<br/>File-based Storage]
+            DATA_DIR[data/]
+            POSTGRES_STORE[postgres-store.ts<br/>Database Operations]
         end
     end
 
     %% Infrastructure Services
     subgraph "Infrastructure"
-        subgraph "Development"
-            SQLITE_DB[(SQLite Database<br/>./data/avail_explorer.db<br/>• Zero Config<br/>• File-based<br/>• Development Only)]
-        end
-
-        subgraph "Production"
-            POSTGRES[(PostgreSQL 15<br/>Production Database<br/>• High Performance<br/>• Concurrent Access<br/>• ACID Compliance)]
+        subgraph "All Environments"
+            POSTGRES[(PostgreSQL 15<br/>Database<br/>• High Performance<br/>• Concurrent Access<br/>• ACID Compliance)]
             REDIS_CACHE[(Redis 7<br/>Cache & Sessions<br/>• IORedis Client<br/>• Session Storage<br/>• API Caching<br/>• Real-time Data)]
             BULL_QUEUE[Bull Queue<br/>• Job Processing<br/>• Background Tasks<br/>• Redis-backed]
         end
@@ -136,8 +133,7 @@ graph TB
 
     BLOCKCHAIN_SERVICE --> DATA_SERVICE
     ANALYTICS_SERVICE --> DATA_SERVICE
-    DATA_SERVICE --> SQLITE_STORE
-    SQLITE_STORE --> SQLITE_DB
+    DATA_SERVICE --> POSTGRES_STORE
 
     %% Production connections
     DATA_SERVICE -.-> POSTGRES
@@ -172,8 +168,8 @@ graph TB
     class EXPRESS,WEBSOCKET_SERVER,MIDDLEWARE,BLOCKS_ROUTE,CHAIN_ROUTE,EXTRINSICS_ROUTE,SEARCH_ROUTE,ACCOUNTS_ROUTE,VALIDATORS_ROUTE,ANALYTICS_ROUTE,ROLLUPS_ROUTE,DATA_SUB_ROUTE api
     class UNIFIED_AVAIL,BLOCKCHAIN_SERVICE,HYBRID_RPC,ANALYTICS_SERVICE,WEBSOCKET_SERVICE,JOBS_SERVICE,DATA_SERVICE service
     class TURBO_DA_SERVICE,NEXUS_SERVICE,LIGHT_CLIENT,BRIDGE_SERVICE specialized
-    class SQLITE_STORE data
-    class SQLITE_DB,POSTGRES,REDIS_CACHE,BULL_QUEUE infra
+    class POSTGRES_STORE data
+    class POSTGRES,REDIS_CACHE,BULL_QUEUE infra
     class LOGS,METRICS,HEALTH monitoring
 ```
 
@@ -183,7 +179,7 @@ graph TB
 graph TB
     subgraph "Development Environment"
         DEV_APP[Node.js Application<br/>tsx watch src/index.ts]
-        DEV_DB[(SQLite Database<br/>./data/avail_explorer.db)]
+        DEV_DB[(PostgreSQL Database<br/>Development Instance<br/>• Network-based<br/>• Production-ready<br/>• Consistent Environment)]
         DEV_APP --> DEV_DB
     end
 
@@ -319,8 +315,7 @@ mindmap
       JWT Authentication
       Express Validator
     Data Layer
-      SQLite (Development)
-      PostgreSQL 15 (Production)
+      PostgreSQL 15 (All Environments)
       Redis 7 (IORedis 5.3+)
       Bull Queue (Job Processing)
     Blockchain Integration
@@ -367,7 +362,7 @@ mindmap
 1. **Unified Service Architecture**: Centralized service orchestration through unified-avail.ts for seamless multi-source integration
 2. **Hybrid RPC Support**: Multi-provider RPC service with automatic failover and load balancing capabilities
 3. **Specialized Data Sources**: Integration with Turbo DA, Avail Nexus, Avail Bridge, and Light Client services
-4. **Dual Database Support**: SQLite for development, PostgreSQL 15 for production with automatic migration
+4. **PostgreSQL Database**: PostgreSQL 15 for all environments with consistent schema and performance
 5. **Advanced Caching**: Redis 7 with IORedis client for high-performance caching and session management
 6. **Real-time Updates**: WebSocket integration with Socket.io for live blockchain data and analytics
 7. **Background Job Processing**: Bull queue system for asynchronous task processing and scheduled operations
@@ -459,7 +454,7 @@ graph TD
             
             subgraph "Data Layer"
                 DATA_DIR[data/]
-                SQLITE_STORE[sqlite-store.ts<br/>Database Operations]
+                POSTGRES_STORE[postgres-store.ts<br/>Database Operations]
             end
         end
         
@@ -499,7 +494,6 @@ graph TD
     end
 
     subgraph "Data & Logs"
-        DATA_FOLDER[data/<br/>SQLite Database]
         LOGS_FOLDER[logs/<br/>Application Logs]
         DIST_FOLDER[dist/<br/>Compiled JavaScript]
         NODE_MODULES[node_modules/<br/>Dependencies]
@@ -566,7 +560,7 @@ graph TD
     RPC_DIR --> RPC_METHODS
     RPC_DIR --> RPC_SUBSCRIPTIONS
     
-    DATA_DIR --> SQLITE_STORE
+    DATA_DIR --> POSTGRES_STORE
     
     MIDDLEWARE_DIR --> MIDDLEWARE_INDEX
     UTILS_DIR --> LOGGER
@@ -597,7 +591,7 @@ graph TD
     class INDEX,TEST_RUNNER,TEST_AVAIL,PACKAGE,DOCKER entry
     class CONFIG_DIR,CONFIG_INDEX,TSCONFIG,ESLINT,ENV,NGINX_CONF config
     class ROUTES_DIR,BLOCKS_ROUTE,CHAIN_ROUTE,EXTRINSICS_ROUTE,SEARCH_ROUTE,ACCOUNTS_ROUTE,VALIDATORS_ROUTE,ANALYTICS_ROUTE,ROLLUPS_ROUTE,DATA_SUB_ROUTE routes
-    class SERVICES_DIR,BLOCKCHAIN_SERVICE,UNIFIED_AVAIL,HYBRID_RPC,ANALYTICS_SERVICE,WEBSOCKET_SERVICE,JOBS_SERVICE,RPC_DIR,RPC_INDEX,RPC_CONNECTION,RPC_METHODS,RPC_SUBSCRIPTIONS,DATA_DIR,SQLITE_STORE services
+    class SERVICES_DIR,BLOCKCHAIN_SERVICE,UNIFIED_AVAIL,HYBRID_RPC,ANALYTICS_SERVICE,WEBSOCKET_SERVICE,JOBS_SERVICE,RPC_DIR,RPC_INDEX,RPC_CONNECTION,RPC_METHODS,RPC_SUBSCRIPTIONS,DATA_DIR,POSTGRES_STORE services
     class TURBO_DA,AVAIL_NEXUS,LIGHT_CLIENT,BRIDGE_SERVICE specialized
     class UTILS_DIR,LOGGER,DATABASE,CACHE,MIDDLEWARE_DIR,MIDDLEWARE_INDEX,TYPES_DIR,TYPES_INDEX,RPC_TYPES utils
     class TESTS,TEST_SETUP,SRC_TESTS,UNIT_TESTS,INTEGRATION_TESTS,E2E_TESTS,FIXTURES,HELPERS tests
@@ -807,8 +801,7 @@ graph LR
     end
 
     subgraph "Database Layer"
-        SQLITE[SQLite<br/>Development DB]
-        POSTGRES[PostgreSQL<br/>Production DB]
+        POSTGRES[PostgreSQL<br/>Database]
         PG_DRIVER[pg 8.11+<br/>PostgreSQL Driver]
         REDIS[Redis<br/>Caching]
         IOREDIS[IORedis 5.3+<br/>Redis Client]
@@ -913,7 +906,7 @@ graph LR
     classDef polkadot fill:#f9f9f9
 
     class EXPRESS,TYPESCRIPT,POLKADOT,SMOLDOT core
-    class SQLITE,POSTGRES,PG_DRIVER,REDIS,IOREDIS database
+    class POSTGRES,PG_DRIVER,REDIS,IOREDIS database
     class BULL,NODE_CRON jobs
     class HELMET,CORS,COMPRESSION,RATE_LIMIT,JOI,EXPRESS_VALIDATOR middleware
     class SOCKETIO,AXIOS realtime

@@ -158,7 +158,7 @@ it('should connect successfully', async () => {
 - **Error Handling**: Verify graceful error handling
 
 ### Integration Tests
-- **API Endpoints**: Test with real database (SQLite in-memory)
+- **API Endpoints**: Test with real database (PostgreSQL test database)
 - **Middleware**: Test request/response flow
 - **Error Responses**: Test API error handling
 

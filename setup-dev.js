@@ -17,23 +17,14 @@ if (!fs.existsSync(envFile)) {
   console.log('✅ .env file already exists\n');
 }
 
-// Create data directory for SQLite
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) {
-  console.log('📁 Creating data directory for SQLite...');
-  fs.mkdirSync(dataDir, { recursive: true });
-  console.log('✅ Data directory created\n');
-} else {
-  console.log('✅ Data directory already exists\n');
-}
-
 console.log('🎉 Development environment setup complete!\n');
 console.log('Next steps:');
-console.log('1. Review and update .env file if needed');
-console.log('2. Run: npm run dev');
-console.log('3. The SQLite database will be created automatically at ./data/avail_explorer.db\n');
+console.log('1. Review and update .env file with your PostgreSQL connection details');
+console.log('2. Ensure PostgreSQL is running and accessible');
+console.log('3. Run: npm run dev');
+console.log('4. The database tables will be created automatically on first run\n');
 
 console.log('📝 Notes:');
-console.log('- SQLite is used for development (no PostgreSQL setup required)');
+console.log('- PostgreSQL is required for all environments');
 console.log('- Redis is optional for development (caching disabled by default)');
-console.log('- Check the .env file to configure API keys if needed\n'); 
+console.log('- Update DATABASE_URL in .env with your PostgreSQL connection string\n'); 
