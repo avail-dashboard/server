@@ -61,8 +61,8 @@ Create test environment file in the workflow:
     cat > .env.test << EOF
     NODE_ENV=test
     PORT=3002
-    DATABASE_TYPE=sqlite
-    SQLITE_PATH=:memory:
+    DATABASE_TYPE=postgresql
+    DATABASE_URL=postgresql://avail_user:<REDACTED>@pg.avail.naxatar.com:5432/avail_explorer_test
     # ... other environment variables
     EOF
 ```

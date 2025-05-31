@@ -41,7 +41,6 @@ NGINX proxy connections:
 ## Issues and Next Steps
 
 1. **Backend Service**: The backend service is experiencing multiple issues:
-   - Initially missing the `better-sqlite3` dependency, which appears to be fixed
    - Permission issues writing to the logs directory
    - Connection issues with the Avail RPC endpoint
 

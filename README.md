@@ -4,17 +4,18 @@ Backend server for the Avail blockchain explorer with automatic API integration 
 
 ## Features
 
-- **Dual Database Support**: SQLite for development, PostgreSQL for production
+- **PostgreSQL Database**: Production-ready database for all environments
 - **Automatic API Integration**: Direct backend APIs with external API fallbacks
 - **Real-time Updates**: WebSocket support for live data
 - **Health Monitoring**: Comprehensive health checks and monitoring
-- **Development-friendly**: Zero-config SQLite setup for local development
+- **Development-friendly**: Easy PostgreSQL setup for local development
 
 ## Quick Start (Development)
 
 ### Prerequisites
 - Node.js 18+
 - npm or yarn
+- PostgreSQL 12+
 
 ### Setup
 
@@ -31,7 +32,6 @@ npm run setup
 ```
 This will:
 - Create `.env` file from template
-- Create `data/` directory for SQLite
 - Set up development defaults
 
 3. **Start development server:**
@@ -40,37 +40,19 @@ npm run dev
 ```
 
 The server will start on `http://localhost:3001` with:
-- ✅ SQLite database (auto-created at `./data/avail_explorer.db`)
+- ✅ PostgreSQL database connection
 - ✅ API endpoints ready
 - ✅ WebSocket support
 - ⚠️ Redis optional (caching disabled by default)
 
 ## Database Configuration
 
-### Development (SQLite) - Default
+### Development & Production (PostgreSQL)
 ```bash
 # .env
-DATABASE_TYPE=sqlite
-SQLITE_PATH=./data/avail_explorer.db
-NODE_ENV=development
-```
-
-**Pros:**
-- ✅ No setup required
-- ✅ File-based, portable
-- ✅ Perfect for development
-- ✅ No external dependencies
-
-**Cons:**
-- ⚠️ Single-threaded
-- ⚠️ Limited concurrent writes
-- ⚠️ Not suitable for production
-
-### Production (PostgreSQL)
-```bash
-# .env
+DATABASE_TYPE=postgresql
 DATABASE_URL=postgresql://user:password@host:port/database
-NODE_ENV=production
+NODE_ENV=development
 ```
 
 **Pros:**
@@ -78,14 +60,15 @@ NODE_ENV=production
 - ✅ Concurrent connections
 - ✅ Production-ready
 - ✅ Advanced features
+- ✅ Consistent across environments
 
 **Cons:**
 - ⚠️ Requires PostgreSQL server
-- ⚠️ More complex setup
+- ⚠️ More complex initial setup
 
 ## Environment Variables
 
-### Required for Production
+### Required
 ```bash
 DATABASE_URL=postgresql://user:password@host:port/database
 ```
@@ -97,9 +80,8 @@ PORT=3001
 NODE_ENV=development
 CORS_ORIGIN=http://localhost:3000
 
-# Database (SQLite defaults)
-DATABASE_TYPE=sqlite
-SQLITE_PATH=./data/avail_explorer.db
+# Database
+DATABASE_TYPE=postgresql
 
 # Features
 ENABLE_WEBSOCKETS=true
@@ -133,12 +115,14 @@ npm run dev    # Start development server
 ### 2. Database Management
 ```bash
 # Tables are created automatically on first run
-# SQLite file: ./data/avail_explorer.db
+# Connect to database
+psql $DATABASE_URL
 
-# View database
-sqlite3 ./data/avail_explorer.db
-.tables
-.schema blocks
+# View tables
+\dt
+
+# View schema
+\d blocks
 ```
 
 ### 3. Testing API Integration
@@ -184,11 +168,11 @@ npm start
 ```
 ┌─────────────────┐    ┌─────────────────┐
 │   Development   │    │   Production    │
-│     SQLite      │    │  PostgreSQL     │
+│   PostgreSQL    │    │   PostgreSQL    │
 │                 │    │                 │
-│ • File-based    │    │ • Network DB    │
-│ • Zero config   │    │ • High perf     │
-│ • Local only    │    │ • Scalable      │
+│ • Network DB    │    │ • Network DB    │
+│ • High perf     │    │ • High perf     │
+│ • Scalable      │    │ • Scalable      │
 └─────────────────┘    └─────────────────┘
          │                       │
          └───────┬───────────────┘
@@ -215,24 +199,22 @@ Frontend ──┐
                                ▼
                         ┌─────────────┐
                         │  Database   │
-                        │   (SQLite/  │
-                        │ PostgreSQL) │
+                        │ PostgreSQL  │
                         └─────────────┘
 ```
 
 ## Troubleshooting
 
-### SQLite Issues
+### Database Issues
 ```bash
-# Check if database exists
-ls -la ./data/
+# Test connection
+psql $DATABASE_URL -c "SELECT 1"
 
-# Check database file
-sqlite3 ./data/avail_explorer.db ".tables"
+# Check tables
+psql $DATABASE_URL -c "\dt"
 
-# Reset database (delete file)
-rm ./data/avail_explorer.db
-npm run dev  # Will recreate
+# Run migrations manually
+npm run migrate
 ```
 
 ### Connection Issues
@@ -247,7 +229,7 @@ npm run dev  # Watch console output
 cat .env
 ```
 
-### PostgreSQL Issues (Production)
+### PostgreSQL Issues
 ```bash
 # Test connection
 psql $DATABASE_URL -c "SELECT 1"
@@ -261,13 +243,7 @@ npm run migrate
 
 ## Performance Notes
 
-### SQLite (Development)
-- **Read performance**: Excellent
-- **Write performance**: Good for development
-- **Concurrent connections**: Limited
-- **File size**: Grows with data
-
-### PostgreSQL (Production)
+### PostgreSQL
 - **Read performance**: Excellent
 - **Write performance**: Excellent
 - **Concurrent connections**: High
@@ -281,4 +257,4 @@ For issues:
 3. Test database connection
 4. Check health endpoint: `/health`
 
-The system is designed to be development-friendly with SQLite while production-ready with PostgreSQL. 
+The system is designed to be production-ready with PostgreSQL for all environments. 

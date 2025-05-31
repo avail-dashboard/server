@@ -6,7 +6,7 @@ Successfully fixed all failing test cases in the Avail blockchain explorer backe
 ## Initial Problem
 - **11 failed tests** across multiple test suites
 - Main issue: `blockchain_1.default.getLatestBlocks is not a function`
-- TypeScript compilation errors in SQLite store tests
+- TypeScript compilation errors in database store tests
 - Jest mocking issues with ES modules
 
 ## Root Cause Analysis
@@ -28,7 +28,7 @@ Successfully fixed all failing test cases in the Avail blockchain explorer backe
   - `getExtrinsicsByBlock`: Returns mock extrinsics for a block
   - `getChainStats`: Returns comprehensive chain statistics
 
-### 2. Fixed SQLite Store Tests (`tests/unit/services/data/sqlite-store.test.ts`)
+### 2. Fixed Database Store Tests (`tests/unit/services/data/database-store.test.ts`)
 - **Problem**: TypeScript compilation errors due to type mismatches
 - **Solutions**:
   - Added missing `rowCount` property to all mock database query results
@@ -46,7 +46,7 @@ Successfully fixed all failing test cases in the Avail blockchain explorer backe
     }]
     ```
   - Fixed weight type from `number` to `string`
-  - Updated method calls to match actual SQLiteDataStore implementation
+  - Updated method calls to match actual PostgreSQL DataStore implementation
   - Fixed test expectations to account for table initialization calls
 
 ### 3. Fixed Linter Issues (`tests/setup.ts`)
@@ -57,7 +57,7 @@ Successfully fixed all failing test cases in the Avail blockchain explorer backe
 ## Test Results
 
 ### Before Fix
-- **1 failed test suite** (SQLite store)
+- **1 failed test suite** (Database store)
 - **7 passed test suites**
 - **59 passed tests**
 - TypeScript compilation errors preventing test execution
@@ -73,7 +73,7 @@ Successfully fixed all failing test cases in the Avail blockchain explorer backe
 2. ✅ **Blocks Integration Tests** (8 tests) - Block retrieval, pagination, error handling
 3. ✅ **Chain Integration Tests** (4 tests) - Chain statistics, info endpoints
 4. ✅ **Search Integration Tests** (11 tests) - Search functionality, filters, validation
-5. ✅ **SQLite Store Unit Tests** (19 tests) - Database operations, storage, retrieval
+5. ✅ **Database Store Unit Tests** (19 tests) - Database operations, storage, retrieval
 6. ✅ **Logger Unit Tests** (8 tests) - Logging functionality
 7. ✅ **Utils Tests** (remaining tests) - Utility functions
 8. ✅ **Additional Integration Tests** (remaining tests)

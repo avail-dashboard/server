@@ -149,7 +149,7 @@ npm run test:ci
 - **@polkadot/api**: Mocked for RPC operations
 - **axios**: Mocked for HTTP requests
 - **ioredis**: Mocked for Redis operations
-- **Database**: In-memory SQLite for isolation
+- **Database**: PostgreSQL test database for isolation
 
 ### Service Mocking
 - **Cache Service**: All operations mocked to return predictable results
@@ -166,7 +166,7 @@ npm run test:ci
 
 ### Data Isolation
 - Each test suite runs in isolation
-- In-memory database prevents data persistence
+- PostgreSQL test database prevents data contamination
 - Mocked external services prevent real API calls
 
 ## Best Practices Implemented

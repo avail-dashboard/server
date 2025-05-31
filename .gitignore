@@ -142,8 +142,6 @@ ehthumbs.db
 Thumbs.db
 
 # Database
-*.sqlite
-*.sqlite3
 *.db
 data/
 
