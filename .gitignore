@@ -148,9 +148,6 @@ data/
 # Redis dump files
 dump.rdb
 
-# Docker
-.docker/
-
 # PM2
 .pm2
 

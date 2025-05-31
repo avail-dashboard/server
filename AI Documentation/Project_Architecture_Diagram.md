@@ -190,15 +190,15 @@ graph TB
             DOMAIN_REDIS[redis.avail.naxatar.com<br/>Port 80/443]
         end
 
-        subgraph "Docker Compose Stack"
+        subgraph "Native Deployment Stack"
             NGINX[Nginx Reverse Proxy<br/>Multi-domain Routing<br/>SSL Termination]
-            BACKEND[Backend Container<br/>avail-backend<br/>Port 3001<br/>Health Checks]
-            PG_CONTAINER[PostgreSQL 15 Container<br/>avail-postgres<br/>Port 5432<br/>Init Scripts]
-            REDIS_CONTAINER[Redis 7 Container<br/>avail-redis<br/>Port 6379<br/>Persistence Enabled]
+            BACKEND[Backend Process<br/>Node.js Application<br/>Port 3001<br/>PM2 Management]
+            PG_SERVICE[PostgreSQL 15 Service<br/>System Service<br/>Port 5432<br/>Native Installation]
+            REDIS_SERVICE[Redis 7 Service<br/>System Service<br/>Port 6379<br/>Native Installation]
             
             %% Optional Admin Tools
-            PGADMIN[pgAdmin Container<br/>Port 5050<br/>Profile: admin]
-            REDIS_INSIGHT[RedisInsight Container<br/>Port 8001<br/>Profile: admin]
+            PGADMIN[pgAdmin (Optional)<br/>Web Interface<br/>Port 5050]
+            REDIS_INSIGHT[RedisInsight (Optional)<br/>Web Interface<br/>Port 8001]
         end
 
         subgraph "Persistent Storage"
@@ -225,20 +225,20 @@ graph TB
 
     %% Connections
     NGINX --> BACKEND
-    NGINX --> PG_CONTAINER
-    NGINX --> REDIS_CONTAINER
+    NGINX --> PG_SERVICE
+    NGINX --> REDIS_SERVICE
     
-    BACKEND --> PG_CONTAINER
-    BACKEND --> REDIS_CONTAINER
+    BACKEND --> PG_SERVICE
+    BACKEND --> REDIS_SERVICE
     BACKEND --> ENV_VARS
     
-    PG_CONTAINER --> PG_VOLUME
-    REDIS_CONTAINER --> REDIS_VOLUME
+    PG_SERVICE --> PG_VOLUME
+    REDIS_SERVICE --> REDIS_VOLUME
     BACKEND --> LOG_VOLUME
 
     %% Admin connections
-    PGADMIN -.-> PG_CONTAINER
-    REDIS_INSIGHT -.-> REDIS_CONTAINER
+    PGADMIN -.-> PG_SERVICE
+    REDIS_INSIGHT -.-> REDIS_SERVICE
 
     %% Cloud deployment paths
     DEV_APP -.-> AWS
@@ -254,7 +254,7 @@ graph TB
 
     class DEV_APP,DEV_DB dev
     class DOMAIN_API,DOMAIN_PG,DOMAIN_REDIS domain
-    class NGINX,BACKEND,PG_CONTAINER,REDIS_CONTAINER,PGADMIN,REDIS_INSIGHT prod
+    class NGINX,BACKEND,PG_SERVICE,REDIS_SERVICE,PGADMIN,REDIS_INSIGHT prod
     class AWS,GCP,AZURE cloud
     class PG_VOLUME,REDIS_VOLUME,LOG_VOLUME storage
     class ENV_VARS config
@@ -350,7 +350,7 @@ mindmap
       Unit & Integration Tests
       Coverage Reports
     DevOps
-      Docker & Docker Compose
+      PM2 Process Management
       Nginx (Multi-domain)
       GitHub Actions
       ESLint 8.55+ & Prettier 3.1+
@@ -367,7 +367,7 @@ mindmap
 6. **Real-time Updates**: WebSocket integration with Socket.io for live blockchain data and analytics
 7. **Background Job Processing**: Bull queue system for asynchronous task processing and scheduled operations
 8. **Comprehensive API Coverage**: Full REST API with blocks, chain, extrinsics, validators, rollups, analytics, and search endpoints
-9. **Production-Ready Infrastructure**: Docker containerization with multi-domain nginx configuration
+9. **Production-Ready Infrastructure**: Native deployment with PM2 process management and multi-domain nginx configuration
 10. **Advanced Monitoring**: Prometheus metrics, Winston logging with daily rotation, and health endpoints
 11. **Analytics & Performance Tracking**: Dedicated analytics service for usage statistics and performance metrics
 12. **Multi-Environment Support**: Development-friendly setup with production-grade deployment options
@@ -382,8 +382,6 @@ graph TD
     subgraph "Project Root"
         ROOT["/"]
         PACKAGE[package.json]
-        DOCKER[docker-compose.yml]
-        DOCKERFILE[Dockerfile]
         TSCONFIG[tsconfig.json]
         ESLINT[.eslintrc.js]
         JEST[jest.config.js]
@@ -400,7 +398,7 @@ graph TD
         INIT_SQL[init.sql]
         SCHEMA_V2[database-schema-v2.sql]
         GITIGNORE[.gitignore]
-        DOCKERIGNORE[.dockerignore]
+        ECOSYSTEM[ecosystem.config.js]
     end
 
     subgraph "Source Code (/src)"
@@ -588,7 +586,7 @@ graph TD
     classDef tests fill:#fff8e1
     classDef data fill:#e1f5fe
 
-    class INDEX,TEST_RUNNER,TEST_AVAIL,PACKAGE,DOCKER entry
+    class INDEX,TEST_RUNNER,TEST_AVAIL,PACKAGE,ECOSYSTEM entry
     class CONFIG_DIR,CONFIG_INDEX,TSCONFIG,ESLINT,ENV,NGINX_CONF config
     class ROUTES_DIR,BLOCKS_ROUTE,CHAIN_ROUTE,EXTRINSICS_ROUTE,SEARCH_ROUTE,ACCOUNTS_ROUTE,VALIDATORS_ROUTE,ANALYTICS_ROUTE,ROLLUPS_ROUTE,DATA_SUB_ROUTE routes
     class SERVICES_DIR,BLOCKCHAIN_SERVICE,UNIFIED_AVAIL,HYBRID_RPC,ANALYTICS_SERVICE,WEBSOCKET_SERVICE,JOBS_SERVICE,RPC_DIR,RPC_INDEX,RPC_CONNECTION,RPC_METHODS,RPC_SUBSCRIPTIONS,DATA_DIR,POSTGRES_STORE services
