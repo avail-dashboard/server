@@ -42,6 +42,10 @@ const configSchema = Joi.object({
   LOG_MAX_FILES: Joi.string().default('14'),
   LOG_MAX_SIZE: Joi.string().default('20m'),
 
+  // Avail-specific Configuration
+  SUPPRESS_AVAIL_WARNINGS: Joi.boolean().default(true),
+  POLKADOT_API_LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('warn'),
+
   // Bull Queue
   REDIS_QUEUE_DB: Joi.number().default(1),
 
@@ -183,6 +187,15 @@ export const config = {
     level: env.LOG_LEVEL,
     maxFiles: env.LOG_MAX_FILES,
     maxSize: env.LOG_MAX_SIZE,
+  },
+
+  // Avail-specific Configuration
+  avail: {
+    suppressWarnings: env.SUPPRESS_AVAIL_WARNINGS,
+    polkadotApiLogLevel: env.POLKADOT_API_LOG_LEVEL,
+    compatibilityMode: true,
+    knownExtensions: ['CheckAppId'],
+    knownRuntimeApis: ['KateApi'],
   },
 
   // Monitoring Configuration
