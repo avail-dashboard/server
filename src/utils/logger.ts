@@ -37,6 +37,38 @@ const consoleFormat = winston.format.combine(
   }),
 );
 
+// Add a custom filter for Polkadot API warnings
+const polkadotApiFilter = winston.format((info) => {
+  // Filter out known Avail-specific warnings that are not critical
+  const message = typeof info.message === 'string' ? info.message : '';
+  
+  // List of known Avail-specific warnings to suppress or reduce level
+  const availWarnings = [
+    'PORTABLEREGISTRY: Unable to determine runtime Call type',
+    'REGISTRY: Unknown signed extensions CheckAppId',
+    'API/INIT: RPC methods not decorated',
+    'API/INIT: avail/47: Not decorating unknown runtime apis',
+    'kate_blockLength',
+    'kate_queryDataProof',
+    'kate_queryProof',
+    'kate_queryRows',
+    'KateApi/1',
+  ];
+
+  // Check if this is an Avail-specific warning
+  const isAvailWarning = availWarnings.some(warning => message.includes(warning));
+  
+  if (isAvailWarning) {
+    // Reduce log level for Avail-specific warnings
+    if (info.level === 'warn' || info.level === 'warning') {
+      info.level = 'debug';
+      info.message = `[AVAIL-COMPAT] ${message}`;
+    }
+  }
+  
+  return info;
+});
+
 // Create transports array
 const transports: winston.transport[] = [];
 
@@ -80,7 +112,12 @@ if (config.server.isProd || config.server.isDev) {
 // Create logger instance
 export const logger = winston.createLogger({
   level: config.logging.level,
-  format: logFormat,
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    polkadotApiFilter(),
+    winston.format.json(),
+  ),
   transports,
   exitOnError: false,
 });

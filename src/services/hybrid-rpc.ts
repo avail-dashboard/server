@@ -153,16 +153,43 @@ export class HybridRPCService extends EventEmitter {
   private async initializePolkadotAPI(): Promise<void> {
     try {
       const provider = new WsProvider(config.dataSources.rpc.endpoints[0]);
+      
+      // Configure API to handle Avail-specific features
       this.api = await ApiPromise.create({ 
         provider,
         throwOnConnect: false,
         throwOnUnknown: false,
+        // Suppress warnings for unknown types and extensions
+        noInitWarn: true,
+        // Add custom types for Avail if needed
+        types: {
+          // Add any Avail-specific types here if available
+        },
+        // Suppress specific warnings
+        typesBundle: {
+          spec: {
+            avail: {
+              types: [
+                {
+                  // Version range for Avail runtime
+                  minmax: [0, undefined],
+                  types: {
+                    // Define CheckAppId and other Avail-specific types
+                    CheckAppId: 'u32',
+                    AppId: 'u32',
+                    // Add other Avail-specific types as needed
+                  },
+                },
+              ],
+            },
+          },
+        },
       });
 
       await this.api.isReady;
       this.emit('hybrid:polkadot:connected');
       
-      rpcLogger.info('Polkadot API initialized successfully');
+      rpcLogger.info('Polkadot API initialized successfully for Avail network');
     } catch (error) {
       rpcLogger.warn('Failed to initialize Polkadot API, falling back to Avail RPC only', { error });
       this.capabilities.standardRPC = {
