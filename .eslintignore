@@ -39,10 +39,6 @@ Thumbs.db
 # Data files
 data/
 
-# Docker
-Dockerfile
-docker-compose.yml
-
 # Documentation
 *.md
 !src/**/*.md

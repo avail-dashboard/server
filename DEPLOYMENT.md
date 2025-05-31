@@ -2,10 +2,12 @@
 
 This guide covers different deployment options for the Avail Blockchain Explorer Backend.
 
-## 🚀 Quick Start with Docker
+## 🚀 Quick Start (Native)
 
 ### Prerequisites
-- Docker and Docker Compose installed
+- Node.js 18+
+- PostgreSQL 12+
+- Redis 6+ (optional, for caching)
 - Basic understanding of environment variables
 
 ### 1. Environment Setup
@@ -22,35 +24,42 @@ nano .env
 
 Required environment variables:
 ```env
-DATABASE_URL=postgresql://avail_user:your_password@postgres:5432/avail_explorer
-REDIS_URL=redis://redis:6379
-POSTGRES_PASSWORD=your_secure_password
+DATABASE_URL=postgresql://avail_user:your_password@localhost:5432/avail_explorer
+REDIS_URL=redis://localhost:6379
 JWT_SECRET=your_jwt_secret_at_least_32_characters
+NODE_ENV=production
 ```
 
-### 2. Start with Docker Compose
+### 2. Quick Installation
 
 ```bash
-# Start all services
-docker-compose up -d
+# Run the automated setup script
+./install.sh
 
-# View logs
-docker-compose logs -f backend
+# Or manual setup:
+npm install
+npm run build
+npm run migrate
+```
 
-# Check health
+### 3. Start the Server
+
+```bash
+# Development
+npm run dev
+
+# Production
+npm start
+
+# With PM2 (recommended for production)
+npm install -g pm2
+pm2 start ecosystem.config.js
+```
+
+### 4. Health Check
+
+```bash
 curl http://localhost:3001/health
-```
-
-### 3. Optional Admin Tools
-
-Start with admin interfaces for database management:
-
-```bash
-# Start with admin tools
-docker-compose --profile admin up -d
-
-# Access pgAdmin at http://localhost:5050
-# Access RedisInsight at http://localhost:8001
 ```
 
 ## 🔧 Manual Installation
@@ -115,68 +124,107 @@ npm start
 
 ### AWS Deployment
 
-#### Using ECS with Fargate
-
-1. **Build and push to ECR:**
-```bash
-# Create ECR repository
-aws ecr create-repository --repository-name avail-explorer-backend
-
-# Get login token
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
-
-# Build and push
-docker build -t avail-explorer-backend .
-docker tag avail-explorer-backend:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/avail-explorer-backend:latest
-docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/avail-explorer-backend:latest
-```
-
-2. **Create RDS PostgreSQL instance and ElastiCache Redis cluster**
-
-3. **Deploy using ECS task definition with environment variables**
-
 #### Using EC2
 
 ```bash
 # Connect to EC2 instance
 ssh -i your-key.pem ubuntu@your-ec2-ip
 
-# Install Docker
+# Install Node.js 18+
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install PostgreSQL and Redis
 sudo apt update
-sudo apt install docker.io docker-compose
-sudo usermod -aG docker ubuntu
+sudo apt install postgresql postgresql-contrib redis-server
+sudo systemctl start postgresql
+sudo systemctl start redis-server
 
 # Clone and deploy
 git clone <your-repo>
 cd server
-docker-compose up -d
+npm install
+npm run build
+npm start
 ```
+
+#### Using Elastic Beanstalk
+
+1. **Prepare application:**
+```bash
+# Create deployment package
+npm run build
+zip -r avail-backend.zip . -x "node_modules/*" "src/*" "tests/*"
+```
+
+2. **Deploy using EB CLI or AWS Console**
+
+3. **Configure environment variables in Elastic Beanstalk console**
 
 ### Google Cloud Platform
 
-#### Using Cloud Run
+#### Using Compute Engine
 
-1. **Build and push to Container Registry:**
 ```bash
-# Configure Docker for GCR
-gcloud auth configure-docker
+# SSH to instance
+gcloud compute ssh your-instance-name
 
-# Build and push
-docker build -t gcr.io/your-project/avail-explorer-backend .
-docker push gcr.io/your-project/avail-explorer-backend
+# Install dependencies
+sudo apt update
+sudo apt install nodejs npm postgresql redis-server
+
+# Deploy application
+git clone <your-repo>
+cd server
+npm install
+npm run build
+npm start
 ```
 
-2. **Deploy to Cloud Run:**
+#### Using App Engine
+
+1. Create `app.yaml`:
+```yaml
+runtime: nodejs18
+
+env_variables:
+  DATABASE_URL: "your-database-url"
+  REDIS_URL: "your-redis-url"
+  NODE_ENV: "production"
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+```
+
+2. Deploy:
 ```bash
-gcloud run deploy avail-explorer-backend \
-  --image gcr.io/your-project/avail-explorer-backend \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars DATABASE_URL="your-connection-string",REDIS_URL="your-redis-url"
+gcloud app deploy
 ```
 
 ### DigitalOcean
+
+#### Using Droplets
+
+```bash
+# SSH to droplet
+ssh root@your-droplet-ip
+
+# Install Node.js, PostgreSQL, Redis
+apt update
+apt install nodejs npm postgresql redis-server
+
+# Setup database
+sudo -u postgres createdb avail_explorer
+sudo -u postgres createuser avail_user
+
+# Deploy application
+git clone <your-repo>
+cd server
+npm install
+npm run build
+npm start
+```
 
 #### Using App Platform
 
@@ -198,13 +246,6 @@ services:
     value: your-database-url
   - key: REDIS_URL
     value: your-redis-url
-  - key: NODE_ENV
-    value: production
-```
-
-2. Deploy:
-```bash
-doctl apps create --spec app.yaml
 ```
 
 ## 🔒 Production Considerations
@@ -298,10 +339,22 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-    - name: Build and Deploy
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Deploy to server
       run: |
-        docker build -t avail-explorer-backend ./server
         # Add your deployment commands here
+        # Example: rsync, scp, or deployment scripts
+        echo "Deploying to production server..."
 ```
 
 ### Health Check Script

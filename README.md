@@ -16,6 +16,7 @@ Backend server for the Avail blockchain explorer with automatic API integration 
 - Node.js 18+
 - npm or yarn
 - PostgreSQL 12+
+- Redis (optional, for caching)
 
 ### Setup
 
@@ -160,6 +161,20 @@ npm run migrate  # Creates tables in PostgreSQL
 ### 3. Start Production Server
 ```bash
 npm start
+```
+
+### 4. Process Management (Optional)
+For production environments, consider using PM2 for process management:
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start with PM2
+pm2 start ecosystem.config.js
+
+# Monitor
+pm2 status
+pm2 logs
 ```
 
 ## Architecture
