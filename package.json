@@ -28,12 +28,12 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@polkadot/api": "^10.11.2",
-    "@polkadot/api-augment": "^16.1.1",
+    "@polkadot/api": "^15.9.3",
+    "@polkadot/api-augment": "^15.9.3",
     "@polkadot/keyring": "^13.5.1",
-    "@polkadot/rpc-core": "^16.1.1",
-    "@polkadot/rpc-provider": "^10.11.2",
-    "@polkadot/types": "^16.1.1",
+    "@polkadot/rpc-core": "^15.9.3",
+    "@polkadot/rpc-provider": "^15.9.3",
+    "@polkadot/types": "^15.9.3",
     "@polkadot/util": "^13.5.1",
     "@polkadot/util-crypto": "^13.5.1",
     "axios": "^1.6.2",
@@ -82,6 +82,20 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "resolutions": {
+    "@polkadot/api": "15.9.3",
+    "@polkadot/api-augment": "15.9.3",
+    "@polkadot/keyring": "13.5.1",
+    "@polkadot/rpc-core": "15.9.3",
+    "@polkadot/rpc-provider": "15.9.3",
+    "@polkadot/types": "15.9.3",
+    "@polkadot/util": "13.5.1",
+    "@polkadot/util-crypto": "13.5.1",
+    "@polkadot/types-create": "15.9.3",
+    "@polkadot/types-codec": "15.9.3",
+    "@polkadot/types-known": "15.9.3",
+    "@polkadot/api-derive": "15.9.3"
   },
   "keywords": [
     "avail",

@@ -30,7 +30,7 @@ RUN apk update && apk upgrade && \
 COPY package*.json ./
 
 # Install dependencies with optimized flags
-RUN npm ci --silent --no-audit --no-fund && \
+RUN npm install --no-audit --no-fund && \
     npm cache clean --force
 
 # Copy source code (after dependencies for better caching)
@@ -77,7 +77,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install only production dependencies with optimized flags
-RUN npm ci --only=production --silent --no-audit --no-fund && \
+RUN npm install --only=production --no-audit --no-fund --ignore-scripts && \
     npm cache clean --force && \
     # Remove npm to reduce attack surface
     npm uninstall -g npm
