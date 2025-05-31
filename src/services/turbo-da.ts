@@ -171,7 +171,7 @@ export class TurboDAService extends EventEmitter {
   // TURBO DA API METHODS
   // ===========================================
 
-  async submitRawData(data: Buffer): Promise<{ submissionId: string; status: string }> {
+  async submitRawData(data: Buffer): Promise<TurboSubmissionResponse> {
     const startTime = Date.now();
     const dataSize = data.length;
     try {
@@ -199,7 +199,15 @@ export class TurboDAService extends EventEmitter {
         duration: `${duration}ms`,
       });
       
-      return response.data;
+      // Transform response to match TurboSubmissionResponse interface
+      return {
+        submission_id: response.data.submissionId || response.data.submission_id,
+        data_hash: response.data.dataHash || response.data.data_hash || '',
+        status: response.data.status || 'pending',
+        block_hash: response.data.blockHash || response.data.block_hash,
+        block_number: response.data.blockNumber || response.data.block_number,
+        tx_hash: response.data.txHash || response.data.tx_hash,
+      };
     } catch (error) {
       const duration = Date.now() - startTime;
       logAvailDataSubmission('turboDA', 0, dataSize, undefined, undefined, false, (error as Error).message);
@@ -209,7 +217,7 @@ export class TurboDAService extends EventEmitter {
     }
   }
 
-  async submitJsonData(data: any): Promise<{ submissionId: string; status: string }> {
+  async submitJsonData(data: any): Promise<TurboSubmissionResponse> {
     const startTime = Date.now();
     const dataString = JSON.stringify(data);
     const dataSize = Buffer.byteLength(dataString, 'utf8');
@@ -233,7 +241,15 @@ export class TurboDAService extends EventEmitter {
         duration: `${duration}ms`,
       });
       
-      return response.data;
+      // Transform response to match TurboSubmissionResponse interface
+      return {
+        submission_id: response.data.submissionId || response.data.submission_id,
+        data_hash: response.data.dataHash || response.data.data_hash || '',
+        status: response.data.status || 'pending',
+        block_hash: response.data.blockHash || response.data.block_hash,
+        block_number: response.data.blockNumber || response.data.block_number,
+        tx_hash: response.data.txHash || response.data.tx_hash,
+      };
     } catch (error) {
       const duration = Date.now() - startTime;
       logAvailDataSubmission('turboDA', 0, dataSize, undefined, undefined, false, (error as Error).message);
@@ -243,7 +259,7 @@ export class TurboDAService extends EventEmitter {
     }
   }
 
-  async submitTextData(text: string): Promise<{ submissionId: string; status: string }> {
+  async submitTextData(text: string): Promise<TurboSubmissionResponse> {
     const startTime = Date.now();
     const dataSize = Buffer.byteLength(text, 'utf8');
     try {
@@ -266,7 +282,15 @@ export class TurboDAService extends EventEmitter {
         duration: `${duration}ms`,
       });
       
-      return response.data;
+      // Transform response to match TurboSubmissionResponse interface
+      return {
+        submission_id: response.data.submissionId || response.data.submission_id,
+        data_hash: response.data.dataHash || response.data.data_hash || '',
+        status: response.data.status || 'pending',
+        block_hash: response.data.blockHash || response.data.block_hash,
+        block_number: response.data.blockNumber || response.data.block_number,
+        tx_hash: response.data.txHash || response.data.tx_hash,
+      };
     } catch (error) {
       const duration = Date.now() - startTime;
       logAvailDataSubmission('turboDA', 0, dataSize, undefined, undefined, false, (error as Error).message);
