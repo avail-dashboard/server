@@ -1,7 +1,15 @@
 import axios, { AxiosInstance } from 'axios';
 import { EventEmitter } from 'events';
 import config from '../config';
-import { logError, rpcLogger } from '../utils/logger';
+import { 
+  logError, 
+  rpcLogger,
+  logAvailHttpRequest,
+  logAvailHttpResponse,
+  logAvailConnectionState,
+  logAvailPerformanceMetric,
+  logAvailServiceHealth,
+} from '../utils/logger';
 
 export interface NexusHealth {
   status: string;
@@ -102,11 +110,13 @@ export class AvailNexusService extends EventEmitter {
     // Request interceptor
     this.httpClient.interceptors.request.use(
       (config) => {
-        rpcLogger.debug('Nexus API HTTP request', {
-          method: config.method,
-          url: config.url,
-          params: config.params,
-        });
+        logAvailHttpRequest(
+          'nexus',
+          config.method?.toUpperCase() || 'GET',
+          `${this.baseURL}${config.url}`,
+          config.params || config.data,
+          config.headers as Record<string, string>,
+        );
         return config;
       },
       (error) => {
@@ -118,14 +128,30 @@ export class AvailNexusService extends EventEmitter {
     // Response interceptor
     this.httpClient.interceptors.response.use(
       (response) => {
-        rpcLogger.debug('Nexus API HTTP response', {
-          status: response.status,
-          url: response.config.url,
-          dataSize: JSON.stringify(response.data).length,
-        });
+        const responseSize = JSON.stringify(response.data).length;
+        logAvailHttpResponse(
+          'nexus',
+          response.config.method?.toUpperCase() || 'GET',
+          `${this.baseURL}${response.config.url}`,
+          response.status,
+          0, // Duration will be calculated in individual methods
+          responseSize,
+          true,
+        );
         return response;
       },
       (error) => {
+        const responseSize = error.response?.data ? JSON.stringify(error.response.data).length : 0;
+        logAvailHttpResponse(
+          'nexus',
+          error.config?.method?.toUpperCase() || 'GET',
+          `${this.baseURL}${error.config?.url}`,
+          error.response?.status || 0,
+          0,
+          responseSize,
+          false,
+          error.message,
+        );
         logError(error, {
           component: 'nexus-api-http',
           action: 'response',
@@ -138,16 +164,25 @@ export class AvailNexusService extends EventEmitter {
   }
 
   async initialize(): Promise<void> {
+    const startTime = Date.now();
     try {
-      // Test connection by checking health
-      await this.checkHealth();
+      logAvailConnectionState('nexus', this.baseURL, 'connecting');
+      
+      // Test connection with a simple API call
+      await this.getHealth();
       
       this.isInitialized = true;
       this.emit('initialized');
       
+      const duration = Date.now() - startTime;
+      logAvailConnectionState('nexus', this.baseURL, 'connected');
+      logAvailPerformanceMetric('nexus', 'initialize', duration, true);
       rpcLogger.info('Avail Nexus Service initialized successfully');
     } catch (error) {
-      logError(error as Error, { component: 'nexus-api', action: 'initialize' });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'initialize', duration, false);
+      logAvailConnectionState('nexus', this.baseURL, 'error', { error: (error as Error).message });
+      logError(error as Error, { component: 'nexus', action: 'initialize' });
       throw error;
     }
   }
@@ -156,92 +191,208 @@ export class AvailNexusService extends EventEmitter {
   // NEXUS API METHODS
   // ===========================================
 
-  async checkHealth(): Promise<NexusHealth> {
+  async getHealth(): Promise<{ status: string; timestamp: string }> {
+    const startTime = Date.now();
     try {
+      logAvailHttpRequest('nexus', 'GET', `${this.baseURL}/health`);
+      
       const response = await this.httpClient.get('/health');
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('nexus', 'GET', `${this.baseURL}/health`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('nexus', 'getHealth', duration, true, { responseSize });
+      
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'checkHealth' });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'getHealth', duration, false);
+      logError(error as Error, { method: 'getHealth' });
       throw error;
     }
   }
 
-  async getAccountState(address: string): Promise<AccountState> {
+  async getNetworkStats(): Promise<any> {
+    const startTime = Date.now();
     try {
-      const response = await this.httpClient.get(`/account/state/${address}`);
+      logAvailHttpRequest('nexus', 'GET', `${this.baseURL}/network/stats`);
+      
+      const response = await this.httpClient.get('/network/stats');
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('nexus', 'GET', `${this.baseURL}/network/stats`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('nexus', 'getNetworkStats', duration, true, { responseSize });
+      
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'getAccountState', address });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'getNetworkStats', duration, false);
+      logError(error as Error, { method: 'getNetworkStats' });
       throw error;
     }
   }
 
-  async getAccountStateWithProof(address: string): Promise<AccountStateWithProof> {
+  async getValidators(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  } = {}): Promise<any> {
+    const startTime = Date.now();
     try {
-      const response = await this.httpClient.get(`/account/state/${address}?with_proof=true`);
+      logAvailHttpRequest('nexus', 'GET', `${this.baseURL}/validators`, params);
+      
+      const response = await this.httpClient.get('/validators', { params });
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('nexus', 'GET', `${this.baseURL}/validators`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('nexus', 'getValidators', duration, true, { 
+        responseSize,
+        validatorCount: response.data.validators?.length || 0,
+        ...params,
+      });
+      
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'getAccountStateWithProof', address });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'getValidators', duration, false, params);
+      logError(error as Error, { method: 'getValidators', params });
       throw error;
     }
   }
 
-  async getAccountStateHex(address: string): Promise<{ data: string }> {
+  async getValidatorById(validatorId: string): Promise<any> {
+    const startTime = Date.now();
     try {
-      const response = await this.httpClient.get(`/account/state/hex/${address}`);
+      logAvailHttpRequest('nexus', 'GET', `${this.baseURL}/validators/${validatorId}`, { validatorId });
+      
+      const response = await this.httpClient.get(`/validators/${validatorId}`);
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('nexus', 'GET', `${this.baseURL}/validators/${validatorId}`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('nexus', 'getValidatorById', duration, true, { 
+        responseSize,
+        validatorId,
+        status: response.data.status,
+      });
+      
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'getAccountStateHex', address });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'getValidatorById', duration, false, { validatorId });
+      logError(error as Error, { method: 'getValidatorById', validatorId });
       throw error;
     }
   }
 
-  async getBlockByHash(hash: string): Promise<BlockResponse> {
+  async getBlocks(params: {
+    page?: number;
+    limit?: number;
+    from?: number;
+    to?: number;
+  } = {}): Promise<any> {
+    const startTime = Date.now();
     try {
-      const response = await this.httpClient.get(`/block/hash/${hash}`);
+      logAvailHttpRequest('nexus', 'GET', `${this.baseURL}/blocks`, params);
+      
+      const response = await this.httpClient.get('/blocks', { params });
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('nexus', 'GET', `${this.baseURL}/blocks`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('nexus', 'getBlocks', duration, true, { 
+        responseSize,
+        blockCount: response.data.blocks?.length || 0,
+        ...params,
+      });
+      
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'getBlockByHash', hash });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'getBlocks', duration, false, params);
+      logError(error as Error, { method: 'getBlocks', params });
       throw error;
     }
   }
 
-  async getBlockByHeight(height: number): Promise<BlockResponse> {
+  async getBlockById(blockId: string): Promise<any> {
+    const startTime = Date.now();
     try {
-      const response = await this.httpClient.get(`/block/height/${height}`);
+      logAvailHttpRequest('nexus', 'GET', `${this.baseURL}/blocks/${blockId}`, { blockId });
+      
+      const response = await this.httpClient.get(`/blocks/${blockId}`);
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('nexus', 'GET', `${this.baseURL}/blocks/${blockId}`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('nexus', 'getBlockById', duration, true, { 
+        responseSize,
+        blockId,
+        blockNumber: response.data.number,
+      });
+      
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'getBlockByHeight', height });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'getBlockById', duration, false, { blockId });
+      logError(error as Error, { method: 'getBlockById', blockId });
       throw error;
     }
   }
 
-  async getHeaderByHash(hash: string): Promise<BlockHeader> {
+  async getTransactions(params: {
+    page?: number;
+    limit?: number;
+    blockNumber?: number;
+    address?: string;
+  } = {}): Promise<any> {
+    const startTime = Date.now();
     try {
-      const response = await this.httpClient.get(`/header/${hash}`);
+      logAvailHttpRequest('nexus', 'GET', `${this.baseURL}/transactions`, params);
+      
+      const response = await this.httpClient.get('/transactions', { params });
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('nexus', 'GET', `${this.baseURL}/transactions`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('nexus', 'getTransactions', duration, true, { 
+        responseSize,
+        transactionCount: response.data.transactions?.length || 0,
+        ...params,
+      });
+      
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'getHeaderByHash', hash });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'getTransactions', duration, false, params);
+      logError(error as Error, { method: 'getTransactions', params });
       throw error;
     }
   }
 
-  async getTransactionStatus(txHash: string): Promise<TransactionStatus> {
+  async getAnalytics(timeframe: string = '24h'): Promise<any> {
+    const startTime = Date.now();
+    const params = { timeframe };
     try {
-      const response = await this.httpClient.get(`/transaction/status/${txHash}`);
+      logAvailHttpRequest('nexus', 'GET', `${this.baseURL}/analytics`, params);
+      
+      const response = await this.httpClient.get('/analytics', { params });
+      const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(response.data).length;
+      
+      logAvailHttpResponse('nexus', 'GET', `${this.baseURL}/analytics`, 200, duration, responseSize, true);
+      logAvailPerformanceMetric('nexus', 'getAnalytics', duration, true, { 
+        responseSize,
+        timeframe,
+      });
+      
       return response.data;
     } catch (error) {
-      logError(error as Error, { method: 'getTransactionStatus', txHash });
-      throw error;
-    }
-  }
-
-  async getBlockRangeForProof(startBlock: number, endBlock: number): Promise<BlockRange> {
-    try {
-      const response = await this.httpClient.get(`/block/range/${startBlock}/${endBlock}`);
-      return response.data;
-    } catch (error) {
-      logError(error as Error, { method: 'getBlockRangeForProof', startBlock, endBlock });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'getAnalytics', duration, false, params);
+      logError(error as Error, { method: 'getAnalytics', params });
       throw error;
     }
   }
@@ -317,33 +468,57 @@ export class AvailNexusService extends EventEmitter {
     return this.isInitialized;
   }
 
-  async getHealth(): Promise<{ healthy: boolean; details: any }> {
+  async getServiceHealth(): Promise<{ healthy: boolean; details: any }> {
+    const startTime = Date.now();
     try {
-      const health = await this.checkHealth();
+      const health = await this.getHealth();
+      const stats = await this.getNetworkStats();
+      const duration = Date.now() - startTime;
 
+      const healthDetails = {
+        apiStatus: health.status,
+        networkStats: stats,
+        endpoint: this.baseURL,
+        responseTime: `${duration}ms`,
+      };
+
+      logAvailServiceHealth('nexus', true, healthDetails);
+      
       return {
         healthy: true,
-        details: {
-          service: 'Avail Nexus API',
-          status: health.status,
-          timestamp: health.timestamp,
-          initialized: this.isInitialized,
-        },
+        details: healthDetails,
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
+      const healthDetails = { 
+        error: (error as Error).message,
+        endpoint: this.baseURL,
+        responseTime: `${duration}ms`,
+      };
+
+      logAvailServiceHealth('nexus', false, healthDetails);
+      
       return {
         healthy: false,
-        details: { error: (error as Error).message },
+        details: healthDetails,
       };
     }
   }
 
   async shutdown(): Promise<void> {
+    const startTime = Date.now();
     try {
+      // No persistent connections to close for HTTP-only service
       this.isInitialized = false;
+      
+      const duration = Date.now() - startTime;
+      logAvailConnectionState('nexus', this.baseURL, 'disconnected', { reason: 'shutdown' });
+      logAvailPerformanceMetric('nexus', 'shutdown', duration, true);
       rpcLogger.info('Avail Nexus Service shutdown complete');
     } catch (error) {
-      logError(error as Error, { component: 'nexus-api', action: 'shutdown' });
+      const duration = Date.now() - startTime;
+      logAvailPerformanceMetric('nexus', 'shutdown', duration, false);
+      logError(error as Error, { component: 'nexus', action: 'shutdown' });
     }
   }
 } 
