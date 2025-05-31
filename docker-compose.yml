@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: avail_explorer
       POSTGRES_USER: avail_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-avail_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:ni_vineet_21}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -44,20 +44,8 @@ services:
       dockerfile: Dockerfile
       target: production
     container_name: avail-backend
-    environment:
-      NODE_ENV: production
-      PORT: 3001
-      DATABASE_URL: postgresql://avail_user:${POSTGRES_PASSWORD:-avail_password}@postgres:5432/avail_explorer
-      REDIS_URL: redis://redis:6379
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
-      AVAIL_RPC_ENDPOINT: ${AVAIL_RPC_ENDPOINT:-wss://mainnet-rpc.avail.so/ws}
-      ENABLE_WEBSOCKETS: ${ENABLE_WEBSOCKETS:-true}
-      ENABLE_CACHING: ${ENABLE_CACHING:-true}
-      ENABLE_RATE_LIMITING: ${ENABLE_RATE_LIMITING:-true}
-      ENABLE_ANALYTICS: ${ENABLE_ANALYTICS:-true}
-      JWT_SECRET: ${JWT_SECRET:-avail-explorer-randomasdf}
-      API_RATE_LIMIT: ${API_RATE_LIMIT:-100}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+    env_file:
+      - .env.production      # Override specific values for Docker internal networking
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
