@@ -1,5 +1,4 @@
 import { UnifiedAvailService } from './services/unified-avail';
-import { rpcLogger } from './utils/logger';
 
 async function testAvailAPIs() {
   console.log('🚀 Testing Complete Avail API Integration...\n');
@@ -62,8 +61,8 @@ async function testAvailAPIs() {
     if (health.services.nexus.healthy) {
       try {
         console.log('🎯 Testing Nexus Service...');
-        const nexusHealth = await availService.nexus.checkHealth();
-        console.log(`✅ Nexus: Status ${nexusHealth.status}`);
+        const nexusHealth = await availService.nexus.getServiceHealth();
+        console.log(`✅ Nexus: Status ${nexusHealth.healthy ? 'HEALTHY' : 'UNHEALTHY'}`);
       } catch (error) {
         console.log(`❌ Nexus: ${(error as Error).message}`);
       }
@@ -82,7 +81,7 @@ async function testAvailAPIs() {
     
     console.log('\n🎉 API Integration Test Complete!');
     console.log('\n📊 Summary:');
-    console.log(`   Total Services: 5`);
+    console.log('   Total Services: 5');
     console.log(`   Healthy Services: ${Object.values(health.services).filter(s => s.healthy).length}`);
     console.log(`   Overall Status: ${health.overall ? '✅ ALL SYSTEMS GO' : '⚠️ SOME ISSUES DETECTED'}`);
     

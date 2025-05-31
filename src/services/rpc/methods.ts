@@ -9,7 +9,7 @@ import {
   logAvailPerformanceMetric,
   logDetailedRpcCall,
 } from '../../utils/logger';
-import { cache, CacheKeys } from '../../utils/cache';
+import { cache } from '../../utils/cache';
 import { config } from '../../config';
 import {
   RPCMethodCall,
@@ -243,7 +243,7 @@ export class RPCMethodsService {
   async getBlockByNumber(blockNumber: bigint): Promise<Block | null> {
     const startTime = Date.now();
     try {
-      const connection = this.connectionManager.getActiveConnection();
+      const connection = this.connectionManager.getHealthyConnection();
       if (!connection) {
         throw new Error('No active RPC connection available');
       }
@@ -296,7 +296,7 @@ export class RPCMethodsService {
   async getBlockByHash(blockHash: string): Promise<Block | null> {
     const startTime = Date.now();
     try {
-      const connection = this.connectionManager.getActiveConnection();
+      const connection = this.connectionManager.getHealthyConnection();
       if (!connection) {
         throw new Error('No active RPC connection available');
       }
@@ -550,49 +550,40 @@ export class RPCMethodsService {
   async getChainStats(): Promise<ChainStats> {
     const startTime = Date.now();
     try {
-      const connection = this.connectionManager.getActiveConnection();
+      const connection = this.connectionManager.getHealthyConnection();
       if (!connection) {
         throw new Error('No active RPC connection available');
       }
 
-      const [
-        finalizedHead,
-        bestHead,
-        totalIssuance,
-        validatorCount,
-      ] = await Promise.all([
-        connection.api.rpc.chain.getFinalizedHead(),
-        connection.api.rpc.chain.getHeader(),
-        connection.api.query.balances.totalIssuance(),
-        connection.api.query.session.validators(),
-      ]);
-
-      const finalizedHeader = await connection.api.rpc.chain.getHeader(finalizedHead);
+      // Get latest block
+      const bestHead = await connection.api.rpc.chain.getHeader();
+      
+      // Get total issuance
+      const totalIssuance = await this.getTotalIssuance();
+      
+      // Get staking info
+      const stakingInfo = await this.getStakingInfo();
+      
+      // Get validators count
+      const validators = await this.getValidators();
       
       const duration = Date.now() - startTime;
-      
-      logDetailedRpcCall(
-        'chain.getChainStats',
-        connection.endpoint,
-        [],
-        duration,
-        true,
-        undefined,
-        false,
-        'rpc',
-      );
-      
       logAvailPerformanceMetric('rpc', 'getChainStats', duration, true, {
-        finalizedBlock: finalizedHeader.number.toNumber(),
-        bestBlock: bestHead.number.toNumber(),
-        validatorCount: validatorCount.length,
+        blockNumber: bestHead.number.toNumber(),
+        validatorCount: validators.length,
       });
 
       return {
-        bestBlock: bestHead.number.toBigInt(),
-        finalizedBlock: finalizedHeader.number.toBigInt(),
-        totalIssuance: totalIssuance.toBigInt(),
-        validatorCount: validatorCount.length,
+        blockHeight: bestHead.number.toBigInt(),
+        blockTime: 20, // TODO: Calculate actual block time
+        totalIssuance: BigInt(totalIssuance),
+        activeValidators: validators.length,
+        nominators: stakingInfo.nominatorCount,
+        minimumStake: stakingInfo.minimumStake,
+        averageStake: stakingInfo.totalStaked / BigInt(validators.length || 1),
+        inflation: 0.1, // TODO: Calculate actual inflation
+        stakingRatio: 0.5, // TODO: Calculate actual staking ratio
+        lastUpdateTime: BigInt(Date.now()),
       };
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -660,36 +651,29 @@ export class RPCMethodsService {
   async getValidators(): Promise<Validator[]> {
     const startTime = Date.now();
     try {
-      const connection = this.connectionManager.getActiveConnection();
+      const connection = this.connectionManager.getHealthyConnection();
       if (!connection) {
         throw new Error('No active RPC connection available');
       }
 
-      const validators = await connection.api.query.session.validators();
+      const validatorsCodec = await connection.api.query.session.validators();
+      const validators = validatorsCodec.toJSON() as string[];
       
       const duration = Date.now() - startTime;
-      const responseSize = JSON.stringify(validators.toJSON()).length;
-      
-      logDetailedRpcCall(
-        'session.validators',
-        connection.endpoint,
-        [],
-        duration,
-        true,
-        responseSize,
-        false,
-        'rpc',
-      );
-      
       logAvailPerformanceMetric('rpc', 'getValidators', duration, true, {
         validatorCount: validators.length,
-        responseSize,
       });
 
-      return validators.map((validator, index) => ({
-        address: validator.toString(),
-        index,
-        isActive: true, // All validators in the session are active
+      return validators.map((validator: string, index: number) => ({
+        address: validator,
+        active: true,
+        commission: '0%', // TODO: Get actual commission
+        selfStake: BigInt(0), // TODO: Get actual self stake
+        totalStake: BigInt(0), // TODO: Get actual total stake
+        nominators: 0, // TODO: Get actual nominator count
+        identity: {
+          display: `Validator ${index + 1}`,
+        },
       }));
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -1163,5 +1147,19 @@ export class RPCMethodsService {
         details: { error: (error as Error).message },
       };
     }
+  }
+
+  private formatBlock(block: any, header: any): Block {
+    return {
+      number: BigInt(header.number.toString()),
+      hash: header.hash.toString(),
+      parentHash: header.parentHash.toString(),
+      stateRoot: header.stateRoot.toString(),
+      extrinsicsRoot: header.extrinsicsRoot.toString(),
+      timestamp: BigInt(Date.now()), // TODO: Extract actual timestamp from block
+      extrinsicsCount: block.block.extrinsics.length,
+      size: JSON.stringify(block).length,
+      finalized: true, // TODO: Check actual finalization status
+    };
   }
 } 
