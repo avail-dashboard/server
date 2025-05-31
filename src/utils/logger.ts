@@ -200,9 +200,97 @@ export const logRpcCall = (method: string, duration: number, success: boolean) =
   });
 };
 
+// Enhanced RPC logging with detailed information
+export const logDetailedRpcCall = (
+  method: string,
+  endpoint: string,
+  params: any[],
+  duration: number,
+  success: boolean,
+  responseSize?: number,
+  cached?: boolean,
+  service?: string,
+) => {
+  rpcLogger.info('RPC Method Call', {
+    service: service || 'rpc',
+    method,
+    endpoint,
+    params: params.length > 0 ? params : undefined,
+    duration: `${duration}ms`,
+    success,
+    responseSize: responseSize ? `${responseSize} bytes` : undefined,
+    cached: cached || false,
+  });
+};
+
 // WebSocket logging helpers
 export const logSocketConnection = (socketId: string, event: string) => {
   wsLogger.info('Socket Event', { socketId, event });
+};
+
+// Enhanced WebSocket logging
+export const logWebSocketConnection = (
+  endpoint: string,
+  event: string,
+  service: string,
+  details?: Record<string, any>,
+) => {
+  wsLogger.info('WebSocket Connection', {
+    service,
+    endpoint,
+    event,
+    ...details,
+  });
+};
+
+export const logWebSocketMessage = (
+  endpoint: string,
+  method: string,
+  service: string,
+  messageId?: string,
+  responseTime?: number,
+  messageSize?: number,
+) => {
+  wsLogger.info('WebSocket Message', {
+    service,
+    endpoint,
+    method,
+    messageId,
+    responseTime: responseTime ? `${responseTime}ms` : undefined,
+    messageSize: messageSize ? `${messageSize} bytes` : undefined,
+  });
+};
+
+// Service operation logging
+export const logServiceOperation = (
+  service: string,
+  operation: string,
+  duration: number,
+  success: boolean,
+  details?: Record<string, any>,
+) => {
+  rpcLogger.info('Service Operation', {
+    service,
+    operation,
+    duration: `${duration}ms`,
+    success,
+    ...details,
+  });
+};
+
+// Service fallback logging
+export const logServiceFallback = (
+  operation: string,
+  failedService: string,
+  fallbackService: string,
+  reason?: string,
+) => {
+  rpcLogger.warn('Service Fallback', {
+    operation,
+    failedService,
+    fallbackService,
+    reason,
+  });
 };
 
 // Job logging helpers

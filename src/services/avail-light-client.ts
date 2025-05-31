@@ -1,8 +1,13 @@
-import axios, { AxiosInstance } from 'axios';
-import { WebSocket } from 'ws';
 import { EventEmitter } from 'events';
-import config from '../config';
-import { logError, rpcLogger } from '../utils/logger';
+import axios, { AxiosInstance } from 'axios';
+import WebSocket from 'ws';
+import { config } from '../config';
+import { 
+  logError, 
+  rpcLogger, 
+  logWebSocketConnection, 
+  logWebSocketMessage,
+} from '../utils/logger';
 
 export interface LightClientStatus {
   modes: {
@@ -145,10 +150,38 @@ export class AvailLightClientService extends EventEmitter {
   }
 
   async getStatus(): Promise<LightClientStatus> {
+    const startTime = Date.now();
     try {
+      rpcLogger.info('Light Client HTTP request', {
+        service: 'lightClient',
+        method: 'getStatus',
+        endpoint: `${this.httpEndpoint}/status`,
+      });
+      
       const response = await this.httpClient.get('/status');
+      const duration = Date.now() - startTime;
+      
+      rpcLogger.info('Light Client HTTP response', {
+        service: 'lightClient',
+        method: 'getStatus',
+        endpoint: `${this.httpEndpoint}/status`,
+        duration: `${duration}ms`,
+        success: true,
+        responseSize: `${JSON.stringify(response.data).length} bytes`,
+      });
+      
       return response.data;
     } catch (error) {
+      const duration = Date.now() - startTime;
+      rpcLogger.error('Light Client HTTP error', {
+        service: 'lightClient',
+        method: 'getStatus',
+        endpoint: `${this.httpEndpoint}/status`,
+        duration: `${duration}ms`,
+        success: false,
+        error: (error as Error).message,
+      });
+      
       logError(error as Error, { method: 'getStatus' });
       throw error;
     }
@@ -175,10 +208,41 @@ export class AvailLightClientService extends EventEmitter {
   }
 
   async getBlockData(blockNumber: number): Promise<BlockData> {
+    const startTime = Date.now();
     try {
+      rpcLogger.info('Light Client HTTP request', {
+        service: 'lightClient',
+        method: 'getBlockData',
+        endpoint: `${this.httpEndpoint}/data/${blockNumber}`,
+        params: { blockNumber },
+      });
+      
       const response = await this.httpClient.get(`/data/${blockNumber}`);
+      const duration = Date.now() - startTime;
+      
+      rpcLogger.info('Light Client HTTP response', {
+        service: 'lightClient',
+        method: 'getBlockData',
+        endpoint: `${this.httpEndpoint}/data/${blockNumber}`,
+        params: { blockNumber },
+        duration: `${duration}ms`,
+        success: true,
+        responseSize: `${JSON.stringify(response.data).length} bytes`,
+      });
+      
       return response.data;
     } catch (error) {
+      const duration = Date.now() - startTime;
+      rpcLogger.error('Light Client HTTP error', {
+        service: 'lightClient',
+        method: 'getBlockData',
+        endpoint: `${this.httpEndpoint}/data/${blockNumber}`,
+        params: { blockNumber },
+        duration: `${duration}ms`,
+        success: false,
+        error: (error as Error).message,
+      });
+      
       logError(error as Error, { method: 'getBlockData', blockNumber });
       throw error;
     }
@@ -213,28 +277,59 @@ export class AvailLightClientService extends EventEmitter {
         this.ws = new WebSocket(this.wsEndpoint);
 
         this.ws.on('open', () => {
-          rpcLogger.info('Light Client WebSocket connected');
+          logWebSocketConnection(
+            this.wsEndpoint,
+            'connected',
+            'lightClient',
+            { readyState: this.ws?.readyState },
+          );
           this.emit('ws:connected');
           resolve();
         });
 
         this.ws.on('message', (data: Buffer) => {
+          const messageStartTime = Date.now();
           try {
             const message = JSON.parse(data.toString());
+            const messageSize = data.length;
+            
+            logWebSocketMessage(
+              this.wsEndpoint,
+              message.method || 'unknown',
+              'lightClient',
+              message.id,
+              Date.now() - messageStartTime,
+              messageSize,
+            );
+            
             this.handleWebSocketMessage(message);
           } catch (error) {
-            logError(error as Error, { component: 'light-client-ws', action: 'parse-message' });
+            logError(error as Error, { 
+              component: 'light-client-ws', 
+              action: 'parse-message',
+              messageSize: data.length,
+            });
           }
         });
 
         this.ws.on('close', (code: number, reason: Buffer) => {
-          rpcLogger.warn('Light Client WebSocket disconnected', { code, reason: reason.toString() });
+          logWebSocketConnection(
+            this.wsEndpoint,
+            'disconnected',
+            'lightClient',
+            { code, reason: reason.toString() },
+          );
           this.emit('ws:disconnected', { code, reason });
           this.scheduleReconnection();
         });
 
         this.ws.on('error', (error: Error) => {
-          logError(error, { component: 'light-client-ws' });
+          logWebSocketConnection(
+            this.wsEndpoint,
+            'error',
+            'lightClient',
+            { error: error.message },
+          );
           this.emit('ws:error', error);
           reject(error);
         });

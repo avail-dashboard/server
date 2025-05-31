@@ -3,9 +3,13 @@ import { Header, SignedBlock } from '@polkadot/types/interfaces';
 // import { u32, Vec } from '@polkadot/types'; // Commented out as not currently used
 import { createHash } from 'crypto';
 import { RPCConnectionManager } from './connection';
-import { logError, rpcLogger } from '../../utils/logger';
+import {
+  logError,
+  rpcLogger,
+  logDetailedRpcCall,
+} from '../../utils/logger';
 import { cache, CacheKeys } from '../../utils/cache';
-import config from '../../config';
+import { config } from '../../config';
 import {
   RPCMethodCall,
   RPCMethodResponse,
@@ -54,12 +58,25 @@ export class RPCMethodsService {
       if (cacheKey && config.features.caching) {
         const cached = await cache.get(cacheKey);
         if (cached) {
+          const duration = Date.now() - startTime;
+          
+          logDetailedRpcCall(
+            methodCall.method,
+            'cache',
+            methodCall.params,
+            duration,
+            true,
+            JSON.stringify(cached).length,
+            true,
+            'rpc',
+          );
+          
           return {
             success: true,
             data: cached,
             metadata: {
               method: methodCall.method,
-              duration: Date.now() - startTime,
+              duration,
               endpoint: 'cache',
               cached: true,
               timestamp: new Date(),
@@ -77,6 +94,7 @@ export class RPCMethodsService {
       // Execute RPC call
       const result = await this.callRPCMethod(connection.api, methodCall);
       const duration = Date.now() - startTime;
+      const responseSize = JSON.stringify(result).length;
 
       // Update connection metrics
       this.connectionManager.updateConnectionMetrics(connection.id, duration, true);
@@ -86,12 +104,17 @@ export class RPCMethodsService {
         await cache.set(cacheKey, result, cacheTTL);
       }
 
-      rpcLogger.debug('RPC call successful', {
-        method: methodCall.method,
+      // Log detailed RPC call information
+      logDetailedRpcCall(
+        methodCall.method,
+        connection.endpoint,
+        methodCall.params,
         duration,
-        endpoint: connection.endpoint,
-        cached: false,
-      });
+        true,
+        responseSize,
+        false,
+        'rpc',
+      );
 
       return {
         success: true,
@@ -112,11 +135,23 @@ export class RPCMethodsService {
         this.connectionManager.updateConnectionMetrics(connection.id, duration, false);
       }
 
+      // Log failed RPC call
+      logDetailedRpcCall(
+        methodCall.method,
+        connection?.endpoint || 'unknown',
+        methodCall.params,
+        duration,
+        false,
+        0,
+        false,
+        'rpc',
+      );
+
       logError(error as Error, {
         method: methodCall.method,
         params: methodCall.params,
         endpoint: connection?.endpoint,
-        duration,
+        duration: `${duration}ms`,
       });
 
       return {
