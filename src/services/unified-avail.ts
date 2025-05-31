@@ -4,7 +4,12 @@ import { AvailLightClientService } from './avail-light-client';
 import { AvailBridgeService } from './avail-bridge';
 import { AvailNexusService } from './avail-nexus';
 import { TurboDAService } from './turbo-da';
-import { logError, rpcLogger } from '../utils/logger';
+import { 
+  logError, 
+  rpcLogger, 
+  logServiceOperation, 
+  logServiceFallback,
+} from '../utils/logger';
 import {
   Block,
   Account,
@@ -111,39 +116,110 @@ export class UnifiedAvailService extends EventEmitter {
   // ===========================================
 
   async getLatestBlocks(query?: BlocksQuery): Promise<{ blocks: Block[]; total: number }> {
+    const startTime = Date.now();
     const services = this.servicePreferences.blocks;
     
+    rpcLogger.info('Unified Service: Getting latest blocks', {
+      operation: 'getLatestBlocks',
+      preferredServices: services,
+      query,
+    });
+    
     for (const serviceKey of services) {
+      const serviceStartTime = Date.now();
       try {
         switch (serviceKey) {
         case 'lightClient':
           if (this.lightClient.isConnected()) {
+            rpcLogger.info('Using Light Client service for latest blocks', {
+              service: 'lightClient',
+              operation: 'getLatestBlocks',
+            });
+            
             // Use light client for latest blocks (more reliable)
             const status = await this.lightClient.getStatus();
             const latestBlockNumber = status.blocks.latest;
             const blockData = await this.lightClient.getBlockData(latestBlockNumber);
-              
-            return {
+            
+            const result = {
               blocks: [this.transformLightClientBlock(blockData)],
               total: 1,
             };
+            
+            logServiceOperation(
+              'lightClient',
+              'getLatestBlocks',
+              Date.now() - serviceStartTime,
+              true,
+              { blocksReturned: result.blocks.length, totalBlocks: result.total },
+            );
+            
+            return result;
+          } else {
+            rpcLogger.debug('Light Client not connected, trying next service', {
+              service: 'lightClient',
+              operation: 'getLatestBlocks',
+            });
           }
           break;
             
         case 'rpc':
           if (this.rpc.isReady()) {
-            return await this.rpc.getLatestBlocks(query);
+            rpcLogger.info('Using RPC service for latest blocks', {
+              service: 'rpc',
+              operation: 'getLatestBlocks',
+            });
+            
+            const result = await this.rpc.getLatestBlocks(query);
+            
+            logServiceOperation(
+              'rpc',
+              'getLatestBlocks',
+              Date.now() - serviceStartTime,
+              true,
+              { blocksReturned: result.blocks.length, totalBlocks: result.total },
+            );
+            
+            return result;
+          } else {
+            rpcLogger.debug('RPC service not ready, trying next service', {
+              service: 'rpc',
+              operation: 'getLatestBlocks',
+            });
           }
           break;
         }
       } catch (error) {
+        const duration = Date.now() - serviceStartTime;
+        logServiceOperation(serviceKey, 'getLatestBlocks', duration, false);
+        
         logError(error as Error, { 
           method: 'getLatestBlocks', 
           service: serviceKey,
           fallbackAttempt: true,
+          duration: `${duration}ms`,
         });
+        
+        // Log fallback attempt if there are more services to try
+        const currentIndex = services.indexOf(serviceKey);
+        if (currentIndex < services.length - 1) {
+          const nextService = services[currentIndex + 1];
+          logServiceFallback(
+            'getLatestBlocks',
+            serviceKey,
+            nextService,
+            (error as Error).message,
+          );
+        }
       }
     }
+    
+    const totalDuration = Date.now() - startTime;
+    rpcLogger.error('All block services failed for getLatestBlocks', {
+      operation: 'getLatestBlocks',
+      triedServices: services,
+      totalDuration: `${totalDuration}ms`,
+    });
     
     throw new Error('All block services are unavailable');
   }
