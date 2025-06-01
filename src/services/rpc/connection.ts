@@ -3,6 +3,7 @@ import { WsProvider } from '@polkadot/rpc-provider';
 import { EventEmitter } from 'events';
 import config from '../../config';
 import { logError, rpcLogger } from '../../utils/logger';
+import availTypes from '../../config/avail-types';
 import {
   RPCConnection,
   HealthCheckResult,
@@ -134,10 +135,13 @@ export class RPCConnectionManager extends EventEmitter {
         this.emit('connection:error', connection, error);
       });
 
-      // Create API instance
+      // Create API instance with Avail-specific types
       connection.api = await ApiPromise.create({
         provider: connection.provider,
+        types: availTypes.types,
+        rpc: availTypes.rpc,
         throwOnConnect: true,
+        throwOnUnknown: false, // Don't throw on unknown types/calls
       });
 
       await connection.api.isReady;

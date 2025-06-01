@@ -413,9 +413,9 @@ export class RPCMethodsService {
         return [];
       }
 
-      return signedBlock.data.block.extrinsics.map((ext, index) => 
-        this.transformExtrinsic(ext, blockNumber, index, block.timestamp),
-      );
+      return signedBlock.data.block.extrinsics
+        .map((ext, index) => this.transformExtrinsic(ext, blockNumber, index, block.timestamp))
+        .filter((ext): ext is Extrinsic => ext !== null);
     } catch (error) {
       logError(error as Error, { operation: 'getExtrinsicsByBlock', blockNumber });
       return [];
@@ -427,58 +427,105 @@ export class RPCMethodsService {
     blockNumber: bigint,
     index: number,
     timestamp: bigint,
-  ): Extrinsic {
-    // Extract fee information from extrinsic
-    let fee = BigInt(0);
-    let tip = BigInt(0);
-    const success = true;
+  ): Extrinsic | null {
+    try {
+      // Extract fee information from extrinsic
+      let fee = BigInt(0);
+      let tip = BigInt(0);
+      const success = true;
 
-    // Check if extrinsic has payment info
-    if (extrinsic.tip) {
-      tip = BigInt(extrinsic.tip.toString());
+      // Check if extrinsic has payment info
+      if (extrinsic.tip) {
+        tip = BigInt(extrinsic.tip.toString());
+      }
+
+      // Handle unknown call indices gracefully
+      let module = 'Unknown';
+      let call = 'Unknown';
+      let args = {};
+      let isSigned = false;
+      let signer = '';
+
+      try {
+        // Try to extract method information
+        if (extrinsic.method) {
+          module = extrinsic.method.section || 'Unknown';
+          call = extrinsic.method.method || 'Unknown';
+          args = extrinsic.method.args || {};
+        }
+
+        // Properly detect if extrinsic is signed
+        isSigned = Boolean(
+          extrinsic.signature || 
+          extrinsic.signer || 
+          (extrinsic.method && 
+           extrinsic.method.section !== 'timestamp' && 
+           extrinsic.method.section !== 'vector' &&
+           extrinsic.method.section !== 'imOnline'),
+        );
+
+        if (extrinsic.signer) {
+          signer = extrinsic.signer.toString();
+        }
+      } catch (methodError) {
+        // If we can't decode the method, log it but continue with defaults
+        rpcLogger.warn('Failed to decode extrinsic method', {
+          blockNumber: blockNumber.toString(),
+          extrinsicIndex: index,
+          error: (methodError as Error).message,
+        });
+        
+        // Try to determine if it's signed from the raw extrinsic structure
+        try {
+          isSigned = extrinsic.signature !== undefined;
+          if (extrinsic.signature && extrinsic.signature.signer) {
+            signer = extrinsic.signature.signer.toString();
+          }
+        } catch {
+          // If even basic signature detection fails, assume unsigned
+          isSigned = false;
+        }
+      }
+
+      // For signed extrinsics, try to get fee from events
+      // Note: In a real implementation, you'd need to fetch the block events
+      // and match them to this extrinsic to determine actual fee and success
+      if (isSigned) {
+        // Default fee estimation for signed extrinsics
+        fee = BigInt(1000000000000); // 1 AVAIL (10^12 planck)
+      }
+
+      // Determine if this is a user transaction vs system extrinsic
+      const isUserTransaction = isSigned && 
+        module !== 'timestamp' && 
+        module !== 'vector' &&
+        module !== 'imOnline';
+
+      return {
+        hash: extrinsic.hash?.toString() || `${blockNumber}-${index}`,
+        blockNumber,
+        extrinsicIndex: index,
+        module,
+        call,
+        success, // TODO: Check events for actual success/failure
+        timestamp,
+        signer,
+        fee,
+        tip,
+        args,
+        // Add additional fields for better filtering
+        isSigned,
+        isUserTransaction,
+      };
+    } catch (error) {
+      // If we completely fail to transform the extrinsic, log and skip it
+      rpcLogger.warn('Failed to transform extrinsic, skipping', {
+        blockNumber: blockNumber.toString(),
+        extrinsicIndex: index,
+        error: (error as Error).message,
+      });
+      return null;
     }
-
-    // Properly detect if extrinsic is signed
-    // Check for signature field or if it's not a system extrinsic
-    const isSigned = Boolean(
-      extrinsic.signature || 
-      extrinsic.signer || 
-      (extrinsic.method && 
-       extrinsic.method.section !== 'timestamp' && 
-       extrinsic.method.section !== 'vector' &&
-       extrinsic.method.section !== 'imOnline'),
-    );
-
-    // For signed extrinsics, try to get fee from events
-    // Note: In a real implementation, you'd need to fetch the block events
-    // and match them to this extrinsic to determine actual fee and success
-    if (isSigned) {
-      // Default fee estimation for signed extrinsics
-      fee = BigInt(1000000000000); // 1 AVAIL (10^12 planck)
-    }
-
-    // Determine if this is a user transaction vs system extrinsic
-    const isUserTransaction = isSigned && 
-      extrinsic.method.section !== 'timestamp' && 
-      extrinsic.method.section !== 'vector' &&
-      extrinsic.method.section !== 'imOnline';
-
-    return {
-      hash: extrinsic.hash.toString(),
-      blockNumber,
-      extrinsicIndex: index,
-      module: extrinsic.method.section,
-      call: extrinsic.method.method,
-      success, // TODO: Check events for actual success/failure
-      timestamp,
-      signer: extrinsic.signer?.toString() || '',
-      fee,
-      tip,
-      args: extrinsic.method.args,
-      // Add additional fields for better filtering
-      isSigned,
-      isUserTransaction,
-    };
   }
 
   // ===========================================

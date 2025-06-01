@@ -335,6 +335,13 @@ export class HybridRPCService extends EventEmitter {
     return this.availRPC.getLatestExtrinsics(query);
   }
 
+  async getExtrinsicsByBlock(blockNumber: bigint): Promise<Extrinsic[]> {
+    this.ensureInitialized();
+
+    // Always use Avail RPC for extrinsics due to custom types
+    return this.availRPC.getExtrinsicsByBlock(blockNumber);
+  }
+
   private async getLatestExtrinsicsPolkadot(query?: ExtrinsicsQuery): Promise<{ extrinsics: Extrinsic[]; total: number }> {
     if (!this.api) {
       throw new Error('Polkadot API not initialized');

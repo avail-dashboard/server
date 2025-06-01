@@ -115,10 +115,7 @@ class BlockchainService {
   async getExtrinsicsByBlock(blockNumber: bigint): Promise<Extrinsic[]> {
     this.ensureInitialized();
     try {
-      // Note: This method doesn't exist in HybridRPCService yet
-      // We'll need to implement it or return empty array for now
-      rpcLogger.warn('getExtrinsicsByBlock: Method not implemented in HybridRPCService');
-      return [];
+      return await this.hybridRPC.getExtrinsicsByBlock(blockNumber);
     } catch (error) {
       logError(error as Error, { operation: 'getExtrinsicsByBlock', blockNumber });
       return [];
