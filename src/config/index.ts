@@ -52,6 +52,10 @@ const configSchema = Joi.object({
   // Monitoring
   ENABLE_METRICS: Joi.boolean().default(true),
   METRICS_PORT: Joi.number().default(9464),
+
+  // NEW: Direct WebSocket connection to Avail mainnet (Primary)
+  ENABLE_DIRECT_WS: Joi.string(),
+  DIRECT_WS_ENDPOINT: Joi.string(),
 });
 
 const { error, value: env } = configSchema.validate(process.env, {
@@ -117,6 +121,17 @@ export const config = {
       batchSize: 100,
       maxRetryDelay: 30000,
       connectionPoolSize: 5,
+    },
+    
+    // NEW: Direct WebSocket connection to Avail mainnet (Primary)
+    directWS: {
+      enabled: env.ENABLE_DIRECT_WS !== 'false', // Default enabled
+      endpoint: env.DIRECT_WS_ENDPOINT || 'wss://mainnet-rpc.avail.so/ws',
+      reconnectAttempts: 10,
+      reconnectDelay: 5000,
+      requestTimeout: 30000,
+      pingInterval: 30000,
+      priority: 1, // Highest priority
     },
     
     // NEW: Additional Avail APIs
