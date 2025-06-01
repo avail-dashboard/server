@@ -1,11 +1,12 @@
-import { ApiPromise, WsProvider } from '@polkadot/api';
+import { ApiPromise } from '@polkadot/api';
+import { WsProvider } from '@polkadot/rpc-provider';
 import { TypeRegistry } from '@polkadot/types';
 import { Keyring } from '@polkadot/keyring';
-import { cryptoWaitReady } from '@polkadot/util-crypto';
 import { EventEmitter } from 'events';
 import { AvailRPCService } from './rpc';
+import { DirectAvailWebSocketService } from './rpc/direct-websocket';
 import { logError, rpcLogger } from '../utils/logger';
-import { config } from '../config';
+import config from '../config';
 import {
   Block,
   Extrinsic,
@@ -19,6 +20,7 @@ import {
   DataAvailabilityProof,
   ApplicationData,
 } from '../types/rpc';
+import { cryptoWaitReady } from '@polkadot/util-crypto';
 
 export interface HybridCapabilities {
   // Standard Polkadot SDK capabilities
@@ -66,6 +68,7 @@ interface PolkadotAccountInfo {
 export class HybridRPCService extends EventEmitter {
   private api?: ApiPromise;
   private availRPC: AvailRPCService;
+  private directWS: DirectAvailWebSocketService | null = null;
   private registry: TypeRegistry;
   private keyring?: Keyring;
   private isInitialized = false;
@@ -74,6 +77,18 @@ export class HybridRPCService extends EventEmitter {
   constructor() {
     super();
     this.availRPC = new AvailRPCService();
+    
+    // Initialize DirectWS only if enabled in config
+    if (config.dataSources.directWS.enabled) {
+      this.directWS = new DirectAvailWebSocketService({
+        endpoint: config.dataSources.directWS.endpoint,
+        reconnectAttempts: config.dataSources.directWS.reconnectAttempts,
+        reconnectDelay: config.dataSources.directWS.reconnectDelay,
+        requestTimeout: config.dataSources.directWS.requestTimeout,
+        pingInterval: config.dataSources.directWS.pingInterval,
+      });
+    }
+    
     this.registry = new TypeRegistry();
     this.capabilities = this.initializeCapabilities();
     this.setupEventHandlers();
@@ -102,6 +117,24 @@ export class HybridRPCService extends EventEmitter {
   }
 
   private setupEventHandlers(): void {
+    // Forward Direct WebSocket events (only if enabled)
+    if (this.directWS) {
+      this.directWS.on('connected', () => {
+        this.emit('hybrid:directws:connected');
+        rpcLogger.info('DirectWS: Primary connection established');
+      });
+
+      this.directWS.on('disconnected', (info) => {
+        this.emit('hybrid:directws:disconnected', info);
+        rpcLogger.warn('DirectWS: Primary connection lost', info);
+      });
+
+      this.directWS.on('error', (error) => {
+        this.emit('hybrid:directws:error', error);
+        logError(error, { component: 'hybrid-rpc-directws' });
+      });
+    }
+
     // Forward Avail RPC events
     this.availRPC.on('rpc:connection:established', (connection) => {
       this.emit('hybrid:avail:connected', connection);
@@ -123,7 +156,8 @@ export class HybridRPCService extends EventEmitter {
     }
 
     try {
-      rpcLogger.info('Initializing Hybrid RPC Service');
+      const directWSEnabled = config.dataSources.directWS.enabled;
+      rpcLogger.info('Initializing Hybrid RPC Service', { directWSEnabled });
 
       // Initialize crypto
       await cryptoWaitReady();
@@ -131,10 +165,20 @@ export class HybridRPCService extends EventEmitter {
       // Initialize keyring
       this.keyring = new Keyring({ type: 'sr25519' });
 
-      // Initialize Polkadot API
+      // Initialize Direct WebSocket as primary (if enabled)
+      if (this.directWS) {
+        try {
+          await this.directWS.connect();
+          rpcLogger.info('DirectWS: Primary connection established successfully');
+        } catch (error) {
+          rpcLogger.warn('DirectWS: Primary connection failed, will use fallbacks', { error });
+        }
+      }
+
+      // Initialize Polkadot API as secondary
       await this.initializePolkadotAPI();
 
-      // Initialize Avail RPC as fallback
+      // Initialize Avail RPC as tertiary fallback
       await this.availRPC.initialize();
 
       // Test capabilities
@@ -143,7 +187,12 @@ export class HybridRPCService extends EventEmitter {
       this.isInitialized = true;
       this.emit('hybrid:initialized', this.capabilities);
 
-      rpcLogger.info('Hybrid RPC Service initialized successfully', { capabilities: this.capabilities });
+      rpcLogger.info('Hybrid RPC Service initialized successfully', { 
+        capabilities: this.capabilities,
+        directWSHealthy: this.directWS?.isHealthy() || false,
+        polkadotAPIAvailable: this.isPolkadotAPIAvailable(),
+        availRPCAvailable: this.isAvailRPCAvailable(),
+      });
     } catch (error) {
       logError(error as Error, { component: 'hybrid-rpc-service', action: 'initialize' });
       throw error;
@@ -245,7 +294,17 @@ export class HybridRPCService extends EventEmitter {
   async getLatestBlocks(query?: BlocksQuery): Promise<{ blocks: Block[]; total: number }> {
     this.ensureInitialized();
 
-    // Always use Avail RPC for blocks due to custom extrinsic types discovered in testing
+    // Try DirectWS first (primary)
+    if (this.directWS?.isHealthy()) {
+      try {
+        const blocks = await this.directWS.getLatestBlocks(query?.limit || 10);
+        return { blocks, total: blocks.length };
+      } catch (error) {
+        rpcLogger.warn('DirectWS getLatestBlocks failed, falling back to Avail RPC', { error });
+      }
+    }
+
+    // Fallback to Avail RPC
     return this.availRPC.getLatestBlocks(query);
   }
 
@@ -291,8 +350,17 @@ export class HybridRPCService extends EventEmitter {
 
   async getBlockByNumber(blockNumber: bigint): Promise<Block | null> {
     this.ensureInitialized();
-    
-    // Always use Avail RPC for blocks due to custom extrinsic types
+
+    // Try DirectWS first (primary)
+    if (this.directWS?.isHealthy()) {
+      try {
+        return await this.directWS.getBlockByNumber(blockNumber);
+      } catch (error) {
+        rpcLogger.warn('DirectWS getBlockByNumber failed, falling back to Avail RPC', { error });
+      }
+    }
+
+    // Fallback to Avail RPC
     return this.availRPC.getBlockByNumber(blockNumber);
   }
 
@@ -331,14 +399,24 @@ export class HybridRPCService extends EventEmitter {
   async getLatestExtrinsics(query?: ExtrinsicsQuery): Promise<{ extrinsics: Extrinsic[]; total: number }> {
     this.ensureInitialized();
 
-    // Always use Avail RPC for extrinsics due to custom types
+    // For now, use Avail RPC due to complex extrinsic parsing requirements
+    // DirectWS could be enhanced later for better extrinsic support
     return this.availRPC.getLatestExtrinsics(query);
   }
 
   async getExtrinsicsByBlock(blockNumber: bigint): Promise<Extrinsic[]> {
     this.ensureInitialized();
 
-    // Always use Avail RPC for extrinsics due to custom types
+    // Try DirectWS first (primary)
+    if (this.directWS?.isHealthy()) {
+      try {
+        return await this.directWS.getExtrinsicsByBlock(blockNumber);
+      } catch (error) {
+        rpcLogger.warn('DirectWS getExtrinsicsByBlock failed, falling back to Avail RPC', { error });
+      }
+    }
+
+    // Fallback to Avail RPC
     return this.availRPC.getExtrinsicsByBlock(blockNumber);
   }
 
@@ -397,6 +475,16 @@ export class HybridRPCService extends EventEmitter {
   async getAccountDetails(address: string): Promise<Account | null> {
     this.ensureInitialized();
 
+    // Try DirectWS first (primary)
+    if (this.directWS?.isHealthy()) {
+      try {
+        return await this.directWS.getAccountDetails(address);
+      } catch (error) {
+        rpcLogger.warn('DirectWS getAccountDetails failed, falling back to Polkadot API', { error });
+      }
+    }
+
+    // Try Polkadot API as secondary
     if (this.capabilities.standardRPC.accounts && this.api) {
       try {
         return await this.getAccountDetailsPolkadot(address);
@@ -405,6 +493,7 @@ export class HybridRPCService extends EventEmitter {
       }
     }
 
+    // Final fallback to Avail RPC
     return this.availRPC.getAccountDetails(address);
   }
 
@@ -437,11 +526,22 @@ export class HybridRPCService extends EventEmitter {
   }
 
   // ===========================================
-  // AVAIL-SPECIFIC OPERATIONS (Always use Avail RPC)
+  // AVAIL-SPECIFIC OPERATIONS (Enhanced with DirectWS)
   // ===========================================
 
   async getDataAvailabilityProof(blockHash: string, extrinsicIndex: number): Promise<DataAvailabilityProof | null> {
     this.ensureInitialized();
+    
+    // Try DirectWS first for Avail-specific methods
+    if (this.directWS?.isHealthy()) {
+      try {
+        return await this.directWS.getDataAvailabilityProof(blockHash, extrinsicIndex);
+      } catch (error) {
+        rpcLogger.warn('DirectWS getDataAvailabilityProof failed, falling back to Avail RPC', { error });
+      }
+    }
+
+    // Fallback to Avail RPC
     if (!this.capabilities.availSpecific.dataAvailability) {
       throw new Error('Data availability proofs not supported');
     }
@@ -450,6 +550,17 @@ export class HybridRPCService extends EventEmitter {
 
   async getApplicationData(blockHash: string, appId: number): Promise<ApplicationData[]> {
     this.ensureInitialized();
+    
+    // Try DirectWS first for Avail-specific methods
+    if (this.directWS?.isHealthy()) {
+      try {
+        return await this.directWS.getApplicationData(blockHash, appId);
+      } catch (error) {
+        rpcLogger.warn('DirectWS getApplicationData failed, falling back to Avail RPC', { error });
+      }
+    }
+
+    // Fallback to Avail RPC
     if (!this.capabilities.availSpecific.applicationData) {
       throw new Error('Application data not supported');
     }
@@ -466,6 +577,17 @@ export class HybridRPCService extends EventEmitter {
 
   async getBlockDataRoot(blockHash: string): Promise<string | null> {
     this.ensureInitialized();
+    
+    // Try DirectWS first for Avail-specific methods
+    if (this.directWS?.isHealthy()) {
+      try {
+        return await this.directWS.getBlockDataRoot(blockHash);
+      } catch (error) {
+        rpcLogger.warn('DirectWS getBlockDataRoot failed, falling back to Avail RPC', { error });
+      }
+    }
+
+    // Fallback to Avail RPC
     return this.availRPC.getBlockDataRoot(blockHash);
   }
 
@@ -564,6 +686,16 @@ export class HybridRPCService extends EventEmitter {
   async getChainStats(): Promise<ChainStats> {
     this.ensureInitialized();
 
+    // Try DirectWS first (primary)
+    if (this.directWS?.isHealthy()) {
+      try {
+        return await this.directWS.getChainStats();
+      } catch (error) {
+        rpcLogger.warn('DirectWS getChainStats failed, falling back to Polkadot API', { error });
+      }
+    }
+
+    // Try Polkadot API as secondary
     if (this.capabilities.standardRPC.chainState && this.api) {
       try {
         return await this.getChainStatsPolkadot();
@@ -572,6 +704,7 @@ export class HybridRPCService extends EventEmitter {
       }
     }
 
+    // Final fallback to Avail RPC
     return this.availRPC.getChainStats();
   }
 
@@ -613,6 +746,10 @@ export class HybridRPCService extends EventEmitter {
 
   isAvailRPCAvailable(): boolean {
     return this.availRPC ? true : false;
+  }
+
+  isDirectWSAvailable(): boolean {
+    return this.directWS ? this.directWS.isHealthy() : false;
   }
 
   // ===========================================
@@ -689,13 +826,18 @@ export class HybridRPCService extends EventEmitter {
     this.ensureInitialized();
     
     try {
-      // Check both APIs if available
+      // Check all available services
       const availHealth = await this.availRPC.getHealth();
       const polkadotHealth = this.isPolkadotAPIAvailable();
+      const directWSHealth = this.isDirectWSAvailable();
       
       return {
-        healthy: availHealth.healthy && (polkadotHealth || !this.capabilities.standardRPC.blocks),
+        healthy: directWSHealth || availHealth.healthy || polkadotHealth,
         details: {
+          directWS: {
+            healthy: directWSHealth,
+            stats: this.directWS?.getConnectionStats() || {},
+          },
           availRPC: availHealth,
           polkadotAPI: polkadotHealth,
           capabilities: this.capabilities,
@@ -720,6 +862,8 @@ export class HybridRPCService extends EventEmitter {
       return {
         ...availMetrics,
         hybrid: {
+          directWSAvailable: this.isDirectWSAvailable(),
+          directWSStats: this.directWS?.getConnectionStats() || {},
           polkadotAPIAvailable: this.isPolkadotAPIAvailable(),
           availRPCAvailable: this.isAvailRPCAvailable(),
           capabilities,
@@ -729,6 +873,8 @@ export class HybridRPCService extends EventEmitter {
       logError(error as Error, { operation: 'getMetrics' });
       return {
         hybrid: {
+          directWSAvailable: this.isDirectWSAvailable(),
+          directWSStats: this.directWS?.getConnectionStats() || {},
           polkadotAPIAvailable: this.isPolkadotAPIAvailable(),
           availRPCAvailable: this.isAvailRPCAvailable(),
           capabilities: this.getCapabilities(),
@@ -746,6 +892,10 @@ export class HybridRPCService extends EventEmitter {
     return {
       ...availStats,
       hybrid: {
+        directWS: {
+          connected: this.isDirectWSAvailable(),
+          stats: this.directWS?.getConnectionStats() || {},
+        },
         polkadotConnected: this.isPolkadotAPIAvailable(),
         availConnected: this.isAvailRPCAvailable(),
         capabilities: this.getCapabilities(),
@@ -766,6 +916,11 @@ export class HybridRPCService extends EventEmitter {
 
   async shutdown(): Promise<void> {
     rpcLogger.info('Shutting down Hybrid RPC Service');
+
+    // Shutdown DirectWS first
+    if (this.directWS) {
+      await this.directWS.shutdown();
+    }
 
     if (this.api) {
       await this.api.disconnect();

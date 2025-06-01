@@ -6,7 +6,12 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/extrinsics - Get extrinsics
+/**
+ * @route GET /api/extrinsics
+ * @description Get latest extrinsics with pagination
+ * @access Public
+ * @note Now uses DirectWS (wss://mainnet-rpc.avail.so/ws) as primary data source when enabled
+ */
 router.get('/', 
   pagination,
   async (req: Request, res: Response) => {
