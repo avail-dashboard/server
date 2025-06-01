@@ -51,16 +51,41 @@ class AvailExplorerServer {
     this.app.use(helmet());
     this.app.use(securityHeaders);
 
-    // CORS configuration
+    // CORS configuration - support multiple origins from environment
+    const corsOrigins = config.server.corsOrigin.split(',').map((origin: string) => origin.trim());
+    
     this.app.use(cors({
-      origin: [
-        'http://localhost:3000',
-        'http://localhost:3001', 
-        'http://localhost:3002',
+      origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) {
+          return callback(null, true);
+        }
+        
+        // Check if the origin is in our allowed list
+        if (corsOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        
+        // In development, allow localhost with any port
+        if (config.server.isDev && origin.startsWith('http://localhost')) {
+          return callback(null, true);
+        }
+        
+        return callback(new Error('Not allowed by CORS'));
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Origin',
+        'X-Requested-With', 
+        'Content-Type', 
+        'Accept', 
+        'Authorization',
+        'Cache-Control',
+        'Pragma',
       ],
-      credentials: false,
-      methods: ['GET', 'POST'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      exposedHeaders: ['X-Total-Count'],
+      optionsSuccessStatus: 200,
     }));
 
     // Performance middleware
