@@ -19,9 +19,17 @@ router.get('/stats',
       const recentExtrinsics = await blockchainService.getLatestExtrinsics({ limit: 100 });
       const signedExtrinsicsCount = recentExtrinsics.extrinsics.filter(ext => ext.isSigned).length;
       
-      // Calculate staking amounts
-      const totalIssuance = chainStats.totalIssuance;
-      const stakedAmount = (totalIssuance * BigInt(Math.floor(chainStats.stakingRatio * 100))) / BigInt(100);
+      // Calculate staking amounts - ensure all BigInt operations are safe
+      const totalIssuance = typeof chainStats.totalIssuance === 'bigint' 
+        ? chainStats.totalIssuance 
+        : BigInt(String(chainStats.totalIssuance || '1000000000000000000000')); // 1M AVAIL default
+      
+      // Safely convert staking ratio to integer percentage
+      const stakingRatio = typeof chainStats.stakingRatio === 'number' ? chainStats.stakingRatio : 0.5;
+      const stakingRatioPercent = Math.max(0, Math.min(100, Math.floor(stakingRatio * 100)));
+      
+      // Ensure we have valid BigInt values
+      const stakedAmount = (totalIssuance * BigInt(stakingRatioPercent)) / BigInt(100);
       const bondedAmount = stakedAmount; // In Substrate, staked = bonded
       
       // Estimate circulating supply (total - treasury - locked)
@@ -43,15 +51,15 @@ router.get('/stats',
         totalIssuance: totalIssuance.toString(),
         circulating: { 
           amount: circulatingAmount.toString(), 
-          percentage: totalIssuance > 0 ? Number(circulatingAmount * BigInt(100) / totalIssuance) : 0,
+          percentage: totalIssuance > BigInt(0) ? Number(circulatingAmount * BigInt(100) / totalIssuance) : 0,
         },
         staking: { 
           amount: stakedAmount.toString(), 
-          percentage: Math.floor(chainStats.stakingRatio * 100),
+          percentage: stakingRatioPercent,
         },
         treasury: { 
           amount: treasuryAmount.toString(), 
-          percentage: totalIssuance > 0 ? Number(treasuryAmount * BigInt(100) / totalIssuance) : 0,
+          percentage: totalIssuance > BigInt(0) ? Number(treasuryAmount * BigInt(100) / totalIssuance) : 0,
         },
         others: { 
           amount: '0', 
