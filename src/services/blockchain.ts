@@ -1,4 +1,5 @@
 import { HybridRPCService } from './hybrid-rpc';
+import { db } from '../utils/database';
 import { 
   Block, 
   Extrinsic, 
@@ -197,35 +198,55 @@ class BlockchainService {
   async getDataSubmissionStats() {
     this.ensureInitialized();
     try {
-      // Optimize: Use smaller limit and add timeout protection
-      const { submissions } = await this.hybridRPC.getDataSubmissions({ limit: 50 });
-      
-      const totalSubmissions = submissions.length;
-      const totalDataSize = submissions.reduce((sum, sub) => sum + sub.size, 0);
-      const uniqueApps = new Set(submissions.map(sub => sub.appId)).size;
-      const uniqueSubmitters = new Set(submissions.map(sub => sub.submitter)).size;
-      const averageSize = totalSubmissions > 0 ? totalDataSize / totalSubmissions : 0;
-      
-      // Calculate today's stats
+      // Use SQL aggregation queries for accurate statistics
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayTimestamp = BigInt(today.getTime());
-      
-      const todaySubmissions = submissions.filter(sub => sub.timestamp >= todayTimestamp);
-      const submissionsToday = todaySubmissions.length;
-      const dataSizeToday = todaySubmissions.reduce((sum, sub) => sum + sub.size, 0);
-      
-      // Find the most recent submission
-      const lastSubmission = submissions.length > 0 ? 
-        submissions.reduce((latest, current) => 
-          current.timestamp > latest.timestamp ? current : latest,
-        ) : null;
+      const todayTimestamp = today.getTime();
 
-      rpcLogger.info('Blockchain service data submission stats calculated', {
+      // Execute all queries in parallel for better performance
+      const [
+        totalSubmissionsResult,
+        totalDataSizeResult,
+        uniqueAppsResult,
+        uniqueSubmittersResult,
+        submissionsTodayResult,
+        dataSizeTodayResult,
+      ] = await Promise.all([
+        // Total submissions count
+        db.query('SELECT COUNT(*) as count FROM data_submissions WHERE success = true'),
+        
+        // Total data size
+        db.query('SELECT COALESCE(SUM(data_size), 0) as total_size FROM data_submissions WHERE success = true'),
+        
+        // Unique apps count
+        db.query('SELECT COUNT(DISTINCT app_id) as count FROM data_submissions WHERE success = true'),
+        
+        // Unique submitters count
+        db.query('SELECT COUNT(DISTINCT submitter) as count FROM data_submissions WHERE success = true'),
+        
+        // Submissions today
+        db.query('SELECT COUNT(*) as count FROM data_submissions WHERE success = true AND timestamp >= $1', [todayTimestamp]),
+        
+        // Data size today
+        db.query('SELECT COALESCE(SUM(data_size), 0) as total_size FROM data_submissions WHERE success = true AND timestamp >= $1', [todayTimestamp]),
+      ]);
+
+      const totalSubmissions = parseInt(totalSubmissionsResult.rows[0]?.count || '0');
+      const totalDataSize = parseInt(totalDataSizeResult.rows[0]?.total_size || '0');
+      const uniqueApps = parseInt(uniqueAppsResult.rows[0]?.count || '0');
+      const uniqueSubmitters = parseInt(uniqueSubmittersResult.rows[0]?.count || '0');
+      const submissionsToday = parseInt(submissionsTodayResult.rows[0]?.count || '0');
+      const dataSizeToday = parseInt(dataSizeTodayResult.rows[0]?.total_size || '0');
+      
+      const averageSize = totalSubmissions > 0 ? Math.round(totalDataSize / totalSubmissions) : 0;
+
+      rpcLogger.info('Blockchain service data submission stats calculated from database', {
         totalSubmissions,
         uniqueApps,
         uniqueSubmitters,
         submissionsToday,
+        totalDataSize,
+        dataSizeToday,
       });
 
       return {
@@ -236,31 +257,35 @@ class BlockchainService {
         averageSize,
         submissionsToday,
         dataSizeToday,
-        lastSubmission: lastSubmission ? {
-          timestamp: lastSubmission.timestamp,
-          appId: lastSubmission.appId,
-          size: lastSubmission.size,
-        } : null,
       };
     } catch (error) {
       logError(error as Error, { operation: 'getDataSubmissionStats' });
-      rpcLogger.warn('Blockchain service falling back to sample stats', { error: (error as Error).message });
       
-      // Fallback to reasonable sample stats
-      return {
-        totalSubmissions: 50,
-        totalDataSize: 2500000, // ~2.5MB total
-        uniqueApps: 8,
-        uniqueSubmitters: 25,
-        averageSize: 50000, // ~50KB average
-        submissionsToday: 12,
-        dataSizeToday: 600000, // ~600KB today
-        lastSubmission: {
-          timestamp: BigInt(Date.now() - 300000), // 5 minutes ago
-          appId: 25,
-          size: 45000,
-        },
-      };
+      // Check if this is a database connection issue
+      if ((error as Error).message.includes('database') || 
+          (error as Error).message.includes('connection') ||
+          (error as Error).message.includes('ECONNREFUSED') ||
+          (error as Error).message.includes('ENOTFOUND')) {
+        
+        rpcLogger.error('Database is unavailable for data submission stats. Server will exit to ensure data integrity.', { 
+          error: (error as Error).message,
+        });
+        
+        // Exit the server if database is unavailable
+        console.error('CRITICAL: Database unavailable. Exiting server to prevent serving inaccurate data.');
+        
+        // Use setTimeout to exit after logging, avoiding direct process.exit in main thread
+        setTimeout(() => {
+          // eslint-disable-next-line no-process-exit
+          process.exit(1);
+        }, 100);
+        
+        // Throw error immediately to stop execution
+        throw new Error('CRITICAL: Database unavailable - server shutting down');
+      }
+      
+      // For other errors, still throw to maintain proper error handling
+      throw new Error('Failed to fetch data submission statistics from database');
     }
   }
 
