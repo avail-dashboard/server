@@ -7,7 +7,44 @@ import blockchainService from '../services/blockchain';
 
 const router = Router();
 
-// GET /api/analytics/network - Get network analytics overview
+interface DataSubmissionStats {
+  totalSubmissions: number;
+  totalDataSize: number;
+  uniqueApps: number;
+  uniqueSubmitters: number;
+  averageSize: number;
+  submissionsToday: number;
+  dataSizeToday: number;
+}
+
+const getDataSubmissionStatsWithFallback = async (): Promise<DataSubmissionStats> => {
+  const defaultStats: DataSubmissionStats = {
+    totalSubmissions: 0,
+    totalDataSize: 0,
+    uniqueApps: 0,
+    uniqueSubmitters: 0,
+    averageSize: 0,
+    submissionsToday: 0,
+    dataSizeToday: 0,
+  };
+
+  try {
+    const result = await blockchainService.getDataSubmissionStats();
+    // Since the method currently throws, this line won't be reached
+    // but we include it for when the method is properly implemented
+    return result as unknown as DataSubmissionStats;
+  } catch (error) {
+    // getDataSubmissionStats is not implemented yet, use defaults
+    logError(error as Error, { 
+      component: 'analytics-route', 
+      action: 'getDataSubmissionStats-fallback',
+      note: 'Using default values - method not implemented',
+    });
+    return defaultStats;
+  }
+};
+
+// GET /api/analytics/network - Get network-wide analytics and trends
 router.get('/network',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
@@ -15,28 +52,7 @@ router.get('/network',
       const period = req.query.period as string || '24h';
       
       const chainStats = await blockchainService.getChainStats();
-      
-      // Handle getDataSubmissionStats which currently throws an error
-      let dataSubmissionStats = {
-        totalSubmissions: 0,
-        totalDataSize: 0,
-        uniqueApps: 0,
-        uniqueSubmitters: 0,
-        averageSize: 0,
-        submissionsToday: 0,
-        dataSizeToday: 0,
-      };
-      
-      try {
-        dataSubmissionStats = await blockchainService.getDataSubmissionStats();
-      } catch (error) {
-        // getDataSubmissionStats is not implemented yet, use defaults
-        logError(error as Error, { 
-          component: 'analytics-route', 
-          action: 'getDataSubmissionStats-fallback',
-          note: 'Using default values - method not implemented' 
-        });
-      }
+      const dataSubmissionStats = await getDataSubmissionStatsWithFallback();
 
       // TODO: Implement time-series data collection for trends
       const networkAnalytics = {
@@ -149,28 +165,7 @@ router.get('/rollups',
   async (req: Request, res: Response) => {
     try {
       const period = req.query.period as string || '24h';
-      
-      // Handle getDataSubmissionStats which currently throws an error
-      let dataSubmissionStats = {
-        totalSubmissions: 0,
-        totalDataSize: 0,
-        uniqueApps: 0,
-        uniqueSubmitters: 0,
-        averageSize: 0,
-        submissionsToday: 0,
-        dataSizeToday: 0,
-      };
-      
-      try {
-        dataSubmissionStats = await blockchainService.getDataSubmissionStats();
-      } catch (error) {
-        // getDataSubmissionStats is not implemented yet, use defaults
-        logError(error as Error, { 
-          component: 'analytics-route', 
-          action: 'getDataSubmissionStats-fallback',
-          note: 'Using default values - method not implemented' 
-        });
-      }
+      const dataSubmissionStats = await getDataSubmissionStatsWithFallback();
 
       // TODO: Implement per-rollup analytics
       const rollupAnalytics = {
@@ -285,28 +280,7 @@ router.get('/data-throughput',
     try {
       const period = req.query.period as string || '24h';
       const granularity = req.query.granularity as string || 'hour';
-
-      // Handle getDataSubmissionStats which currently throws an error
-      let dataSubmissionStats = {
-        totalSubmissions: 0,
-        totalDataSize: 0,
-        uniqueApps: 0,
-        uniqueSubmitters: 0,
-        averageSize: 0,
-        submissionsToday: 0,
-        dataSizeToday: 0,
-      };
-      
-      try {
-        dataSubmissionStats = await blockchainService.getDataSubmissionStats();
-      } catch (error) {
-        // getDataSubmissionStats is not implemented yet, use defaults
-        logError(error as Error, { 
-          component: 'analytics-route', 
-          action: 'getDataSubmissionStats-fallback',
-          note: 'Using default values - method not implemented' 
-        });
-      }
+      const dataSubmissionStats = await getDataSubmissionStatsWithFallback();
 
       // TODO: Implement time-series data throughput tracking
       const throughputAnalytics = {
