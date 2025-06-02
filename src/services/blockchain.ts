@@ -11,6 +11,7 @@ import {
   DataSubmissionQuery,
 } from '../types';
 import { logError, rpcLogger } from '../utils/logger';
+import { DatabaseGuardian } from './database-guardian';
 
 class BlockchainService {
   private hybridRPC: HybridRPCService;
@@ -197,6 +198,7 @@ class BlockchainService {
 
   async getDataSubmissionStats() {
     this.ensureInitialized();
+
     try {
       // Use SQL aggregation queries for accurate statistics
       const today = new Date();
@@ -261,31 +263,10 @@ class BlockchainService {
     } catch (error) {
       logError(error as Error, { operation: 'getDataSubmissionStats' });
       
-      // Check if this is a database connection issue
-      if ((error as Error).message.includes('database') || 
-          (error as Error).message.includes('connection') ||
-          (error as Error).message.includes('ECONNREFUSED') ||
-          (error as Error).message.includes('ENOTFOUND')) {
-        
-        rpcLogger.error('Database is unavailable for data submission stats. Server will exit to ensure data integrity.', { 
-          error: (error as Error).message,
-        });
-        
-        // Exit the server if database is unavailable
-        console.error('CRITICAL: Database unavailable. Exiting server to prevent serving inaccurate data.');
-        
-        // Use setTimeout to exit after logging, avoiding direct process.exit in main thread
-        setTimeout(() => {
-          // eslint-disable-next-line no-process-exit
-          process.exit(1);
-        }, 100);
-        
-        // Throw error immediately to stop execution
-        throw new Error('CRITICAL: Database unavailable - server shutting down');
-      }
-      
-      // For other errors, still throw to maintain proper error handling
-      throw new Error('Failed to fetch data submission statistics from database');
+      // Use Database Guardian for centralized database failure handling
+      await DatabaseGuardian.handleDatabaseError(error as Error, 'blockchain-getDataSubmissionStats');
+      // This line should never be reached due to handleDatabaseError's never return type
+      throw error;
     }
   }
 

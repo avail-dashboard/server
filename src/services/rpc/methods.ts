@@ -32,8 +32,8 @@ import {
   ExtrinsicsQuery,
   DataSubmission,
   DataSubmissionQuery,
-  DataSubmissionStats,
 } from '../../types';
+import { DatabaseGuardian } from '../database-guardian';
 
 export class RPCMethodsService {
   private connectionManager: RPCConnectionManager;
@@ -964,12 +964,6 @@ export class RPCMethodsService {
         }
       });
       
-      // If no submissions found, provide some mock data for demonstration
-      if (submissions.length === 0) {
-        rpcLogger.info('No data submissions found in recent blocks, generating sample data');
-        submissions.push(...this.generateSampleDataSubmissions());
-      }
-      
       // Sort submissions
       submissions.sort((a, b) => {
         const aValue = orderBy === 'timestamp' ? Number(a.timestamp) : 
@@ -997,61 +991,11 @@ export class RPCMethodsService {
       };
     } catch (error) {
       logError(error as Error, { operation: 'getDataSubmissions', query });
-      rpcLogger.warn('Falling back to sample data due to error', { error: (error as Error).message });
       
-      // Fallback to sample data if real data fails
-      const sampleSubmissions = this.generateSampleDataSubmissions();
-      const { page = 1, limit = 10 } = query;
-      const startIndex = (page - 1) * limit;
-      const paginatedSubmissions = sampleSubmissions.slice(startIndex, startIndex + limit);
-      
-      return { 
-        submissions: paginatedSubmissions, 
-        total: sampleSubmissions.length,
-      };
-    }
-  }
-
-  private generateSampleDataSubmissions(): DataSubmission[] {
-    const now = Date.now();
-    const sampleSubmissions: DataSubmission[] = [];
-    
-    // Generate 50 sample submissions with realistic data
-    for (let i = 0; i < 50; i++) {
-      const blockNumber = BigInt(1000000 + i);
-      const timestamp = BigInt(now - (i * 60000)); // Each submission 1 minute apart
-      const appId = [25, 17, 30, 42, 7, 3, 19, 88][i % 8]; // Rotate through common app IDs
-      const size = 1024 + Math.floor(Math.random() * 100000); // 1KB to 100KB
-      
-      sampleSubmissions.push({
-        extrinsicId: `${blockNumber}-${i % 5}`,
-        blockNumber,
-        extrinsicIndex: i % 5,
-        appId,
-        size,
-        dataHash: `0x${Math.random().toString(16).slice(2).padStart(64, '0')}`,
-        submitter: `0x${Math.random().toString(16).slice(2).padStart(40, '0')}`,
-        timestamp,
-        success: Math.random() > 0.05, // 95% success rate
-        data: `Sample data submission ${i + 1}`,
-      });
-    }
-    
-    return sampleSubmissions;
-  }
-
-  async getDataSubmissionStats(): Promise<DataSubmissionStats> {
-    try {
-      // NOTE: This method is deprecated and should not be used directly.
-      // Use blockchainService.getDataSubmissionStats() instead, which uses proper database aggregation.
-      // This method is kept for backward compatibility but will throw an error to prevent misuse.
-      
-      rpcLogger.warn('getDataSubmissionStats called on RPC methods service - this is deprecated. Use blockchainService.getDataSubmissionStats() instead.');
-      
-      throw new Error('This method is deprecated. Use blockchainService.getDataSubmissionStats() for proper database-based statistics.');
-    } catch (error) {
-      logError(error as Error, { operation: 'getDataSubmissionStats' });
-      throw new Error('Failed to fetch data submission statistics - use blockchainService.getDataSubmissionStats() instead');
+      // Use database guardian instead of falling back to sample data
+      await DatabaseGuardian.handleDatabaseError(error as Error, 'rpc-getDataSubmissions');
+      // This line should never be reached due to handleDatabaseError's never return type
+      throw error;
     }
   }
 

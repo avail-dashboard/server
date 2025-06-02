@@ -181,11 +181,6 @@ export class AvailRPCService extends EventEmitter {
     return this.methodsService.getDataSubmissions(query);
   }
 
-  async getDataSubmissionStats() {
-    this.ensureInitialized();
-    return this.methodsService.getDataSubmissionStats();
-  }
-
   async getBlockDataRoot(blockHash: string): Promise<string | null> {
     this.ensureInitialized();
     return this.methodsService.getBlockDataRoot(blockHash);

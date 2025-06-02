@@ -6,6 +6,7 @@ import { APIResponse, APIError } from '../types';
 import { logRequest, logError } from '../utils/logger';
 import { cache } from '../utils/cache';
 import { db } from '../utils/database';
+import { DatabaseGuardian } from '../services/database-guardian';
 
 // Request timing middleware
 export const requestTimer = (req: Request, res: Response, next: NextFunction): void => {
@@ -278,6 +279,14 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
 
     const [dbHealth, cacheHealth] = await Promise.all(healthChecks);
 
+    // Fail-fast if database is unhealthy
+    if (!dbHealth.connected) {
+      DatabaseGuardian.exitOnDatabaseFailure(
+        new Error('Database health check failed'), 
+        'health-check',
+      );
+    }
+
     const health = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -296,7 +305,7 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
     const cachingHealthy = !config.features.caching || cacheHealth.connected;
     const allHealthy = databaseHealthy && cachingHealthy;
 
-    // Set overall status
+    // Set overall status - database must be healthy, cache is optional
     health.status = allHealthy ? 'healthy' : 'degraded';
 
     res.status(allHealthy ? 200 : 503).json({
@@ -307,14 +316,8 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
   } catch (error) {
     logError(error as Error, { component: 'health-check' });
     
-    res.status(503).json({
-      success: false,
-      error: {
-        code: 'HEALTH_CHECK_FAILED',
-        message: 'Health check failed',
-      },
-      timestamp: new Date().toISOString(),
-    });
+    // Use database guardian for health check failures
+    DatabaseGuardian.exitOnDatabaseFailure(error as Error, 'health-check-error');
   }
 };
 
