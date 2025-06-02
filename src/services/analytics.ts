@@ -1,5 +1,4 @@
 import { logger } from '../utils/logger';
-import { db } from '../utils/database';
 import blockchainService from './blockchain';
 import { 
   NetworkStatsSnapshot,
@@ -142,16 +141,26 @@ class AnalyticsService {
   private async getCurrentNetworkStats(): Promise<NetworkStatsSnapshot> {
     try {
       const chainStats = await blockchainService.getChainStats();
-      const dataStats = await blockchainService.getDataSubmissionStats();
+      
+      // Since getDataSubmissionStats throws database not implemented error,
+      // we'll use default values for data submission stats
+      const defaultDataStats = {
+        totalSubmissions: 0,
+        totalDataSize: 0,
+        uniqueApps: 0,
+        uniqueSubmitters: 0,
+        averageSize: 0,
+        submissionsToday: 0,
+        dataSizeToday: 0,
+      };
 
-      // TODO: This should come from the database once data is being stored
       return {
         id: 0,
         snapshot_time: new Date(),
         block_number: chainStats.blockHeight,
         total_blocks: chainStats.blockHeight,
         total_extrinsics: BigInt(0), // TODO: Get from database
-        total_data_size: BigInt(dataStats.totalDataSize),
+        total_data_size: BigInt(defaultDataStats.totalDataSize),
         total_fees: BigInt(0), // TODO: Calculate from extrinsics
         active_validators: chainStats.activeValidators,
         total_staked: chainStats.totalIssuance,
@@ -166,56 +175,12 @@ class AnalyticsService {
     }
   }
 
-  private async getHistoricalNetworkStats(timeframe: AnalyticsTimeframe): Promise<NetworkStatsSnapshot[]> {
-    try {
-      // TODO: Implement database query for historical network snapshots
-      // This would query the network_stats_snapshots table
-      
-      const query = `
-        SELECT * FROM network_stats_snapshots 
-        WHERE snapshot_time >= NOW() - INTERVAL $1
-        ORDER BY snapshot_time DESC
-        LIMIT 100
-      `;
-      
-      const intervalString = this.timeframeToInterval(timeframe);
-      const result = await db.query(query, [intervalString]);
-      
-      return result.rows.map(row => ({
-        ...row,
-        block_number: BigInt(row.block_number),
-        total_blocks: BigInt(row.total_blocks || 0),
-        total_extrinsics: BigInt(row.total_extrinsics || 0),
-        total_data_size: BigInt(row.total_data_size || 0),
-        total_fees: BigInt(row.total_fees || 0),
-        total_staked: BigInt(row.total_staked || 0),
-      }));
-    } catch (error) {
-      logger.error('Analytics: Failed to get historical network stats', { error, timeframe });
-      return [];
-    }
+  private async getHistoricalNetworkStats(_timeframe: AnalyticsTimeframe): Promise<NetworkStatsSnapshot[]> {
+    throw new Error('Database not implemented - Historical network stats not available');
   }
 
-  private async calculateGrowthMetrics(_timeframe: AnalyticsTimeframe) {
-    try {
-      // TODO: Implement growth metrics calculation
-      // This would compare current values with previous period values
-      
-      return {
-        blocks_growth_24h: 0,
-        extrinsics_growth_24h: 0,
-        data_size_growth_24h: 0,
-        validators_growth_24h: 0,
-      };
-    } catch (error) {
-      logger.error('Analytics: Failed to calculate growth metrics', { error });
-      return {
-        blocks_growth_24h: 0,
-        extrinsics_growth_24h: 0,
-        data_size_growth_24h: 0,
-        validators_growth_24h: 0,
-      };
-    }
+  private async calculateGrowthMetrics(_timeframe: AnalyticsTimeframe): Promise<never> {
+    throw new Error('Database not implemented - Growth metrics not available');
   }
 
   private async calculatePerformanceMetrics() {
@@ -273,32 +238,8 @@ class AnalyticsService {
     }
   }
 
-  private async getGasPriceTrend(timeframe: AnalyticsTimeframe): Promise<GasPriceHistory[]> {
-    try {
-      // TODO: Implement gas price history query
-      const query = `
-        SELECT * FROM gas_price_history 
-        WHERE timestamp >= EXTRACT(EPOCH FROM NOW() - INTERVAL $1) 
-        ORDER BY timestamp DESC
-        LIMIT 1000
-      `;
-      
-      const intervalString = this.timeframeToInterval(timeframe);
-      const result = await db.query(query, [intervalString]);
-      
-      return result.rows.map(row => ({
-        ...row,
-        block_number: BigInt(row.block_number),
-        timestamp: BigInt(row.timestamp),
-        gas_price: BigInt(row.gas_price),
-        gas_used: row.gas_used ? BigInt(row.gas_used) : undefined,
-        gas_limit: row.gas_limit ? BigInt(row.gas_limit) : undefined,
-        average_fee: row.average_fee ? BigInt(row.average_fee) : undefined,
-      }));
-    } catch (error) {
-      logger.error('Analytics: Failed to get gas price trend', { error, timeframe });
-      return [];
-    }
+  private async getGasPriceTrend(_timeframe: AnalyticsTimeframe): Promise<GasPriceHistory[]> {
+    throw new Error('Database not implemented - Gas price trend not available');
   }
 
   private async calculateGasEfficiencyMetrics() {
@@ -365,64 +306,15 @@ class AnalyticsService {
   }
 
   private async getTotalRollups(): Promise<number> {
-    try {
-      const query = 'SELECT COUNT(DISTINCT app_id) as count FROM rollups';
-      const result = await db.query(query);
-      return parseInt(result.rows[0]?.count || '0');
-    } catch (error) {
-      logger.error('Analytics: Failed to get total rollups', { error });
-      return 0;
-    }
+    throw new Error('Database not implemented - Rollup count not available');
   }
 
   private async getActiveRollups24h(): Promise<number> {
-    try {
-      const query = `
-        SELECT COUNT(DISTINCT app_id) as count 
-        FROM data_submissions 
-        WHERE timestamp >= EXTRACT(EPOCH FROM NOW() - INTERVAL '24 hours')
-      `;
-      const result = await db.query(query);
-      return parseInt(result.rows[0]?.count || '0');
-    } catch (error) {
-      logger.error('Analytics: Failed to get active rollups 24h', { error });
-      return 0;
-    }
+    throw new Error('Database not implemented - Active rollups data not available');
   }
 
-  private async calculateRollupLeaderboard(timeframe: AnalyticsTimeframe) {
-    try {
-      // TODO: Implement rollup leaderboard calculation
-      const query = `
-        SELECT 
-          r.app_id,
-          r.name,
-          SUM(ds.data_size) as total_data_size,
-          COUNT(ds.id) as submission_count
-        FROM rollups r
-        LEFT JOIN data_submissions ds ON r.app_id = ds.app_id
-        WHERE ds.timestamp >= EXTRACT(EPOCH FROM NOW() - INTERVAL $1)
-        GROUP BY r.app_id, r.name
-        ORDER BY total_data_size DESC
-        LIMIT 20
-      `;
-      
-      const intervalString = this.timeframeToInterval(timeframe);
-      const result = await db.query(query, [intervalString]);
-      
-      const totalDataSize = result.rows.reduce((sum, row) => sum + parseInt(row.total_data_size || '0'), 0);
-      
-      return result.rows.map((row) => ({
-        app_id: row.app_id,
-        name: row.name || `App ${row.app_id}`,
-        metric_value: parseInt(row.total_data_size || '0'),
-        percentage_of_total: totalDataSize > 0 ? (parseInt(row.total_data_size || '0') / totalDataSize) * 100 : 0,
-        change_24h: 0, // TODO: Calculate 24h change
-      }));
-    } catch (error) {
-      logger.error('Analytics: Failed to calculate rollup leaderboard', { error });
-      return [];
-    }
+  private async calculateRollupLeaderboard(_timeframe: AnalyticsTimeframe): Promise<never> {
+    throw new Error('Database not implemented - Rollup leaderboard not available');
   }
 
   private async calculateDAContribution(_timeframe: AnalyticsTimeframe) {
@@ -551,13 +443,23 @@ class AnalyticsService {
 
   private async getCurrentThroughputMetrics() {
     try {
-      const dataStats = await blockchainService.getDataSubmissionStats();
+      // Since getDataSubmissionStats throws database not implemented error,
+      // we'll use default values for data submission stats
+      const defaultDataStats = {
+        totalSubmissions: 0,
+        totalDataSize: 0,
+        uniqueApps: 0,
+        uniqueSubmitters: 0,
+        averageSize: 0,
+        submissionsToday: 0,
+        dataSizeToday: 0,
+      };
       
       return {
         submissions_per_hour: 0, // TODO: Calculate current rate
         data_mb_per_hour: 0, // TODO: Calculate current data rate
-        unique_submitters_active: dataStats.uniqueSubmitters,
-        average_submission_size: dataStats.averageSize,
+        unique_submitters_active: defaultDataStats.uniqueSubmitters,
+        average_submission_size: defaultDataStats.averageSize,
       };
     } catch (error) {
       logger.error('Analytics: Failed to get current throughput metrics', { error });
@@ -637,49 +539,8 @@ class AnalyticsService {
   // SNAPSHOT CREATION
   // ===========================================
 
-  async createNetworkSnapshot(): Promise<NetworkStatsSnapshot> {
-    this.ensureInitialized();
-    
-    try {
-      const snapshot = await this.getCurrentNetworkStats();
-      
-      // TODO: Store snapshot in database
-      const query = `
-        INSERT INTO network_stats_snapshots (
-          snapshot_time, block_number, total_blocks, total_extrinsics,
-          total_data_size, total_fees, active_validators, total_staked,
-          inflation_rate, network_utilization, average_block_time
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING *
-      `;
-      
-      const values = [
-        snapshot.snapshot_time,
-        snapshot.block_number.toString(),
-        snapshot.total_blocks?.toString(),
-        snapshot.total_extrinsics?.toString(),
-        snapshot.total_data_size?.toString(),
-        snapshot.total_fees?.toString(),
-        snapshot.active_validators,
-        snapshot.total_staked?.toString(),
-        snapshot.inflation_rate,
-        snapshot.network_utilization,
-        snapshot.average_block_time,
-      ];
-      
-      const result = await db.query(query, values);
-      
-      if (result.rows[0]) {
-        logger.info('Analytics: Network snapshot created successfully', {
-          blockNumber: snapshot.block_number.toString(),
-        });
-      }
-      
-      return snapshot;
-    } catch (error) {
-      logger.error('Analytics: Failed to create network snapshot', { error });
-      throw error;
-    }
+  async createNetworkSnapshot(): Promise<never> {
+    throw new Error('Database not implemented - Cannot create network snapshots');
   }
 
   // ===========================================

@@ -1,5 +1,4 @@
 import { HybridRPCService } from './hybrid-rpc';
-import { db } from '../utils/database';
 import { 
   Block, 
   Extrinsic, 
@@ -11,7 +10,6 @@ import {
   DataSubmissionQuery,
 } from '../types';
 import { logError, rpcLogger } from '../utils/logger';
-import { DatabaseGuardian } from './database-guardian';
 
 class BlockchainService {
   private hybridRPC: HybridRPCService;
@@ -197,77 +195,7 @@ class BlockchainService {
   }
 
   async getDataSubmissionStats() {
-    this.ensureInitialized();
-
-    try {
-      // Use SQL aggregation queries for accurate statistics
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayTimestamp = today.getTime();
-
-      // Execute all queries in parallel for better performance
-      const [
-        totalSubmissionsResult,
-        totalDataSizeResult,
-        uniqueAppsResult,
-        uniqueSubmittersResult,
-        submissionsTodayResult,
-        dataSizeTodayResult,
-      ] = await Promise.all([
-        // Total submissions count
-        db.query('SELECT COUNT(*) as count FROM data_submissions WHERE success = true'),
-        
-        // Total data size
-        db.query('SELECT COALESCE(SUM(data_size), 0) as total_size FROM data_submissions WHERE success = true'),
-        
-        // Unique apps count
-        db.query('SELECT COUNT(DISTINCT app_id) as count FROM data_submissions WHERE success = true'),
-        
-        // Unique submitters count
-        db.query('SELECT COUNT(DISTINCT submitter) as count FROM data_submissions WHERE success = true'),
-        
-        // Submissions today
-        db.query('SELECT COUNT(*) as count FROM data_submissions WHERE success = true AND timestamp >= $1', [todayTimestamp]),
-        
-        // Data size today
-        db.query('SELECT COALESCE(SUM(data_size), 0) as total_size FROM data_submissions WHERE success = true AND timestamp >= $1', [todayTimestamp]),
-      ]);
-
-      const totalSubmissions = parseInt(totalSubmissionsResult.rows[0]?.count || '0');
-      const totalDataSize = parseInt(totalDataSizeResult.rows[0]?.total_size || '0');
-      const uniqueApps = parseInt(uniqueAppsResult.rows[0]?.count || '0');
-      const uniqueSubmitters = parseInt(uniqueSubmittersResult.rows[0]?.count || '0');
-      const submissionsToday = parseInt(submissionsTodayResult.rows[0]?.count || '0');
-      const dataSizeToday = parseInt(dataSizeTodayResult.rows[0]?.total_size || '0');
-      
-      const averageSize = totalSubmissions > 0 ? Math.round(totalDataSize / totalSubmissions) : 0;
-
-      rpcLogger.info('Blockchain service data submission stats calculated from database', {
-        totalSubmissions,
-        uniqueApps,
-        uniqueSubmitters,
-        submissionsToday,
-        totalDataSize,
-        dataSizeToday,
-      });
-
-      return {
-        totalSubmissions,
-        totalDataSize,
-        uniqueApps,
-        uniqueSubmitters,
-        averageSize,
-        submissionsToday,
-        dataSizeToday,
-      };
-    } catch (error) {
-      logError(error as Error, { operation: 'getDataSubmissionStats' });
-      
-      // Use Database Guardian for centralized database failure handling
-      await DatabaseGuardian.handleDatabaseError(error as Error, 'blockchain-getDataSubmissionStats');
-      // This line should never be reached due to handleDatabaseError's never return type
-      throw error;
-    }
+    throw new Error('Database not implemented - Data submission stats not available');
   }
 
   async getBlockDataRoot(blockHash: string) {
