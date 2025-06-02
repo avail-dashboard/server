@@ -144,7 +144,7 @@ export class TurboDAService extends EventEmitter {
       try {
         await this.getStats();
         logAvailConnectionState('turboDA', this.baseURL, 'connected');
-      } catch (error) {
+      } catch {
         // Stats endpoint might not be available, but service can still work
         logAvailConnectionState('turboDA', this.baseURL, 'connected', { 
           note: 'Stats endpoint not available, but service is functional',

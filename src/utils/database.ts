@@ -9,7 +9,7 @@ interface DatabaseConfig {
   ssl?: boolean | object;
 }
 
-interface QueryResult_<T = any> {
+interface QueryResult<T = any> {
   rows: T[];
   rowCount: number;
 }
@@ -59,7 +59,7 @@ class DatabaseService {
       client.release();
       this.isConnected = true;
       console.log('Database: Connected to PostgreSQL');
-    } catch (error) {
+    } catch {
       this.isConnected = false;
       logError(error as Error, { component: 'database', action: 'connect' });
       
@@ -75,12 +75,12 @@ class DatabaseService {
       }
       console.log('Database: Disconnected from PostgreSQL');
       this.isConnected = false;
-    } catch (error) {
+    } catch {
       logError(error as Error, { component: 'database', action: 'disconnect' });
     }
   }
 
-  async query<T = any>(text: string, params?: any[]): Promise<QueryResult_<T>> {
+  async query<T = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
     const start = Date.now();
 
     try {
@@ -90,7 +90,7 @@ class DatabaseService {
       logQuery(text, duration, result.rowCount);
       
       return result;
-    } catch (error) {
+    } catch {
       const duration = Date.now() - start;
       logError(error as Error, { 
         component: 'database', 
@@ -106,7 +106,7 @@ class DatabaseService {
     }
   }
 
-  private async executePostgreSQLQuery<T>(text: string, params?: any[]): Promise<QueryResult_<T>> {
+  private async executePostgreSQLQuery<T>(text: string, params?: any[]): Promise<QueryResult<T>> {
     if (!this.pgPool) {
       throw new Error('PostgreSQL pool not initialized');
     }
@@ -142,7 +142,7 @@ class DatabaseService {
       
       await client.query('COMMIT');
       return result;
-    } catch (error) {
+    } catch {
       await client.query('ROLLBACK');
       logError(error as Error, { component: 'database', action: 'transaction' });
       
@@ -165,7 +165,7 @@ class DatabaseService {
       await this.query('SELECT 1 as test');
       const latency = Date.now() - start;
       return { connected: true, latency, type: this.dbConfig.type };
-    } catch (error) {
+    } catch {
       return { connected: false, type: this.dbConfig.type };
     }
   }
@@ -386,7 +386,7 @@ export const createTables = async (): Promise<void> => {
   for (const query of queries) {
     try {
       await db.query(query);
-    } catch (error) {
+    } catch {
       logError(error as Error, { component: 'database', action: 'createTables', query });
       throw error;
     }

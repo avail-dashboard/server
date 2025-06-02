@@ -57,6 +57,24 @@ module.exports = {
         selector: 'enumMember',
         format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
       },
+      // Allow PascalCase for specific imports and interfaces
+      {
+        selector: 'import',
+        format: ['camelCase', 'PascalCase'],
+      },
+      {
+        selector: 'interface',
+        format: ['PascalCase'],
+      },
+      // Allow specific variable names that are commonly PascalCase
+      {
+        selector: 'variable',
+        filter: {
+          regex: '^(Joi|WebSocket|Redis|DailyRotateFile|CacheKeys)$',
+          match: true,
+        },
+        format: ['PascalCase'],
+      },
     ],
     
     // General ESLint rules
