@@ -52,7 +52,7 @@ router.get('/',
               url: `/blocks/${query}`,
             });
           }
-        } catch (error) {
+        } catch {
           // Block not found, continue search
         }
       } else if (/^0x[a-fA-F0-9]{64}$/.test(query)) {
@@ -68,7 +68,7 @@ router.get('/',
               url: `/blocks/${query}`,
             });
           }
-        } catch (error) {
+        } catch {
           // Block not found, try extrinsic
           try {
             const extrinsic = await blockchainService.getExtrinsicByHash(query);
@@ -81,7 +81,7 @@ router.get('/',
                 url: `/extrinsics/${query}`,
               });
             }
-          } catch (error) {
+          } catch {
             // Extrinsic not found
           }
         }
@@ -98,7 +98,7 @@ router.get('/',
               url: `/accounts/${query}`,
             });
           }
-        } catch (error) {
+        } catch {
           // Account not found
         }
       }

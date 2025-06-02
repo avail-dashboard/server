@@ -29,29 +29,29 @@ export const camelToSnake = (str: string): string => {
  * @param obj The object to transform
  * @returns A new object with all keys in camelCase
  */
-export const keysToCamelCase = <T extends Record<string, any>>(obj: T): Record<string, any> => {
+export const keysToCamelCase = <T>(obj: T): Record<string, unknown> => {
   if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
-    return obj;
+    return obj as unknown as Record<string, unknown>;
   }
 
-  const camelCaseObj: Record<string, any> = {};
+  const camelCaseObj: Record<string, unknown> = {};
   
-  Object.keys(obj).forEach(key => {
+  Object.keys(obj as Record<string, unknown>).forEach(key => {
     const camelKey = snakeToCamel(key);
-    const value = obj[key];
+    const value = (obj as Record<string, unknown>)[key];
     
     // Handle nested objects and arrays recursively
     if (Array.isArray(value)) {
       camelCaseObj[camelKey] = value.map(item => 
         typeof item === 'object' && item !== null ? keysToCamelCase(item) : item,
       );
-    } else if (value !== null && typeof value === 'object') {
+    } else if (typeof value === 'object' && value !== null) {
       camelCaseObj[camelKey] = keysToCamelCase(value);
     } else {
       camelCaseObj[camelKey] = value;
     }
   });
-  
+
   return camelCaseObj;
 };
 
@@ -60,12 +60,12 @@ export const keysToCamelCase = <T extends Record<string, any>>(obj: T): Record<s
  * @param obj The object to transform
  * @returns A new object with all keys in snake_case
  */
-export const keysToSnakeCase = <T extends Record<string, any>>(obj: T): Record<string, any> => {
+export const keysToSnakeCase = <T extends Record<string, unknown>>(obj: T): Record<string, unknown> => {
   if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
     return obj;
   }
 
-  const snakeCaseObj: Record<string, any> = {};
+  const snakeCaseObj: Record<string, unknown> = {};
   
   Object.keys(obj).forEach(key => {
     const snakeKey = camelToSnake(key);
@@ -74,10 +74,10 @@ export const keysToSnakeCase = <T extends Record<string, any>>(obj: T): Record<s
     // Handle nested objects and arrays recursively
     if (Array.isArray(value)) {
       snakeCaseObj[snakeKey] = value.map(item => 
-        typeof item === 'object' && item !== null ? keysToSnakeCase(item) : item,
+        typeof item === 'object' && item !== null ? keysToSnakeCase(item as Record<string, unknown>) : item,
       );
     } else if (value !== null && typeof value === 'object') {
-      snakeCaseObj[snakeKey] = keysToSnakeCase(value);
+      snakeCaseObj[snakeKey] = keysToSnakeCase(value as Record<string, unknown>);
     } else {
       snakeCaseObj[snakeKey] = value;
     }

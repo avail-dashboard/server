@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 import config from '../config';
-import { logCacheHit, logCacheMiss, logCacheSet, logError } from './logger';
+import { logCacheHit, logCacheMiss, logCacheSet, logError, logger } from './logger';
 
 class CacheService {
   private redis: Redis;
@@ -13,11 +13,11 @@ class CacheService {
       connectTimeout: 10000,
       retryStrategy: (times) => {
         if (times > 10) {
-          console.log('Cache: Too many Redis connection attempts, giving up');
+          logger.warn('Cache: Too many Redis connection attempts, giving up', { component: 'cache', attempts: times });
           return null; // stop retrying
         }
         const delay = Math.min(times * 500, 5000);
-        console.log(`Cache: Retrying Redis connection in ${delay}ms (attempt ${times})`);
+        logger.info(`Cache: Retrying Redis connection in ${delay}ms (attempt ${times})`, { component: 'cache', attempt: times, delay });
         return delay;
       },
     });
@@ -28,7 +28,7 @@ class CacheService {
   private setupEventHandlers(): void {
     this.redis.on('connect', () => {
       this.isConnected = true;
-      console.log('Cache: Connected to Redis');
+      logger.info('Cache: Connected to Redis', { component: 'cache' });
     });
 
     this.redis.on('error', (error) => {
@@ -38,7 +38,7 @@ class CacheService {
 
     this.redis.on('close', () => {
       this.isConnected = false;
-      console.log('Cache: Redis connection closed');
+      logger.info('Cache: Redis connection closed', { component: 'cache' });
     });
   }
 
@@ -59,7 +59,7 @@ class CacheService {
     }
   }
 
-  async get<T = any>(key: string): Promise<T | null> {
+  async get<T = unknown>(key: string): Promise<T | null> {
     if (!this.isConnected) {
       logCacheMiss(key);
       return null;
@@ -82,7 +82,7 @@ class CacheService {
     }
   }
 
-  async set(key: string, value: any, ttl?: number): Promise<boolean> {
+  async set(key: string, value: unknown, ttl?: number): Promise<boolean> {
     if (!this.isConnected) {
       return false;
     }
@@ -203,7 +203,7 @@ class CacheService {
       await this.redis.ping();
       const ping = Date.now() - start;
       return { connected: true, ping };
-    } catch (error) {
+    } catch {
       return { connected: false };
     }
   }

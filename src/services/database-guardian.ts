@@ -1,4 +1,4 @@
-import { logError } from '../utils/logger';
+import { logError, logger } from '../utils/logger';
 
 interface ErrorAnalysis {
   severity: 'CRITICAL' | 'SEVERE' | 'MODERATE' | 'MINOR';
@@ -234,7 +234,7 @@ export class DatabaseGuardian {
   static async handleDatabaseError(error: Error, context: string): Promise<never> {
     // Check circuit breaker
     if (this.isCircuitBreakerOpen(context)) {
-      console.error(`CRITICAL: Circuit breaker open for ${context}. Exiting immediately.`);
+      logger.error(`CRITICAL: Circuit breaker open for ${context}. Exiting immediately.`, { component: 'database-guardian', context });
       this.forceExit();
     }
 
@@ -255,13 +255,15 @@ export class DatabaseGuardian {
       description: analysis.description,
     });
 
-    console.error(`Database Guardian: ${analysis.description}`);
-    console.error(`Context: ${context}, Severity: ${analysis.severity}`);
+    logger.error(`Database Guardian: ${analysis.description}`, { component: 'database-guardian', context, severity: analysis.severity });
 
     // Handle based on severity
     if (analysis.severity === 'CRITICAL' || analysis.shouldExit) {
-      console.error(`CRITICAL: Database failure in ${context}. Exiting to ensure data integrity.`);
-      console.error(`Error: ${error.message}`);
+      logger.error(`CRITICAL: Database failure in ${context}. Exiting to ensure data integrity.`, { 
+        component: 'database-guardian', 
+        context, 
+        errorMessage: error.message,
+      });
       await this.gracefulShutdown();
       this.forceExit();
     }
@@ -296,14 +298,19 @@ export class DatabaseGuardian {
       
       return true;
     } catch (error) {
-      console.error('Database health check failed:', (error as Error).message);
+      logger.error('Database health check failed', { 
+        component: 'database-guardian', 
+        errorMessage: (error as Error).message,
+      });
       
       // Analyze the error but don't exit on health check failures
       const analysis = this.analyzeError(error as Error, 'health-check');
       
       // Only exit if it's a critical error
       if (analysis.severity === 'CRITICAL') {
-        console.error('CRITICAL: Database health check failed with critical error. Exiting.');
+        logger.error('CRITICAL: Database health check failed with critical error. Exiting.', { 
+          component: 'database-guardian',
+        });
         await this.gracefulShutdown();
         this.forceExit();
       }
@@ -325,14 +332,14 @@ export class DatabaseGuardian {
    */
   private static async gracefulShutdown(): Promise<void> {
     try {
-      console.log('Database Guardian: Initiating graceful shutdown...');
+      logger.info('Database Guardian: Initiating graceful shutdown...', { component: 'database-guardian' });
       
       // Close Redis connections if available
       try {
         const { default: cache } = await import('../utils/cache');
         await cache.disconnect();
-        console.log('Database Guardian: Redis connections closed');
-      } catch (error) {
+        logger.info('Database Guardian: Redis connections closed', { component: 'database-guardian' });
+      } catch {
         // Redis might not be available, continue shutdown
       }
 
@@ -340,17 +347,20 @@ export class DatabaseGuardian {
       try {
         const { default: db } = await import('../utils/database');
         await db.disconnect();
-        console.log('Database Guardian: Database connections closed');
-      } catch (error) {
+        logger.info('Database Guardian: Database connections closed', { component: 'database-guardian' });
+      } catch {
         // Database might already be disconnected
       }
 
       // Give services time to cleanup
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      console.log('Database Guardian: Graceful shutdown completed');
+      logger.info('Database Guardian: Graceful shutdown completed', { component: 'database-guardian' });
     } catch (error) {
-      console.error('Database Guardian: Error during graceful shutdown:', error);
+      logger.error('Database Guardian: Error during graceful shutdown', { 
+        component: 'database-guardian', 
+        error: error,
+      });
     }
   }
 

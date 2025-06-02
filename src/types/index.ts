@@ -1,11 +1,11 @@
 // API Response Types
-export interface APIResponse<T = any> {
+export interface APIResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: Record<string, unknown>;
   };
   meta?: {
     page?: number;
@@ -49,7 +49,7 @@ export interface Extrinsic {
   timestamp: bigint;
   signer: string;
   fee: bigint;
-  args?: any;
+  args?: Record<string, unknown>;
   events?: ExtrinsicEvent[];
   tip?: bigint;
   signature?: string;
@@ -63,7 +63,7 @@ export interface ExtrinsicEvent {
   module: string;
   event: string;
   phase: string;
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface Account {
@@ -190,7 +190,7 @@ export interface TokenPrice {
 // Background Job Types
 export interface JobData {
   type: string;
-  payload?: any;
+  payload?: Record<string, unknown>;
   priority?: number;
   delay?: number;
   attempts?: number;
@@ -212,7 +212,7 @@ export interface AnalyticsJobData extends JobData {
 export interface APIError extends Error {
   code: string;
   statusCode?: number;
-  details?: any;
+  details?: Record<string, unknown>;
   source?: DataSource;
 }
 
