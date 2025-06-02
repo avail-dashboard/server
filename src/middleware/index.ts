@@ -4,6 +4,13 @@ import { validationResult, ValidationChain } from 'express-validator';
 import config from '../config';
 import { APIResponse, APIError } from '../types';
 import { logRequest, logError } from '../utils/logger';
+import { camelCaseResponse } from './camelCaseResponse';
+
+// Export the camelCaseResponse middleware
+export { camelCaseResponse };
+
+// Export test camelCase validator middleware
+export { default as testCamelCaseValidator } from './testCamelCaseValidator';
 
 // Request timing middleware
 export const requestTimer = (req: Request, res: Response, next: NextFunction): void => {

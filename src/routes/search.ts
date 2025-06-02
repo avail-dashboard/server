@@ -1,18 +1,32 @@
 import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
-import { searchRateLimit } from '../middleware';
+import { cacheMiddleware } from '../middleware';
+import blockchainService from '../services/blockchain';
+import { keysToCamelCase } from '../utils/caseConverter';
+
+interface SearchResult {
+  type: string;
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+}
 
 const router = Router();
 
-// GET /api/search - Universal search
+/**
+ * @route GET /api/search
+ * @description Universal search for blocks, extrinsics, accounts
+ * @access Public
+ */
 router.get('/', 
-  searchRateLimit,
+  cacheMiddleware(60), // 1 minute cache
   async (req: Request, res: Response) => {
     try {
       const query = req.query.q as string;
 
-      if (!query || query.trim().length === 0) {
+      if (!query) {
         return res.status(400).json({
           success: false,
           error: {
@@ -22,66 +36,81 @@ router.get('/',
         });
       }
 
-      // Mock search results based on query pattern
-      const searchResults = [];
+      const searchResults: SearchResult[] = [];
 
-      // Check if query looks like a block number
+      // Search logic based on query type
       if (/^\d+$/.test(query)) {
-        searchResults.push({
-          type: 'block',
-          id: query,
-          title: `Block #${query}`,
-          description: `Block number ${query}`,
-          url: `/blocks/${query}`,
-        });
+        // Numeric query - search for block by number
+        try {
+          const block = await blockchainService.getBlockByNumber(BigInt(query));
+          if (block) {
+            searchResults.push({
+              type: 'block',
+              id: query,
+              title: `Block #${query}`,
+              description: `Block number ${query}`,
+              url: `/blocks/${query}`,
+            });
+          }
+        } catch (error) {
+          // Block not found, continue search
+        }
+      } else if (/^0x[a-fA-F0-9]{64}$/.test(query)) {
+        // Hash query - could be block or extrinsic
+        try {
+          const block = await blockchainService.getBlockByHash(query);
+          if (block) {
+            searchResults.push({
+              type: 'block',
+              id: query,
+              title: `Block ${query.substring(0, 10)}...`,
+              description: `Block hash ${query}`,
+              url: `/blocks/${query}`,
+            });
+          }
+        } catch (error) {
+          // Block not found, try extrinsic
+          try {
+            const extrinsic = await blockchainService.getExtrinsicByHash(query);
+            if (extrinsic) {
+              searchResults.push({
+                type: 'extrinsic',
+                id: query,
+                title: `Extrinsic ${query.substring(0, 10)}...`,
+                description: `Extrinsic hash ${query}`,
+                url: `/extrinsics/${query}`,
+              });
+            }
+          } catch (error) {
+            // Extrinsic not found
+          }
+        }
+      } else if (query.length >= 47) {
+        // Address query
+        try {
+          const account = await blockchainService.getAccountDetails(query);
+          if (account) {
+            searchResults.push({
+              type: 'account',
+              id: query,
+              title: `Account ${query.substring(0, 10)}...`,
+              description: `Account address ${query}`,
+              url: `/accounts/${query}`,
+            });
+          }
+        } catch (error) {
+          // Account not found
+        }
       }
 
-      // Check if query looks like a hash
-      if (/^0x[a-fA-F0-9]{64}$/.test(query)) {
-        searchResults.push({
-          type: 'block',
-          id: query,
-          title: `Block ${query.substring(0, 20)}...`,
-          description: `Block with hash ${query}`,
-          url: `/blocks/${query}`,
-        });
-        
-        searchResults.push({
-          type: 'extrinsic',
-          id: query,
-          title: `Extrinsic ${query.substring(0, 20)}...`,
-          description: `Extrinsic with hash ${query}`,
-          url: `/extrinsics/${query}`,
-        });
-      }
-
-      // Check if query looks like an account address
-      if (/^5[a-zA-Z0-9]{47}$/.test(query)) {
-        searchResults.push({
-          type: 'account',
-          id: query,
-          title: `Account ${query.substring(0, 20)}...`,
-          description: `Account address ${query}`,
-          url: `/accounts/${query}`,
-        });
-      }
-
-      // If no specific matches, add some generic results
-      if (searchResults.length === 0) {
-        searchResults.push({
-          type: 'info',
-          id: 'no-results',
-          title: 'No results found',
-          description: `No results found for "${query}"`,
-          url: null,
-        });
-      }
+      // Transform search results using the keysToCamelCase utility
+      const transformedResults = searchResults.map(result => keysToCamelCase(result));
 
       const response: APIResponse = {
         success: true,
-        data: searchResults,
+        data: transformedResults,
         meta: {
-          total: searchResults.length,
+          total: transformedResults.length,
           source: 'database',
         },
       };

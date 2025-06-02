@@ -3,6 +3,7 @@ import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { pagination } from '../middleware';
 import blockchainService from '../services/blockchain';
+import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
 
@@ -37,24 +38,19 @@ router.get('/',
         });
       }
 
-      // Transform RPC data to match API response format
-      const transformedExtrinsics = extrinsicsResult.extrinsics.map(ext => ({
-        hash: ext.hash,
-        blockNumber: Number(ext.blockNumber),
-        extrinsicIndex: ext.extrinsicIndex,
-        module: ext.module,
-        call: ext.call,
-        success: ext.success,
-        timestamp: Number(ext.timestamp),
-        signer: ext.signer,
-        fee: Number(ext.fee),
-        tip: ext.tip ? Number(ext.tip) : 0,
-        signature: ext.signature,
-        args: ext.args,
-        events: ext.events,
-        isSigned: ext.isSigned,
-        isUserTransaction: ext.isUserTransaction,
-      }));
+      // Transform RPC data using the keysToCamelCase utility
+      const transformedExtrinsics = extrinsicsResult.extrinsics.map(ext => {
+        // Convert numeric fields appropriately
+        const processedExt = {
+          ...ext,
+          blockNumber: Number(ext.blockNumber),
+          timestamp: Number(ext.timestamp),
+          fee: Number(ext.fee),
+          tip: ext.tip ? Number(ext.tip) : 0,
+        };
+        
+        return keysToCamelCase(processedExt);
+      });
 
       const response: APIResponse = {
         success: true,
@@ -101,24 +97,16 @@ router.get('/:hash',
         });
       }
 
-      // Transform extrinsic data to match API response format
-      const transformedExtrinsic = {
-        hash: extrinsic.hash,
+      // Transform extrinsic data using the keysToCamelCase utility
+      const processedExtrinsic = {
+        ...extrinsic,
         blockNumber: Number(extrinsic.blockNumber),
-        extrinsicIndex: extrinsic.extrinsicIndex,
-        module: extrinsic.module,
-        call: extrinsic.call,
-        success: extrinsic.success,
         timestamp: Number(extrinsic.timestamp),
-        signer: extrinsic.signer,
         fee: Number(extrinsic.fee),
         tip: extrinsic.tip ? Number(extrinsic.tip) : 0,
-        signature: extrinsic.signature,
-        args: extrinsic.args,
-        events: extrinsic.events,
-        isSigned: extrinsic.isSigned,
-        isUserTransaction: extrinsic.isUserTransaction,
       };
+
+      const transformedExtrinsic = keysToCamelCase(processedExtrinsic);
 
       const response: APIResponse = {
         success: true,

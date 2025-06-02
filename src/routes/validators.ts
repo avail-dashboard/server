@@ -4,6 +4,7 @@ import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import blockchainService from '../services/blockchain';
+import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
 
@@ -23,15 +24,20 @@ router.get('/',
       const endIndex = startIndex + limit;
       const paginatedValidators = validators.slice(startIndex, endIndex);
 
+      // Transform validators data using keysToCamelCase utility
+      const transformedValidators = paginatedValidators.map(validator => keysToCamelCase(validator));
+
+      const validatorsData = {
+        validators: transformedValidators,
+        total_count: validators.length,
+        active_count: validators.filter(v => v.active).length,
+        waiting_count: validators.filter(v => !v.active).length,
+        slashed_count: 0, // TODO: Implement slashing detection
+      };
+
       const response: APIResponse = {
         success: true,
-        data: {
-          validators: paginatedValidators,
-          total_count: validators.length,
-          active_count: validators.filter(v => v.active).length,
-          waiting_count: validators.filter(v => !v.active).length,
-          slashed_count: 0, // TODO: Implement slashing detection
-        },
+        data: keysToCamelCase(validatorsData),
         meta: {
           page,
           limit,
@@ -86,19 +92,21 @@ router.get('/:address',
         });
       }
 
+      const validatorData = {
+        ...validator,
+        nominations: [], // TODO: Implement nominations fetching
+        recent_blocks: [], // TODO: Implement recent blocks fetching
+        slashing_history: [], // TODO: Implement slashing history
+        performance_metrics: {
+          blocks_authored: 0, // TODO: Calculate from blockchain data
+          uptime_percentage: 0, // TODO: Calculate uptime
+          average_block_time: 0, // TODO: Calculate average block time
+        },
+      };
+
       const response: APIResponse = {
         success: true,
-        data: {
-          ...validator,
-          nominations: [], // TODO: Implement nominations fetching
-          recent_blocks: [], // TODO: Implement recent blocks fetching
-          slashing_history: [], // TODO: Implement slashing history
-          performance_metrics: {
-            blocks_authored: 0, // TODO: Calculate from blockchain data
-            uptime_percentage: 0, // TODO: Calculate uptime
-            average_block_time: 0, // TODO: Calculate average block time
-          },
-        },
+        data: keysToCamelCase(validatorData),
         meta: {
           source: 'rpc',
         },
@@ -156,7 +164,7 @@ router.get('/staking/overview',
 
       const response: APIResponse = {
         success: true,
-        data: stakingOverview,
+        data: keysToCamelCase(stakingOverview),
         meta: {
           source: 'rpc',
         },
@@ -182,19 +190,21 @@ router.get('/nomination-pools',
   async (req: Request, res: Response) => {
     try {
       // TODO: Implement nomination pools fetching
+      const poolsData = {
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 50,
+          total_count: 0,
+          total_pages: 0,
+          has_next: false,
+          has_prev: false,
+        },
+      };
+
       const response: APIResponse = {
         success: true,
-        data: {
-          data: [],
-          pagination: {
-            page: 1,
-            limit: 50,
-            total_count: 0,
-            total_pages: 0,
-            has_next: false,
-            has_prev: false,
-          },
-        },
+        data: keysToCamelCase(poolsData),
         meta: {
           source: 'rpc',
         },

@@ -4,6 +4,7 @@ import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import blockchainService from '../services/blockchain';
+import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
 
@@ -36,19 +37,19 @@ router.get('/stats',
       const treasuryAmount = totalIssuance / BigInt(20); // Estimate 5% in treasury
       const circulatingAmount = totalIssuance - treasuryAmount - stakedAmount;
       
-      // Transform RPC data to match frontend ChainData interface
+      // Transform RPC data using the keysToCamelCase utility
       const chainData = {
-        finalizedBlocks: Number(chainStats.blockHeight),
-        signedExtrinsics: signedExtrinsicsCount,
-        stakedAmount: stakedAmount.toString(),
-        bondedAmount: bondedAmount.toString(),
+        finalized_blocks: Number(chainStats.blockHeight),
+        signed_extrinsics: signedExtrinsicsCount,
+        staked_amount: stakedAmount.toString(),
+        bonded_amount: bondedAmount.toString(),
         holders: chainStats.nominators + chainStats.activeValidators, // Estimate
-        totalAccounts: chainStats.nominators + chainStats.activeValidators, // Estimate
+        total_accounts: chainStats.nominators + chainStats.activeValidators, // Estimate
         transfers: Math.floor(signedExtrinsicsCount * 0.7), // Estimate 70% are transfers
-        inflationRate: chainStats.inflation,
-        tokenPrice: 0, // TODO: Fetch from external API
-        priceChange: 0, // TODO: Calculate from price history
-        totalIssuance: totalIssuance.toString(),
+        inflation_rate: chainStats.inflation,
+        token_price: 0, // TODO: Fetch from external API
+        price_change: 0, // TODO: Calculate from price history
+        total_issuance: totalIssuance.toString(),
         circulating: { 
           amount: circulatingAmount.toString(), 
           percentage: totalIssuance > BigInt(0) ? Number(circulatingAmount * BigInt(100) / totalIssuance) : 0,
@@ -67,19 +68,19 @@ router.get('/stats',
         },
         
         // Additional fields for compatibility
-        marketCap: 0, // TODO: Calculate from price and supply
-        totalSupply: Number(totalIssuance),
-        circulatingSupply: Number(circulatingAmount),
-        stakingRatio: chainStats.stakingRatio,
+        market_cap: 0, // TODO: Calculate from price and supply
+        total_supply: Number(totalIssuance),
+        circulating_supply: Number(circulatingAmount),
+        staking_ratio: chainStats.stakingRatio,
         inflation: chainStats.inflation,
-        activeValidators: chainStats.activeValidators,
-        blockTime: chainStats.blockTime,
-        lastBlockTimestamp: Number(chainStats.lastUpdateTime),
+        active_validators: chainStats.activeValidators,
+        block_time: chainStats.blockTime,
+        last_block_timestamp: Number(chainStats.lastUpdateTime),
       };
 
       const response: APIResponse = {
         success: true,
-        data: chainData,
+        data: keysToCamelCase(chainData),
         meta: {
           source: 'rpc',
         },

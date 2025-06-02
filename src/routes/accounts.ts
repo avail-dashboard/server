@@ -1,59 +1,57 @@
 import { Router, Request, Response } from 'express';
+import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import blockchainService from '../services/blockchain';
-import { asyncHandler, createValidationError, createNotFoundError, createExternalServiceError } from '../utils/asyncHandler';
+import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
 
 // GET /api/accounts/:address - Get account details
 router.get('/:address', 
   cacheMiddleware(config.cache.ttl.accountBalance),
-  asyncHandler(async (req: Request, res: Response) => {
-    const { address } = req.params;
-
-    // Validate address format (basic validation)
-    if (!address || address.length < 47) {
-      throw createValidationError('Invalid account address format', 'address', address);
-    }
-
-    // Fetch account details from RPC
-    let account;
+  async (req: Request, res: Response) => {
     try {
-      account = await blockchainService.getAccountDetails(address);
-    } catch (rpcError) {
-      throw createExternalServiceError('Blockchain RPC', rpcError as Error);
+      const { address } = req.params;
+
+      // Fetch account details from RPC
+      const accountDetails = await blockchainService.getAccountDetails(address);
+
+      if (!accountDetails) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Account not found',
+          },
+        });
+      }
+
+      // Transform account data using the keysToCamelCase utility
+      const transformedAccount = keysToCamelCase(accountDetails);
+
+      const response: APIResponse = {
+        success: true,
+        data: transformedAccount,
+        meta: {
+          source: 'rpc',
+        },
+      };
+
+      res.json(response);
+    } catch (error) {
+      logError(error as Error, { component: 'accounts-route', action: 'getAccount' });
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch account details',
+        },
+      });
     }
-
-    if (!account) {
-      throw createNotFoundError('Account', address);
-    }
-
-    // Transform account data to match API response format
-    const transformedAccount = {
-      address: account.address,
-      balance: Number(account.balance),
-      nonce: account.nonce,
-      lastUpdated: account.lastUpdated,
-      accountInfo: account.accountInfo ? {
-        free: Number(account.accountInfo.free),
-        reserved: Number(account.accountInfo.reserved),
-        frozen: Number(account.accountInfo.frozen),
-        flags: Number(account.accountInfo.flags),
-      } : null,
-    };
-
-    const response: APIResponse = {
-      success: true,
-      data: transformedAccount,
-      meta: {
-        source: 'rpc',
-      },
-    };
-
-    res.json(response);
-  }),
+  },
 );
 
 export default router; 

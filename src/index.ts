@@ -22,7 +22,9 @@ import {
   securityHeaders,
   healthCheck,
   metricsHandler,
+  camelCaseResponse,
 } from './middleware';
+import testCamelCaseValidator from './middleware/testCamelCaseValidator';
 
 // Route imports
 import blockRoutes from './routes/blocks';
@@ -142,6 +144,12 @@ class AvailExplorerServer {
 
     // Health endpoint under API versioning
     apiRouter.get('/health', healthCheck);
+
+    // Apply camelCase middleware to all API routes
+    this.app.use(config.api.prefix, camelCaseResponse);
+
+    // Apply test camelCase validator in TEST environment (must be after camelCaseResponse)
+    this.app.use(config.api.prefix, testCamelCaseValidator);
 
     // Mount API routes
     this.app.use(config.api.prefix, apiRouter);

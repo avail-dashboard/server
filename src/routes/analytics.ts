@@ -4,6 +4,7 @@ import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import blockchainService from '../services/blockchain';
+import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
 
@@ -80,7 +81,7 @@ router.get('/network',
 
       const response: APIResponse = {
         success: true,
-        data: networkAnalytics,
+        data: keysToCamelCase(networkAnalytics),
         meta: {
           source: 'rpc',
           period,
@@ -136,7 +137,7 @@ router.get('/gas',
 
       const response: APIResponse = {
         success: true,
-        data: gasAnalytics,
+        data: keysToCamelCase(gasAnalytics),
         meta: {
           source: 'rpc',
           period,
@@ -182,7 +183,7 @@ router.get('/rollups',
 
       const response: APIResponse = {
         success: true,
-        data: rollupAnalytics,
+        data: keysToCamelCase(rollupAnalytics),
         meta: {
           source: 'rpc',
           period,
@@ -250,7 +251,7 @@ router.get('/rollups/:appId',
 
       const response: APIResponse = {
         success: true,
-        data: rollupDetails,
+        data: keysToCamelCase(rollupDetails),
         meta: {
           source: 'rpc',
           period,
@@ -305,7 +306,7 @@ router.get('/data-throughput',
 
       const response: APIResponse = {
         success: true,
-        data: throughputAnalytics,
+        data: keysToCamelCase(throughputAnalytics),
         meta: {
           source: 'rpc',
           period,
@@ -373,7 +374,7 @@ router.get('/validators',
 
       const response: APIResponse = {
         success: true,
-        data: validatorAnalytics,
+        data: keysToCamelCase(validatorAnalytics),
         meta: {
           source: 'rpc',
         },
