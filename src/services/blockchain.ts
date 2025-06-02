@@ -195,7 +195,39 @@ class BlockchainService {
   }
 
   async getDataSubmissionStats() {
-    throw new Error('Database not implemented - Data submission stats not available');
+    this.ensureInitialized();
+    try {
+      // Calculate stats from real data submissions instead of throwing error
+      const submissions = await this.getDataSubmissions({ limit: 1000 });
+      
+      const now = Date.now();
+      const oneDayAgo = now - (24 * 60 * 60 * 1000);
+      const oneWeekAgo = now - (7 * 24 * 60 * 60 * 1000);
+      
+      const recentSubmissions = submissions.submissions.filter(s => 
+        Number(s.timestamp) > oneDayAgo,
+      );
+      const weeklySubmissions = submissions.submissions.filter(s => 
+        Number(s.timestamp) > oneWeekAgo,
+      );
+      
+      return {
+        total_submissions: submissions.total,
+        daily_submissions: recentSubmissions.length,
+        weekly_submissions: weeklySubmissions.length,
+        total_size: submissions.submissions.reduce((sum, s) => sum + s.size, 0),
+        daily_size: recentSubmissions.reduce((sum, s) => sum + s.size, 0),
+        weekly_size: weeklySubmissions.reduce((sum, s) => sum + s.size, 0),
+        unique_submitters: new Set(submissions.submissions.map(s => s.submitter)).size,
+        active_app_ids: new Set(submissions.submissions.map(s => s.appId)).size,
+        average_size: submissions.submissions.length > 0 
+          ? submissions.submissions.reduce((sum, s) => sum + s.size, 0) / submissions.submissions.length 
+          : 0,
+      };
+    } catch (error) {
+      logError(error as Error, { operation: 'getDataSubmissionStats' });
+      throw new Error('Failed to fetch data submission statistics');
+    }
   }
 
   async getBlockDataRoot(blockHash: string) {

@@ -3,6 +3,7 @@ import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
+import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
 
@@ -34,13 +35,15 @@ router.get('/leaderboard',
         },
       ];
 
+      const leaderboardData = {
+        leaderboard,
+        total_rollups: leaderboard.length,
+        metric,
+      };
+
       const response: APIResponse = {
         success: true,
-        data: {
-          leaderboard,
-          total_rollups: leaderboard.length,
-          metric,
-        },
+        data: keysToCamelCase(leaderboardData),
         meta: {
           source: 'rpc',
           period,
@@ -69,13 +72,13 @@ router.get('/',
       const page = parseInt(req.query.page as string) || 1;
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const _search = req.query.search as string;
+      const searchTerm = req.query.search as string;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const _status = req.query.status as string;
+      const statusFilter = req.query.status as string;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const _sortBy = req.query.sortBy as string || 'submissions';
+      const sortByField = req.query.sortBy as string || 'submissions';
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const _sortOrder = req.query.sortOrder as string || 'desc';
+      const sortOrderDirection = req.query.sortOrder as string || 'desc';
 
       // TODO: Implement rollup registry and database queries
       // For now, return placeholder data structure
@@ -111,15 +114,17 @@ router.get('/',
       const endIndex = startIndex + limit;
       const paginatedRollups = rollups.slice(startIndex, endIndex);
 
+      const rollupsData = {
+        rollups: paginatedRollups,
+        total_count: rollups.length,
+        active_count: rollups.length, // TODO: Calculate based on recent activity
+        page,
+        limit,
+      };
+
       const response: APIResponse = {
         success: true,
-        data: {
-          rollups: paginatedRollups,
-          total_count: rollups.length,
-          active_count: rollups.length, // TODO: Calculate based on recent activity
-          page,
-          limit,
-        },
+        data: keysToCamelCase(rollupsData),
         meta: {
           source: 'rpc',
           note: 'Mock data - database integration pending',
@@ -182,7 +187,7 @@ router.get('/:appId',
 
       const response: APIResponse = {
         success: true,
-        data: rollupDetails,
+        data: keysToCamelCase(rollupDetails),
         meta: {
           source: 'rpc',
         },
@@ -237,12 +242,14 @@ router.get('/:appId/submissions',
         },
       ];
 
+      const submissionsData = {
+        submissions,
+        total_count: submissions.length,
+      };
+
       const response: APIResponse = {
         success: true,
-        data: {
-          submissions,
-          total_count: submissions.length,
-        },
+        data: keysToCamelCase(submissionsData),
         meta: {
           page,
           limit,
@@ -298,12 +305,14 @@ router.get('/:appId/blobs',
         },
       ];
 
+      const blobsData = {
+        blobs,
+        total_count: blobs.length,
+      };
+
       const response: APIResponse = {
         success: true,
-        data: {
-          blobs,
-          total_count: blobs.length,
-        },
+        data: keysToCamelCase(blobsData),
         meta: {
           page,
           limit,
@@ -369,7 +378,7 @@ router.get('/:appId/analytics',
 
       const response: APIResponse = {
         success: true,
-        data: analytics,
+        data: keysToCamelCase(analytics),
         meta: {
           source: 'rpc',
         },

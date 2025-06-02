@@ -4,6 +4,7 @@ import { APIResponse } from '../types';
 import { pagination, cacheMiddleware } from '../middleware';
 import config from '../config';
 import blockchainService from '../services/blockchain';
+import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
 
@@ -24,22 +25,19 @@ router.get('/',
         order: 'desc',
       });
 
-      // Transform RPC data to match API response format
-      const transformedBlocks = blocksResult.blocks.map(block => ({
-        number: Number(block.number),
-        hash: block.hash,
-        parent_hash: block.parentHash,
-        timestamp: Number(block.timestamp),
-        extrinsics: block.extrinsicsCount,
-        time: new Date(Number(block.timestamp)).toISOString(),
-        state_root: block.stateRoot,
-        extrinsics_root: block.extrinsicsRoot,
-        author_id: block.authorId,
-        size: block.size,
-        weight: block.weight,
-        spec: block.spec,
-        finalized: block.finalized,
-      }));
+      // Transform blocks data using the keysToCamelCase utility
+      const transformedBlocks = blocksResult.blocks.map(block => {
+        // Convert bigint values to numbers for JSON serialization
+        const processedBlock = {
+          ...block,
+          number: Number(block.number),
+          timestamp: Number(block.timestamp),
+          extrinsics: block.extrinsicsCount,
+          time: new Date(Number(block.timestamp)).toISOString(),
+        };
+        
+        return keysToCamelCase(processedBlock);
+      });
 
       const response: APIResponse = {
         success: true,
@@ -97,37 +95,22 @@ router.get('/:numberOrHash',
       // Fetch extrinsics for this block
       const extrinsics = await blockchainService.getExtrinsicsByBlock(block.number);
 
-      // Transform block data to match API response format
-      const transformedBlock = {
+      // Process the block data
+      const processedBlock = {
+        ...block,
         number: Number(block.number),
-        hash: block.hash,
-        parent_hash: block.parentHash,
-        state_root: block.stateRoot,
         timestamp: Number(block.timestamp),
-        extrinsics_count: block.extrinsicsCount,
         time: new Date(Number(block.timestamp)).toISOString(),
-        extrinsics_root: block.extrinsicsRoot,
-        author_id: block.authorId,
-        size: block.size,
-        weight: block.weight,
-        spec: block.spec,
-        finalized: block.finalized,
         extrinsics: extrinsics.map(ext => ({
-          id: ext.id,
-          hash: ext.hash,
-          extrinsic_index: ext.extrinsicIndex,
-          module: ext.module,
-          call: ext.call,
-          success: ext.success,
+          ...ext,
           timestamp: Number(ext.timestamp),
-          signer: ext.signer,
           fee: Number(ext.fee),
           tip: ext.tip ? Number(ext.tip) : 0,
-          signature: ext.signature,
-          args: ext.args,
-          events: ext.events,
         })),
       };
+
+      // Transform to camelCase
+      const transformedBlock = keysToCamelCase(processedBlock);
 
       const response: APIResponse = {
         success: true,

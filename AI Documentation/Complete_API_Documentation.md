@@ -556,13 +556,13 @@ curl -X GET "http://localhost:3001/api/blocks?page=2&limit=20"
     {
       "number": 1000000,
       "hash": "0x1234567890abcdef...",
-      "parent_hash": "0xabcdef1234567890...",
+      "parentHash": "0xabcdef1234567890...",
       "timestamp": 1704067200000,
       "extrinsics": 5,
       "time": "2024-01-01T00:00:00.000Z",
-      "state_root": "0x...",
-      "extrinsics_root": "0x...",
-      "author_id": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+      "stateRoot": "0x...",
+      "extrinsicsRoot": "0x...",
+      "authorId": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
       "size": 1024,
       "weight": 500000,
       "spec": 1000,
@@ -601,13 +601,13 @@ curl -X GET "http://localhost:3001/api/blocks/0x1234567890abcdef..."
   "data": {
     "number": 1000000,
     "hash": "0x1234567890abcdef...",
-    "parent_hash": "0xabcdef1234567890...",
-    "state_root": "0x...",
+    "parentHash": "0xabcdef1234567890...",
+    "stateRoot": "0x...",
     "timestamp": 1704067200000,
-    "extrinsics_count": 5,
+    "extrinsicsCount": 5,
     "time": "2024-01-01T00:00:00.000Z",
-    "extrinsics_root": "0x...",
-    "author_id": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+    "extrinsicsRoot": "0x...",
+    "authorId": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
     "size": 1024,
     "weight": 500000,
     "spec": 1000,
@@ -616,7 +616,7 @@ curl -X GET "http://localhost:3001/api/blocks/0x1234567890abcdef..."
       {
         "id": "ext_123",
         "hash": "0x...",
-        "extrinsic_index": 0,
+        "extrinsicIndex": 0,
         "module": "System",
         "call": "set_code",
         "success": true,
@@ -998,10 +998,10 @@ curl -X GET "http://localhost:3001/api/validators?page=2&limit=25"
         }
       }
     ],
-    "total_count": 100,
-    "active_count": 95,
-    "waiting_count": 5,
-    "slashed_count": 0
+    "totalCount": 100,
+    "activeCount": 95,
+    "waitingCount": 5,
+    "slashedCount": 0
   },
   "meta": {
     "page": 1,
@@ -1040,12 +1040,12 @@ curl -X GET "http://localhost:3001/api/validators/5GrwvaEF5zXb26Fz9rcQpDWS57CtER
       "web": "https://validator1.com"
     },
     "nominations": [],
-    "recent_blocks": [],
-    "slashing_history": [],
-    "performance_metrics": {
-      "blocks_authored": 0,
-      "uptime_percentage": 0,
-      "average_block_time": 0
+    "recentBlocks": [],
+    "slashingHistory": [],
+    "performanceMetrics": {
+      "blocksAuthored": 0,
+      "uptimePercentage": 0,
+      "averageBlockTime": 0
     }
   },
   "meta": {
@@ -1068,13 +1068,13 @@ curl -X GET "http://localhost:3001/api/validators/staking/overview"
 {
   "success": true,
   "data": {
-    "total_staked": "500000000000000000000000",
-    "active_validators": 95,
-    "total_nominators": 1000,
-    "current_era": 0,
-    "inflation_rate": 0.07,
-    "average_commission": 5.2,
-    "nomination_pools": []
+    "totalStaked": "500000000000000000000000",
+    "activeValidators": 95,
+    "totalNominators": 1000,
+    "currentEra": 0,
+    "inflationRate": 0.07,
+    "averageCommission": 5.2,
+    "nominationPools": []
   },
   "meta": {
     "source": "rpc"
@@ -1100,10 +1100,10 @@ curl -X GET "http://localhost:3001/api/validators/nomination-pools"
     "pagination": {
       "page": 1,
       "limit": 50,
-      "total_count": 0,
-      "total_pages": 0,
-      "has_next": false,
-      "has_prev": false
+      "totalCount": 0,
+      "totalPages": 0,
+      "hasNext": false,
+      "hasPrev": false
     }
   },
   "meta": {
@@ -1137,25 +1137,25 @@ curl -X GET "http://localhost:3001/api/analytics/network?period=7d"
 {
   "success": true,
   "data": {
-    "current_stats": {
-      "block_height": "1000000",
-      "total_extrinsics": 0,
-      "total_data_size": 52428800,
-      "total_fees": 0,
-      "active_validators": 95,
-      "total_staked": "1000000000000000000000000",
-      "inflation_rate": 0.07,
-      "network_utilization": 0,
-      "average_block_time": 20
+    "currentStats": {
+      "blockHeight": "1000000",
+      "totalExtrinsics": 0,
+      "totalDataSize": 52428800,
+      "totalFees": 0,
+      "activeValidators": 95,
+      "totalStaked": "1000000000000000000000000",
+      "inflationRate": 0.07,
+      "networkUtilization": 0,
+      "averageBlockTime": 20
     },
-    "historical_data": [],
-    "gas_price_trend": [],
-    "rollup_distribution": [],
-    "data_throughput": {
-      "submissions_24h": 45,
-      "data_size_24h": 2097152,
-      "unique_apps_24h": 12,
-      "average_submission_size": 10485
+    "historicalData": [],
+    "gasPriceTrend": [],
+    "rollupDistribution": [],
+    "dataThroughput": {
+      "submissions24h": 45,
+      "dataSize24h": 2097152,
+      "uniqueApps24h": 12,
+      "averageSubmissionSize": 10485
     }
   },
   "meta": {
@@ -1183,26 +1183,26 @@ curl -X GET "http://localhost:3001/api/analytics/gas?period=7d&granularity=hour"
 {
   "success": true,
   "data": {
-    "current_gas_price": "0",
-    "average_gas_price_24h": "0",
-    "gas_price_trend": [],
-    "gas_efficiency": {
-      "average_gas_used": 0,
-      "average_gas_limit": 0,
-      "efficiency_ratio": 0
+    "currentGasPrice": "0",
+    "averageGasPrice24h": "0",
+    "gasPriceTrend": [],
+    "gasEfficiency": {
+      "averageGasUsed": 0,
+      "averageGasLimit": 0,
+      "efficiencyRatio": 0
     },
-    "cost_per_transaction": {
-      "average_cost_24h": "0",
-      "median_cost_24h": "0",
-      "cost_trend": []
+    "costPerTransaction": {
+      "averageCost24h": "0",
+      "medianCost24h": "0",
+      "costTrend": []
     },
-    "cost_per_block": {
-      "average_cost_24h": "0",
-      "cost_trend": []
+    "costPerBlock": {
+      "averageCost24h": "0",
+      "costTrend": []
     },
-    "fee_distribution": {
-      "by_transaction_type": [],
-      "by_complexity": []
+    "feeDistribution": {
+      "byTransactionType": [],
+      "byComplexity": []
     }
   },
   "meta": {
@@ -1231,15 +1231,15 @@ curl -X GET "http://localhost:3001/api/analytics/rollups?period=24h"
 {
   "success": true,
   "data": {
-    "total_rollups": 12,
-    "total_submissions": 5000,
-    "total_data_size": 52428800,
-    "rollup_leaderboard": [],
-    "da_contribution_breakdown": [],
-    "rollup_growth_trends": [],
-    "cost_per_mb_by_rollup": [],
-    "active_rollups_24h": 12,
-    "new_rollups_24h": 0
+    "totalRollups": 12,
+    "totalSubmissions": 5000,
+    "totalDataSize": 52428800,
+    "rollupLeaderboard": [],
+    "daContributionBreakdown": [],
+    "rollupGrowthTrends": [],
+    "costPerMbByRollup": [],
+    "activeRollups24h": 12,
+    "newRollups24h": 0
   },
   "meta": {
     "source": "rpc",
@@ -1269,40 +1269,40 @@ curl -X GET "http://localhost:3001/api/analytics/rollups/1?period=24h"
 {
   "success": true,
   "data": {
-    "app_id": 1,
+    "appId": 1,
     "name": "App 1",
     "statistics": {
-      "total_submissions": 0,
-      "total_data_size": 0,
-      "total_fees_paid": 0,
-      "first_seen": null,
-      "last_active": null,
-      "unique_submitters": 0
+      "totalSubmissions": 0,
+      "totalDataSize": 0,
+      "totalFeesPaid": 0,
+      "firstSeen": null,
+      "lastActive": null,
+      "uniqueSubmitters": 0
     },
     "analytics": {
-      "submissions_over_time": [],
-      "data_size_over_time": [],
-      "cost_per_mb_trend": [],
-      "submitter_activity": []
+      "submissionsOverTime": [],
+      "dataSizeOverTime": [],
+      "costPerMbTrend": [],
+      "submitterActivity": []
     },
-    "recent_submissions": [],
-    "performance_metrics": {
-      "average_submission_size": 0,
-      "submission_frequency": 0,
-      "cost_efficiency": 0
+    "recentSubmissions": [],
+    "performanceMetrics": {
+      "averageSubmissionSize": 0,
+      "submissionFrequency": 0,
+      "costEfficiency": 0
     }
   },
   "meta": {
     "source": "rpc",
     "period": "24h",
-    "app_id": "1",
+    "appId": "1",
     "note": "Specific rollup analytics implementation in progress"
   }
 }
 ```
 
 ### 5. Get Data Throughput Analytics
-**GET** `/api/analytics/data-throughput`
+**GET** `/api/analytics/dataThroughput`
 
 Get data throughput analytics.
 
@@ -1311,7 +1311,7 @@ Get data throughput analytics.
 - `granularity` (optional): Data granularity (default: hour)
 
 ```bash
-curl -X GET "http://localhost:3001/api/analytics/data-throughput?period=24h&granularity=hour"
+curl -X GET "http://localhost:3001/api/analytics/dataThroughput?period=24h&granularity=hour"
 ```
 
 **Response:**
@@ -1319,22 +1319,22 @@ curl -X GET "http://localhost:3001/api/analytics/data-throughput?period=24h&gran
 {
   "success": true,
   "data": {
-    "current_metrics": {
-      "submissions_per_hour": 0,
-      "data_mb_per_hour": 0,
-      "unique_submitters_active": 150,
-      "average_submission_size": 10485
+    "currentMetrics": {
+      "submissionsPerHour": 0,
+      "dataMbPerHour": 0,
+      "uniqueSubmittersActive": 150,
+      "averageSubmissionSize": 10485
     },
-    "historical_throughput": [],
-    "peak_usage": {
-      "highest_submissions_hour": { "timestamp": null, "count": 0 },
-      "highest_data_hour": { "timestamp": null, "size": 0 },
-      "busiest_app": { "app_id": null, "submissions": 0 }
+    "historicalThroughput": [],
+    "peakUsage": {
+      "highestSubmissionsHour": { "timestamp": null, "count": 0 },
+      "highestDataHour": { "timestamp": null, "size": 0 },
+      "busiestApp": { "appId": null, "submissions": 0 }
     },
     "predictions": {
-      "next_hour_estimate": 0,
-      "growth_trend": "stable",
-      "capacity_utilization": 0
+      "nextHourEstimate": 0,
+      "growthTrend": "stable",
+      "capacityUtilization": 0
     }
   },
   "meta": {
@@ -1359,27 +1359,27 @@ curl -X GET "http://localhost:3001/api/analytics/validators"
 {
   "success": true,
   "data": {
-    "staking_overview": {
-      "total_staked": "500000000000000000000000",
-      "staking_ratio": 0.5,
-      "inflation_rate": 0.07,
-      "minimum_stake": "1000000000000000000000",
-      "average_stake": "5263157894736842105263"
+    "stakingOverview": {
+      "totalStaked": "500000000000000000000000",
+      "stakingRatio": 0.5,
+      "inflationRate": 0.07,
+      "minimumStake": "1000000000000000000000",
+      "averageStake": "5263157894736842105263"
     },
-    "validator_distribution": {
-      "active_validators": 95,
-      "waiting_validators": 5,
-      "total_nominators": 1000
+    "validatorDistribution": {
+      "activeValidators": 95,
+      "waitingValidators": 5,
+      "totalNominators": 1000
     },
-    "commission_analytics": {
-      "average_commission": 0,
-      "median_commission": 0,
-      "commission_distribution": []
+    "commissionAnalytics": {
+      "averageCommission": 0,
+      "medianCommission": 0,
+      "commissionDistribution": []
     },
-    "performance_metrics": {
-      "average_uptime": 0,
-      "block_production_distribution": [],
-      "slashing_events": []
+    "performanceMetrics": {
+      "averageUptime": 0,
+      "blockProductionDistribution": [],
+      "slashingEvents": []
     }
   },
   "meta": {
@@ -1399,7 +1399,7 @@ Get rollup leaderboard by various metrics.
 
 **Query Parameters:**
 - `period` (optional): Time period (default: 24h)
-- `metric` (optional): Metric to rank by (data_size, submissions, fees) (default: data_size)
+- `metric` (optional): Metric to rank by (dataSize, submissions, fees) (default: dataSize)
 
 ```bash
 # Get leaderboard by data size
@@ -1417,23 +1417,23 @@ curl -X GET "http://localhost:3001/api/rollups/leaderboard?metric=submissions&pe
     "leaderboard": [
       {
         "rank": 1,
-        "app_id": 1,
+        "appId": 1,
         "name": "Top Rollup",
-        "metric_value": 52428800,
-        "percentage_of_total": 45.2,
-        "change_24h": 12.5
+        "metricValue": 52428800,
+        "percentageOfTotal": 45.2,
+        "change24h": 12.5
       },
       {
         "rank": 2,
-        "app_id": 2,
+        "appId": 2,
         "name": "Second Rollup",
-        "metric_value": 31457280,
-        "percentage_of_total": 27.1,
-        "change_24h": -5.2
+        "metricValue": 31457280,
+        "percentageOfTotal": 27.1,
+        "change24h": -5.2
       }
     ],
-    "total_rollups": 2,
-    "metric": "data_size"
+    "totalRollups": 2,
+    "metric": "dataSize"
   },
   "meta": {
     "source": "rpc",
@@ -1463,7 +1463,7 @@ curl -X GET "http://localhost:3001/api/rollups"
 curl -X GET "http://localhost:3001/api/rollups?page=1&limit=25&search=example"
 
 # Sort by data size
-curl -X GET "http://localhost:3001/api/rollups?sortBy=data_size&sortOrder=desc"
+curl -X GET "http://localhost:3001/api/rollups?sortBy=dataSize&sortOrder=desc"
 ```
 
 **Response:**
@@ -1473,20 +1473,20 @@ curl -X GET "http://localhost:3001/api/rollups?sortBy=data_size&sortOrder=desc"
   "data": {
     "rollups": [
       {
-        "app_id": 1,
+        "appId": 1,
         "name": "Example Rollup 1",
         "description": "A sample rollup for demonstration",
-        "last_active": "2024-01-01T00:00:00.000Z",
-        "total_submissions": 1250,
-        "total_data_size": 52428800,
-        "total_fees_paid": "1500000000000000000",
-        "paid_per_mb": "30000000000000000",
+        "lastActive": "2024-01-01T00:00:00.000Z",
+        "totalSubmissions": 1250,
+        "totalDataSize": 52428800,
+        "totalFeesPaid": "1500000000000000000",
+        "paidPerMb": "30000000000000000",
         "website": "https://example-rollup.com",
-        "logo_url": "https://example-rollup.com/logo.png"
+        "logoUrl": "https://example-rollup.com/logo.png"
       }
     ],
-    "total_count": 2,
-    "active_count": 2,
+    "totalCount": 2,
+    "activeCount": 2,
     "page": 1,
     "limit": 50
   },
@@ -1514,24 +1514,24 @@ curl -X GET "http://localhost:3001/api/rollups/1"
 {
   "success": true,
   "data": {
-    "app_id": 1,
+    "appId": 1,
     "name": "Rollup 1",
     "description": "Detailed information for rollup 1",
-    "first_seen": "2024-01-01T00:00:00Z",
-    "last_active": "2024-01-01T00:00:00.000Z",
-    "total_submissions": 1250,
-    "total_data_size": 52428800,
-    "total_fees_paid": "1500000000000000000",
+    "firstSeen": "2024-01-01T00:00:00Z",
+    "lastActive": "2024-01-01T00:00:00.000Z",
+    "totalSubmissions": 1250,
+    "totalDataSize": 52428800,
+    "totalFeesPaid": "1500000000000000000",
     "website": "https://rollup1.com",
-    "logo_url": null,
+    "logoUrl": null,
     "statistics": {
-      "submissions_24h": 45,
-      "data_size_24h": 2097152,
-      "fees_paid_24h": "50000000000000000",
-      "unique_submitters": 12,
-      "average_submission_size": 41943
+      "submissions24h": 45,
+      "dataSize24h": 2097152,
+      "feesPaid24h": "50000000000000000",
+      "uniqueSubmitters": 12,
+      "averageSubmissionSize": 41943
     },
-    "recent_submissions": []
+    "recentSubmissions": []
   },
   "meta": {
     "source": "rpc"
@@ -1562,18 +1562,18 @@ curl -X GET "http://localhost:3001/api/rollups/1/submissions?page=1&limit=20"
   "data": {
     "submissions": [
       {
-        "extrinsic_id": "hash123",
-        "block_number": 1000000,
-        "extrinsic_index": 2,
+        "extrinsicId": "hash123",
+        "blockNumber": 1000000,
+        "extrinsicIndex": 2,
         "signer": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
         "timestamp": "2024-01-01T00:00:00.000Z",
-        "data_size": 1024,
-        "data_hash": "0x1234567890abcdef",
-        "kate_commitment": "0xabcdef1234567890",
+        "dataSize": 1024,
+        "dataHash": "0x1234567890abcdef",
+        "kateCommitment": "0xabcdef1234567890",
         "success": true
       }
     ],
-    "total_count": 1
+    "totalCount": 1
   },
   "meta": {
     "page": 1,
@@ -1607,17 +1607,17 @@ curl -X GET "http://localhost:3001/api/rollups/1/blobs?page=1&limit=10"
   "data": {
     "blobs": [
       {
-        "blob_id": "blob_123",
+        "blobId": "blob_123",
         "signer": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
         "timestamp": "2024-01-01T00:00:00.000Z",
-        "share_commitments": ["0xcommit1", "0xcommit2"],
+        "shareCommitments": ["0xcommit1", "0xcommit2"],
         "size": 2048,
-        "data_hash": "0x1234567890abcdef",
-        "kate_commitment": "0xabcdef1234567890",
+        "dataHash": "0x1234567890abcdef",
+        "kateCommitment": "0xabcdef1234567890",
         "downloadable": true
       }
     ],
-    "total_count": 1
+    "totalCount": 1
   },
   "meta": {
     "page": 1,
@@ -1649,24 +1649,24 @@ curl -X GET "http://localhost:3001/api/rollups/1/analytics?period=7d"
   "success": true,
   "data": {
     "period": "7d",
-    "da_usage": {
-      "total_submissions": 1250,
-      "total_data_size": 52428800,
-      "average_submission_size": 41943
+    "daUsage": {
+      "totalSubmissions": 1250,
+      "totalDataSize": 52428800,
+      "averageSubmissionSize": 41943
     },
-    "blob_count": {
-      "total_blobs": 1250,
-      "blobs_24h": 45,
-      "average_blob_size": 41943
+    "blobCount": {
+      "totalBlobs": 1250,
+      "blobs24h": 45,
+      "averageBlobSize": 41943
     },
-    "fees_paid": {
-      "total_fees": "1500000000000000000",
-      "fees_24h": "50000000000000000",
-      "cost_per_mb": "30000000000000000"
+    "feesPaid": {
+      "totalFees": "1500000000000000000",
+      "fees24h": "50000000000000000",
+      "costPerMb": "30000000000000000"
     },
-    "blob_size_distribution": [],
-    "submission_frequency": [],
-    "cost_efficiency_trend": []
+    "blobSizeDistribution": [],
+    "submissionFrequency": [],
+    "costEfficiencyTrend": []
   },
   "meta": {
     "source": "rpc"

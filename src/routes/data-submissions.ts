@@ -3,10 +3,15 @@ import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { pagination } from '../middleware';
 import blockchainService from '../services/blockchain';
+import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
 
-// GET /api/data-submissions - Get data submissions
+/**
+ * @route GET /api/data-submissions
+ * @description Get data submissions with filtering
+ * @access Public
+ */
 router.get('/', 
   pagination,
   async (req: Request, res: Response) => {
@@ -16,29 +21,22 @@ router.get('/',
       const appId = req.query.appId ? parseInt(req.query.appId as string) : undefined;
       const submitter = req.query.submitter as string;
       const orderBy = (req.query.orderBy as string) || 'timestamp';
-      const order = (req.query.order as string) || 'desc';
+      const order = (req.query.order as 'asc' | 'desc') || 'desc';
 
+      // Fetch data submissions from blockchain service
       const submissionsResult = await blockchainService.getDataSubmissions({
         page,
         limit,
         appId,
         submitter,
         orderBy: orderBy as 'timestamp' | 'size' | 'appId',
-        order: order as 'asc' | 'desc',
+        order,
       });
 
-      // Transform data for API response
-      const transformedSubmissions = submissionsResult.submissions.map(submission => ({
-        extrinsicId: submission.extrinsicId,
-        blockNumber: Number(submission.blockNumber),
-        extrinsicIndex: submission.extrinsicIndex,
-        appId: submission.appId,
-        size: submission.size,
-        dataHash: submission.dataHash,
-        submitter: submission.submitter,
-        timestamp: Number(submission.timestamp),
-        success: submission.success,
-      }));
+      // Transform submissions using the keysToCamelCase utility
+      const transformedSubmissions = submissionsResult.submissions.map((submission) => 
+        keysToCamelCase(submission),
+      );
 
       const response: APIResponse = {
         success: true,
@@ -53,7 +51,7 @@ router.get('/',
 
       res.json(response);
     } catch (error) {
-      logError(error as Error, { component: 'data-submissions-route', action: 'getDataSubmissions' });
+      logError(error as Error, { component: 'data-submissions-route', action: 'getSubmissions' });
       
       res.status(500).json({
         success: false,
@@ -66,15 +64,23 @@ router.get('/',
   },
 );
 
-// GET /api/data-submissions/stats - Get data submission statistics
+/**
+ * @route GET /api/data-submissions/stats
+ * @description Get data submission statistics
+ * @access Public
+ */
 router.get('/stats', 
   async (req: Request, res: Response) => {
     try {
+      // Fetch data submission stats
       const stats = await blockchainService.getDataSubmissionStats();
+
+      // Transform stats using the keysToCamelCase utility
+      const transformedStats = keysToCamelCase(stats);
 
       const response: APIResponse = {
         success: true,
-        data: stats,
+        data: transformedStats,
         meta: {
           source: 'rpc',
         },
@@ -82,7 +88,7 @@ router.get('/stats',
 
       res.json(response);
     } catch (error) {
-      logError(error as Error, { component: 'data-submissions-route', action: 'getDataSubmissionStats' });
+      logError(error as Error, { component: 'data-submissions-route', action: 'getStats' });
       
       res.status(500).json({
         success: false,
