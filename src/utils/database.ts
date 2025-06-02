@@ -1,6 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import config from '../config';
 import { logQuery, logError } from './logger';
+import { DatabaseGuardian } from '../services/database-guardian';
 
 interface DatabaseConfig {
   type: 'postgresql';
@@ -61,7 +62,9 @@ class DatabaseService {
     } catch (error) {
       this.isConnected = false;
       logError(error as Error, { component: 'database', action: 'connect' });
-      throw error;
+      
+      // Use database guardian for centralized exit logic
+      await DatabaseGuardian.handleDatabaseError(error as Error, 'database-connect');
     }
   }
 
@@ -95,6 +98,10 @@ class DatabaseService {
         query: text,
         duration, 
       });
+      
+      // Use database guardian for centralized exit logic
+      await DatabaseGuardian.handleDatabaseError(error as Error, 'database-query');
+      // This line should never be reached due to handleDatabaseError's never return type
       throw error;
     }
   }
@@ -138,6 +145,10 @@ class DatabaseService {
     } catch (error) {
       await client.query('ROLLBACK');
       logError(error as Error, { component: 'database', action: 'transaction' });
+      
+      // Use database guardian for centralized exit logic
+      await DatabaseGuardian.handleDatabaseError(error as Error, 'database-transaction');
+      // This line should never be reached due to handleDatabaseError's never return type
       throw error;
     } finally {
       client.release();

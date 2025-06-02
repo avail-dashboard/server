@@ -12,6 +12,35 @@ process.env.ENABLE_WEBSOCKETS = 'false';
 process.env.ENABLE_RATE_LIMITING = 'false';
 process.env.LOG_LEVEL = 'error';
 
+// Mock database service
+const mockDatabase = {
+  connect: jest.fn().mockResolvedValue(undefined),
+  disconnect: jest.fn().mockResolvedValue(undefined),
+  query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+  transaction: jest.fn().mockImplementation(async (callback) => {
+    return await callback({
+      query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+    });
+  }),
+  getHealth: jest.fn().mockResolvedValue({ connected: true, latency: 5, type: 'postgresql' }),
+  findOne: jest.fn().mockResolvedValue(null),
+  findMany: jest.fn().mockResolvedValue([]),
+  insert: jest.fn().mockResolvedValue({}),
+  update: jest.fn().mockResolvedValue(null),
+  delete: jest.fn().mockResolvedValue(0),
+  count: jest.fn().mockResolvedValue(0),
+  paginate: jest.fn().mockResolvedValue({
+    data: [],
+    meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
+  }),
+};
+
+jest.mock('../src/utils/database', () => ({
+  db: mockDatabase,
+  default: mockDatabase,
+  createTables: jest.fn().mockResolvedValue(undefined),
+}));
+
 // Create comprehensive mock data generators
 const createMockBlock = (blockNumber: number) => ({
   number: blockNumber.toString(),

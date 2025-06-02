@@ -10,6 +10,7 @@ import { logger } from './utils/logger';
 import { cache } from './utils/cache';
 import { db, createTables } from './utils/database';
 import blockchainService from './services/blockchain';
+import { DatabaseGuardian } from './services/database-guardian';
 
 // Middleware imports
 import {
@@ -214,42 +215,55 @@ class AvailExplorerServer {
   }
 
   private async connectServices(): Promise<void> {
-    const services = [];
+    try {
+      // Check database health before starting any services
+      const isDatabaseHealthy = await DatabaseGuardian.checkDatabaseHealth();
+      if (!isDatabaseHealthy) {
+        throw new Error('Database is not available at startup');
+      }
 
-    // Connect to Redis cache
-    if (config.features.caching) {
+      const services = [];
+
+      // Connect to Redis cache
+      if (config.features.caching) {
+        services.push(
+          cache.connect().catch(err => {
+            logger.error('Failed to connect to Redis cache', { error: err.message });
+            throw err;
+          }),
+        );
+      }
+
+      // Connect to PostgreSQL database
       services.push(
-        cache.connect().catch(err => {
-          logger.error('Failed to connect to Redis cache', { error: err.message });
+        db.connect().catch(err => {
+          logger.error('Failed to connect to PostgreSQL database', { error: err.message });
           throw err;
         }),
       );
-    }
 
-    // Connect to PostgreSQL database
-    services.push(
-      db.connect().catch(err => {
-        logger.error('Failed to connect to PostgreSQL database', { error: err.message });
-        throw err;
-      }),
-    );
+      // Blockchain service initializes automatically in constructor
+      // No explicit connection needed as it's handled internally
 
-    // Blockchain service initializes automatically in constructor
-    // No explicit connection needed as it's handled internally
+      // Wait for all critical services
+      await Promise.all(services);
 
-    // Wait for all critical services
-    await Promise.all(services);
+      // Create database tables if they don't exist
+      try {
+        await createTables();
+        logger.info('Database: Tables verified/created successfully');
+      } catch (error) {
+        logger.error('Database: Failed to create tables', { error });
+        throw error;
+      }
 
-    // Create database tables if they don't exist
-    try {
-      await createTables();
-      logger.info('Database: Tables verified/created successfully');
+      logger.info('Services: All services connected successfully');
     } catch (error) {
-      logger.error('Database: Failed to create tables', { error });
-      throw error;
+      logger.error('Failed to connect services', { error: (error as Error).message });
+      
+      // Use Database Guardian for centralized database failure handling
+      await DatabaseGuardian.handleDatabaseError(error as Error, 'server-startup');
     }
-
-    logger.info('Services: All services connected successfully');
   }
 
   private async disconnectServices(): Promise<void> {
