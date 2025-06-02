@@ -83,31 +83,31 @@ export class DatabaseGuardian {
     // Check error code first (more reliable)
     if (errorCode) {
       switch (errorCode) {
-        case 'ECONNREFUSED':
-        case 'ENOTFOUND':
-        case 'EHOSTUNREACH':
-          return {
-            severity: 'SEVERE',
-            category: 'CONNECTION',
-            isRetryable: true,
-            maxRetries: context === 'startup' ? 3 : 5,
-            backoffMs: 2000,
-            shouldExit: true,
-            description: `Connection error: ${errorCode}`,
-          };
+      case 'ECONNREFUSED':
+      case 'ENOTFOUND':
+      case 'EHOSTUNREACH':
+        return {
+          severity: 'SEVERE',
+          category: 'CONNECTION',
+          isRetryable: true,
+          maxRetries: context === 'startup' ? 3 : 5,
+          backoffMs: 2000,
+          shouldExit: true,
+          description: `Connection error: ${errorCode}`,
+        };
         
-        case 'ETIMEDOUT':
-        case 'ECONNRESET':
-        case 'EPIPE':
-          return {
-            severity: 'MODERATE',
-            category: 'CONNECTION',
-            isRetryable: true,
-            maxRetries: 3,
-            backoffMs: 1000,
-            shouldExit: false,
-            description: `Transient connection error: ${errorCode}`,
-          };
+      case 'ETIMEDOUT':
+      case 'ECONNRESET':
+      case 'EPIPE':
+        return {
+          severity: 'MODERATE',
+          category: 'CONNECTION',
+          isRetryable: true,
+          maxRetries: 3,
+          backoffMs: 1000,
+          shouldExit: false,
+          description: `Transient connection error: ${errorCode}`,
+        };
       }
     }
 
