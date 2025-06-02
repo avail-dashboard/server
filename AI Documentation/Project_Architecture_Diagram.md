@@ -371,6 +371,252 @@ src/
 └── types/                   # TypeScript type definitions
 ```
 
+## Technical Implementation Details
+
+### Package Dependencies - What We Use
+
+The system uses these key packages for blockchain integration:
+
+```json
+{
+  "dependencies": {
+    "@polkadot/api": "^16.1.1",           // Main Polkadot API for blockchain calls
+    "@polkadot/api-augment": "^16.1.1",   // Type augmentation for Avail
+    "@polkadot/keyring": "^13.5.1",       // Key management and signing
+    "@polkadot/rpc-core": "^16.1.1",      // Core RPC functionality
+    "@polkadot/rpc-provider": "^16.1.1",  // WebSocket/HTTP providers
+    "@polkadot/types": "^16.1.1",         // Type definitions
+    "@polkadot/util": "^13.5.1",          // Utility functions
+    "@polkadot/util-crypto": "^13.5.1",   // Cryptographic utilities
+    "smoldot": "^2.0.35",                 // Light client implementation
+    "axios": "^1.6.2",                    // HTTP client for external APIs
+    "ws": "^8.18.2"                       // WebSocket client
+  }
+}
+```
+
+### Where Real API Calls Are Made
+
+#### 1. Polkadot API Calls (Blockchain Data)
+**Location**: `src/services/hybrid-rpc.ts` and `src/services/rpc/`
+
+```typescript
+// In hybrid-rpc.ts - Direct Polkadot API usage
+import { ApiPromise } from '@polkadot/api';
+import { WsProvider } from '@polkadot/rpc-provider';
+
+private async initializePolkadotAPI(): Promise<void> {
+  const provider = new WsProvider(config.avail.rpcEndpoint);
+  this.api = await ApiPromise.create({ provider });
+}
+
+// Getting blocks using Polkadot API
+private async getLatestBlocksPolkadot(query?: BlocksQuery): Promise<{ blocks: Block[]; total: number }> {
+  const latestHeader = await this.api!.rpc.chain.getHeader();
+  const blockHash = await this.api!.rpc.chain.getBlockHash(latestHeader.number);
+  const block = await this.api!.rpc.chain.getBlock(blockHash);
+  // Transform and return data
+}
+```
+
+#### 2. External HTTP API Calls
+**Location**: `src/services/turbo-da.ts`, `src/services/avail-nexus.ts`, `src/services/avail-bridge.ts`
+
+```typescript
+// In turbo-da.ts - HTTP calls to Turbo DA API
+import axios, { AxiosInstance } from 'axios';
+
+async submitRawData(data: Buffer): Promise<TurboSubmissionResponse> {
+  const response = await this.httpClient.post('/submit/raw', data, {
+    headers: { 'Content-Type': 'application/octet-stream' }
+  });
+  return response.data;
+}
+
+// In avail-nexus.ts - HTTP calls to Nexus API
+async getRollupData(appId: number): Promise<any> {
+  const response = await this.httpClient.get(`/rollups/${appId}`);
+  return response.data;
+}
+```
+
+#### 3. Light Client Integration
+**Location**: `src/services/avail-light-client.ts`
+
+```typescript
+// Using Smoldot for light client functionality
+import { start } from 'smoldot';
+
+async initialize(): Promise<void> {
+  this.client = start({
+    maxLogLevel: 4,
+    enableCurrentTask: true,
+  });
+  
+  this.chain = await this.client.addChain({
+    chainSpec: this.chainSpec,
+    disableJsonRpc: false,
+  });
+}
+```
+
+### Database Usage - Current Implementation
+
+#### 1. Database Connection
+**Location**: `src/utils/database.ts`
+
+```typescript
+// PostgreSQL connection using pg library
+import { Pool } from 'pg';
+
+private initializePostgreSQL(): void {
+  this.pgPool = new Pool({
+    connectionString: this.dbConfig.url,
+    ssl: this.dbConfig.ssl,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+}
+```
+
+#### 2. Current Database Operations
+The database is currently used for:
+
+**Analytics Storage** (`src/services/analytics.ts`):
+```typescript
+// Storing network statistics
+const query = `
+  INSERT INTO network_stats_snapshots (
+    timestamp, total_blocks, total_extrinsics, total_accounts,
+    avg_block_time, network_utilization, data_availability_score
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`;
+await db.query(query, values);
+
+// Retrieving historical data
+const query = 'SELECT * FROM network_stats_snapshots WHERE timestamp >= $1';
+const result = await db.query(query, [intervalString]);
+```
+
+**Chain Statistics** (`src/services/blockchain.ts`):
+```typescript
+// Querying data submission statistics
+const [
+  totalSubmissions,
+  totalDataSize,
+  uniqueApps,
+  uniqueSubmitters,
+  todaySubmissions,
+  todayDataSize
+] = await Promise.all([
+  db.query('SELECT COUNT(*) as count FROM data_submissions WHERE success = true'),
+  db.query('SELECT COALESCE(SUM(data_size), 0) as total_size FROM data_submissions WHERE success = true'),
+  db.query('SELECT COUNT(DISTINCT app_id) as count FROM data_submissions WHERE success = true'),
+  // ... more queries
+]);
+```
+
+#### 3. Database Schema (Current Tables)
+Based on the queries found, these tables exist:
+
+```sql
+-- Network statistics snapshots
+CREATE TABLE network_stats_snapshots (
+  id SERIAL PRIMARY KEY,
+  timestamp TIMESTAMP NOT NULL,
+  total_blocks BIGINT,
+  total_extrinsics BIGINT,
+  total_accounts BIGINT,
+  avg_block_time DECIMAL,
+  network_utilization DECIMAL,
+  data_availability_score DECIMAL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Data submissions tracking
+CREATE TABLE data_submissions (
+  id SERIAL PRIMARY KEY,
+  app_id INTEGER,
+  submitter VARCHAR(255),
+  data_size BIGINT,
+  success BOOLEAN,
+  timestamp TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Gas price history
+CREATE TABLE gas_price_history (
+  id SERIAL PRIMARY KEY,
+  timestamp TIMESTAMP NOT NULL,
+  gas_price DECIMAL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Rollups tracking
+CREATE TABLE rollups (
+  id SERIAL PRIMARY KEY,
+  app_id INTEGER UNIQUE,
+  name VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Request Flow - From Route to Database
+
+Here's how a typical request flows through the system:
+
+```typescript
+// 1. Route Handler (src/routes/blocks.ts)
+router.get('/', async (req: Request, res: Response) => {
+  // Get data from blockchain service
+  const blocksResult = await blockchainService.getLatestBlocks({ page, limit });
+  
+  // Transform and return
+  res.json({ success: true, data: transformedBlocks });
+});
+
+// 2. Blockchain Service (src/services/blockchain.ts)
+async getLatestBlocks(query: BlocksQuery) {
+  // Route to unified service
+  return this.unifiedAvail.getLatestBlocks(query);
+}
+
+// 3. Unified Service (src/services/unified-avail.ts)
+async getLatestBlocks(query?: BlocksQuery) {
+  // Try Light Client first
+  if (this.lightClient.isConnected()) {
+    return this.lightClient.getLatestBlocks(query);
+  }
+  // Fallback to RPC
+  return this.rpc.getLatestBlocks(query);
+}
+
+// 4. RPC Service (src/services/hybrid-rpc.ts)
+async getLatestBlocks(query?: BlocksQuery) {
+  // Make actual Polkadot API call
+  const latestHeader = await this.api!.rpc.chain.getHeader();
+  const block = await this.api!.rpc.chain.getBlock(blockHash);
+  
+  // Store in database for analytics (if needed)
+  await db.query('INSERT INTO block_stats ...', values);
+  
+  return transformedBlocks;
+}
+```
+
+### Key Insights
+
+1. **No Direct Database Storage of Blockchain Data**: The system doesn't store blocks/transactions in PostgreSQL. It fetches them live from blockchain sources and caches in Redis.
+
+2. **Database Used for Analytics**: PostgreSQL stores aggregated statistics, performance metrics, and historical analytics data.
+
+3. **Polkadot API is Primary**: The `@polkadot/api` package is used for all direct blockchain interactions via WebSocket RPC.
+
+4. **HTTP APIs for Specialized Services**: Axios is used for REST API calls to Turbo DA, Nexus, and Bridge services.
+
+5. **Smart Caching Strategy**: Redis caches API responses while PostgreSQL stores long-term analytics.
+
 ## Next Steps for Understanding
 
 1. **Start with `src/index.ts`** - See how the application initializes
