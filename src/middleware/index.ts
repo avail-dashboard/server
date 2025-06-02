@@ -180,7 +180,7 @@ export const validate = (validations: ValidationChain[]) => {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request parameters',
-          details: errors.array(),
+          details: { errors: errors.array() },
         },
       };
 

@@ -74,7 +74,7 @@ export class RPCMethodsService {
           
           return {
             success: true,
-            data: cached,
+            data: cached as T,
             metadata: {
               method: methodCall.method,
               duration,
@@ -1007,7 +1007,7 @@ export class RPCMethodsService {
       (extrinsic.module === 'system' && extrinsic.call === 'submitData') ||
       (extrinsic.module === 'vector' && extrinsic.call === 'submitData') ||
       // Check if extrinsic has data in args that looks like a submission
-      (extrinsic.args && (extrinsic.args.data || extrinsic.args.appId))
+      Boolean(extrinsic.args && (extrinsic.args.data || extrinsic.args.appId))
     );
   }
 
@@ -1015,7 +1015,7 @@ export class RPCMethodsService {
     try {
       // Extract app ID and data from extrinsic args
       const args = extrinsic.args || {};
-      let appId = args.appId || args.app_id || 0;
+      let appId = Number(args.appId || args.app_id) || 0;
       const data = args.data || '';
       let dataHash = '';
       

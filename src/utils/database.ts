@@ -43,10 +43,6 @@ class DatabaseService {
   private setupPgEventHandlers(): void {
     if (!this.pgPool) {return;}
 
-    this.pgPool.on('connect', () => {
-      this.isConnected = true;
-    });
-
     this.pgPool.on('error', (error) => {
       this.isConnected = false;
       logError(error, { component: 'database' });
@@ -55,16 +51,23 @@ class DatabaseService {
 
   async connect(): Promise<void> {
     try {
+      // Ensure pool is initialized
+      if (!this.pgPool) {
+        this.initializeDatabase();
+      }
+      
+      // Actually test the connection by acquiring a client
       const client = await this.pgPool!.connect();
-      client.release();
+      client.release(); // Release immediately after testing
+      
       this.isConnected = true;
       console.log('Database: Connected to PostgreSQL');
-    } catch {
+    } catch (err) {
       this.isConnected = false;
-      logError(error as Error, { component: 'database', action: 'connect' });
+      logError(err as Error, { component: 'database', action: 'connect' });
       
       // Use database guardian for centralized exit logic
-      await DatabaseGuardian.handleDatabaseError(error as Error, 'database-connect');
+      await DatabaseGuardian.handleDatabaseError(err as Error, 'database-connect');
     }
   }
 
@@ -75,8 +78,8 @@ class DatabaseService {
       }
       console.log('Database: Disconnected from PostgreSQL');
       this.isConnected = false;
-    } catch {
-      logError(error as Error, { component: 'database', action: 'disconnect' });
+    } catch (err) {
+      logError(err as Error, { component: 'database', action: 'disconnect' });
     }
   }
 
@@ -90,9 +93,9 @@ class DatabaseService {
       logQuery(text, duration, result.rowCount);
       
       return result;
-    } catch {
+    } catch (err) {
       const duration = Date.now() - start;
-      logError(error as Error, { 
+      logError(err as Error, { 
         component: 'database', 
         action: 'query', 
         query: text,
@@ -100,9 +103,9 @@ class DatabaseService {
       });
       
       // Use database guardian for centralized exit logic
-      await DatabaseGuardian.handleDatabaseError(error as Error, 'database-query');
+      await DatabaseGuardian.handleDatabaseError(err as Error, 'database-query');
       // This line should never be reached due to handleDatabaseError's never return type
-      throw error;
+      throw err;
     }
   }
 
@@ -142,14 +145,14 @@ class DatabaseService {
       
       await client.query('COMMIT');
       return result;
-    } catch {
+    } catch (err) {
       await client.query('ROLLBACK');
-      logError(error as Error, { component: 'database', action: 'transaction' });
+      logError(err as Error, { component: 'database', action: 'transaction' });
       
       // Use database guardian for centralized exit logic
-      await DatabaseGuardian.handleDatabaseError(error as Error, 'database-transaction');
+      await DatabaseGuardian.handleDatabaseError(err as Error, 'database-transaction');
       // This line should never be reached due to handleDatabaseError's never return type
-      throw error;
+      throw err;
     } finally {
       client.release();
     }
@@ -386,9 +389,9 @@ export const createTables = async (): Promise<void> => {
   for (const query of queries) {
     try {
       await db.query(query);
-    } catch {
-      logError(error as Error, { component: 'database', action: 'createTables', query });
-      throw error;
+    } catch (err) {
+      logError(err as Error, { component: 'database', action: 'createTables', query });
+      throw err;
     }
   }
 
