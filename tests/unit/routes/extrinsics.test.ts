@@ -8,13 +8,13 @@ import { logError } from '../../../src/utils/logger';
 jest.mock('../../../src/services/blockchain');
 jest.mock('../../../src/utils/logger');
 jest.mock('../../../src/middleware', () => ({
-  pagination: jest.fn((req, res, next) => {
+  pagination: jest.fn((req: express.Request, res: express.Response, next: express.NextFunction) => {
     req.query.page = req.query.page || '1';
     req.query.limit = req.query.limit || '10';
     req.query.offset = req.query.offset || '0';
     next();
   }),
-  cacheMiddleware: jest.fn(() => (req, res, next) => next()),
+  cacheMiddleware: jest.fn(() => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next()),
 }));
 jest.mock('../../../src/config', () => ({
   __esModule: true,
