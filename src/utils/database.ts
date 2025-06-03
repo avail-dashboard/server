@@ -59,7 +59,7 @@ class DatabaseService {
       client.release();
       this.isConnected = true;
       console.log('Database: Connected to PostgreSQL');
-    } catch {
+    } catch (error) {
       this.isConnected = false;
       logError(error as Error, { component: 'database', action: 'connect' });
       
@@ -75,7 +75,7 @@ class DatabaseService {
       }
       console.log('Database: Disconnected from PostgreSQL');
       this.isConnected = false;
-    } catch {
+    } catch (error) {
       logError(error as Error, { component: 'database', action: 'disconnect' });
     }
   }
@@ -90,7 +90,7 @@ class DatabaseService {
       logQuery(text, duration, result.rowCount);
       
       return result;
-    } catch {
+    } catch (error) {
       const duration = Date.now() - start;
       logError(error as Error, { 
         component: 'database', 
@@ -142,7 +142,7 @@ class DatabaseService {
       
       await client.query('COMMIT');
       return result;
-    } catch {
+    } catch (error) {
       await client.query('ROLLBACK');
       logError(error as Error, { component: 'database', action: 'transaction' });
       
@@ -386,7 +386,7 @@ export const createTables = async (): Promise<void> => {
   for (const query of queries) {
     try {
       await db.query(query);
-    } catch {
+    } catch (error) {
       logError(error as Error, { component: 'database', action: 'createTables', query });
       throw error;
     }
