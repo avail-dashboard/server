@@ -1002,13 +1002,15 @@ export class RPCMethodsService {
   private isDataSubmissionExtrinsic(extrinsic: Extrinsic): boolean {
     // Check if this is a data availability submission
     // Common patterns: dataAvailability.submitData, system.submitData, etc.
-    return (
+    const isDataSubmission = (
       (extrinsic.module === 'dataAvailability' && extrinsic.call === 'submitData') ||
       (extrinsic.module === 'system' && extrinsic.call === 'submitData') ||
       (extrinsic.module === 'vector' && extrinsic.call === 'submitData') ||
       // Check if extrinsic has data in args that looks like a submission
       Boolean(extrinsic.args && (extrinsic.args.data || extrinsic.args.appId))
     );
+    
+    return Boolean(isDataSubmission);
   }
 
   private async extractDataSubmission(extrinsic: Extrinsic, block: Block): Promise<DataSubmission | null> {
@@ -1193,7 +1195,7 @@ export class RPCMethodsService {
           // For now, leave empty as Avail might not have traditional authors
         }
       }
-    } catch (error) {
+    } catch {
       // Author extraction failed, leave empty
     }
 

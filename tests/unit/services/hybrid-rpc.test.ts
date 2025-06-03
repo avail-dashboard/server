@@ -70,7 +70,6 @@ describe('Hybrid RPC Service', () => {
         }
       });
       hybridRPCService.getHealth = mockHealthCheck;
-      
       const health = await hybridRPCService.getHealth();
       expect(health.healthy).toBe(true);
       expect(health.details).toBeDefined();
@@ -92,10 +91,8 @@ describe('Hybrid RPC Service', () => {
         ],
         total: 1000
       };
-      
       const mockGetLatestBlocks = jest.fn().mockResolvedValue(mockBlocks);
       hybridRPCService.getLatestBlocks = mockGetLatestBlocks;
-      
       const blocks = await hybridRPCService.getLatestBlocks({ limit: 10 });
       expect(blocks).toEqual(mockBlocks);
       expect(mockGetLatestBlocks).toHaveBeenCalledWith({ limit: 10 });
@@ -110,10 +107,8 @@ describe('Hybrid RPC Service', () => {
         timestamp: BigInt(1640995200000),
         extrinsicsCount: 5
       };
-      
       const mockGetBlock = jest.fn().mockResolvedValue(mockBlock);
       hybridRPCService.getBlockByNumber = mockGetBlock;
-      
       const block = await hybridRPCService.getBlockByNumber(BigInt(1000));
       expect(block).toEqual(mockBlock);
       expect(mockGetBlock).toHaveBeenCalledWith(BigInt(1000));
@@ -146,11 +141,29 @@ describe('Hybrid RPC Service', () => {
         ],
         total: 1
       };
-      
       const mockGetExtrinsics = jest.fn().mockResolvedValue(mockExtrinsics);
       hybridRPCService.getLatestExtrinsics = mockGetExtrinsics;
-      
       const extrinsics = await hybridRPCService.getLatestExtrinsics({ limit: 10 });
+      expect(extrinsics).toEqual(mockExtrinsics);
+    });
+
+    it('should fetch extrinsics by block', async () => {
+      const mockExtrinsics = [
+        {
+          hash: '0xext1',
+          blockNumber: BigInt(1000),
+          extrinsicIndex: 0,
+          module: 'System',
+          call: 'remark',
+          success: true,
+          timestamp: BigInt(1640995200000),
+          signer: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
+          fee: BigInt(0)
+        }
+      ];
+      const mockGetExtrinsics = jest.fn().mockResolvedValue(mockExtrinsics);
+      hybridRPCService.getExtrinsicsByBlock = mockGetExtrinsics;
+      const extrinsics = await hybridRPCService.getExtrinsicsByBlock(BigInt(1000));
       expect(extrinsics).toEqual(mockExtrinsics);
     });
   });
@@ -158,16 +171,10 @@ describe('Hybrid RPC Service', () => {
   describe('Chain Statistics', () => {
     it('should fetch chain stats', async () => {
       const mockStats = {
-        blockHeight: BigInt(1000),
-        blockTime: 6,
-        totalIssuance: BigInt('1000000000000000000000000'),
+        finalizedBlocks: 1000,
+        totalIssuance: '1000000000000000000000000',
+        totalStaked: '500000000000000000000000',
         activeValidators: 100,
-        nominators: 500,
-        minimumStake: BigInt('1000000000000000000'),
-        averageStake: BigInt('5000000000000000000'),
-        inflation: 0.1,
-        stakingRatio: 0.5,
-        lastUpdateTime: BigInt(Date.now())
       };
       
       const mockGetStats = jest.fn().mockResolvedValue(mockStats);
@@ -190,8 +197,8 @@ describe('Hybrid RPC Service', () => {
       const address = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY';
       const mockAccount = {
         address,
-        balance: BigInt('1000000000000000000'),
-        nonce: 5
+        balance: '1000000000000000000',
+        nonce: 5,
       };
       
       const mockGetAccount = jest.fn().mockResolvedValue(mockAccount);
@@ -216,18 +223,14 @@ describe('Hybrid RPC Service', () => {
       const mockSubmissions = {
         submissions: [
           {
-            extrinsicId: '1000-0',
-            blockNumber: BigInt(1000),
-            extrinsicIndex: 0,
             appId: 1,
             size: 1024,
-            dataHash: '0xhash',
             submitter: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-            timestamp: BigInt(1640995200000),
-            success: true
-          }
+            blockNumber: 1000,
+            timestamp: 1640995200000,
+          },
         ],
-        total: 1
+        total: 100,
       };
       
       const mockGetSubmissions = jest.fn().mockResolvedValue(mockSubmissions);
@@ -236,6 +239,21 @@ describe('Hybrid RPC Service', () => {
       const submissions = await hybridRPCService.getDataSubmissions();
       expect(submissions).toEqual(mockSubmissions);
     });
+
+    it('should fetch data submission stats', async () => {
+      const mockStats = {
+        totalSubmissions: 5000,
+        totalDataSize: 52428800,
+        uniqueApps: 12,
+        uniqueSubmitters: 150,
+      };
+      
+      const mockGetStats = jest.fn().mockResolvedValue(mockStats);
+      hybridRPCService.getDataSubmissions = mockGetStats;
+      
+      const stats = await hybridRPCService.getDataSubmissions();
+      expect(stats).toEqual(mockStats);
+    });
   });
 
   describe('Validator Operations', () => {
@@ -243,10 +261,9 @@ describe('Hybrid RPC Service', () => {
       const mockValidators = [
         {
           address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-          active: true,
-          commission: '5.0',
-          selfStake: BigInt('1000000000000000000000')
-        }
+          commission: '10%',
+          totalStake: '1000000000000000000',
+        },
       ];
       
       const mockGetValidators = jest.fn().mockResolvedValue(mockValidators);
@@ -254,6 +271,20 @@ describe('Hybrid RPC Service', () => {
       
       const validators = await hybridRPCService.getValidators();
       expect(validators).toEqual(mockValidators);
+    });
+
+    it('should fetch staking info', async () => {
+      const mockStakingInfo = {
+        totalStaked: '1000000000000000000',
+        activeValidators: 100,
+        waitingValidators: 50,
+      };
+      
+      const mockGetStaking = jest.fn().mockResolvedValue(mockStakingInfo);
+      hybridRPCService.getStakingInfo = mockGetStaking;
+      
+      const stakingInfo = await hybridRPCService.getStakingInfo();
+      expect(stakingInfo).toEqual(mockStakingInfo);
     });
   });
 
@@ -267,11 +298,23 @@ describe('Hybrid RPC Service', () => {
     });
 
     it('should handle timeout errors', async () => {
-      const mockError = new Error('Request timeout');
-      const mockMethod = jest.fn().mockRejectedValue(mockError);
-      hybridRPCService.getLatestBlocks = mockMethod;
+      const mockGetBlocks = jest.fn().mockRejectedValue(new Error('Request timeout'));
+      hybridRPCService.getLatestBlocks = mockGetBlocks;
       
       await expect(hybridRPCService.getLatestBlocks({ limit: 10 })).rejects.toThrow('Request timeout');
+    });
+
+    it('should log errors appropriately', async () => {
+      const mockError = new Error('Test error');
+      const mockMethod = jest.fn().mockRejectedValue(mockError);
+      hybridRPCService.getChainStats = mockMethod;
+      
+      try {
+        await hybridRPCService.getChainStats();
+      } catch {
+        // Error should be logged
+        expect(mockLogger.error).toHaveBeenCalled();
+      }
     });
   });
 

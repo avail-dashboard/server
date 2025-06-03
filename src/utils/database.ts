@@ -65,7 +65,6 @@ class DatabaseService {
     } catch (err) {
       this.isConnected = false;
       logError(err as Error, { component: 'database', action: 'connect' });
-      
       // Use database guardian for centralized exit logic
       await DatabaseGuardian.handleDatabaseError(err as Error, 'database-connect');
     }
@@ -101,7 +100,6 @@ class DatabaseService {
         query: text,
         duration, 
       });
-      
       // Use database guardian for centralized exit logic
       await DatabaseGuardian.handleDatabaseError(err as Error, 'database-query');
       // This line should never be reached due to handleDatabaseError's never return type
@@ -148,7 +146,6 @@ class DatabaseService {
     } catch (err) {
       await client.query('ROLLBACK');
       logError(err as Error, { component: 'database', action: 'transaction' });
-      
       // Use database guardian for centralized exit logic
       await DatabaseGuardian.handleDatabaseError(err as Error, 'database-transaction');
       // This line should never be reached due to handleDatabaseError's never return type
