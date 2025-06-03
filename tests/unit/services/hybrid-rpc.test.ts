@@ -1,58 +1,75 @@
+// Mock logger - must be defined before jest.mock
+const mockLogger = {
+  info: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  debug: jest.fn(),
+};
+
+// Mock the logger module
+jest.mock('../../../src/utils/logger', () => ({
+  logger: mockLogger,
+  logError: jest.fn(),
+}));
+
 import { HybridRPCService } from '../../../src/services/hybrid-rpc';
-import { logger } from '../../../src/utils/logger';
 
-// Mock dependencies
-jest.mock('../../../src/utils/logger');
-jest.mock('../../../src/services/rpc/connection');
-
-const mockLogger = logger as jest.Mocked<typeof logger>;
-
-describe('HybridRPCService', () => {
+describe('Hybrid RPC Service', () => {
   let hybridRPCService: HybridRPCService;
-  
+
   beforeEach(() => {
-    jest.clearAllMocks();
     hybridRPCService = new HybridRPCService();
+    jest.clearAllMocks();
   });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
-  describe('Initialization', () => {
-    it('should create HybridRPCService instance', () => {
-      expect(hybridRPCService).toBeInstanceOf(HybridRPCService);
-    });
-
-    it('should initialize with default configuration', () => {
+  describe('Service Structure', () => {
+    it('should be defined', () => {
       expect(hybridRPCService).toBeDefined();
     });
+
+    it('should have required methods', () => {
+      expect(typeof hybridRPCService.initialize).toBe('function');
+      expect(typeof hybridRPCService.shutdown).toBe('function');
+      expect(typeof hybridRPCService.getHealth).toBe('function');
+      expect(typeof hybridRPCService.getLatestBlocks).toBe('function');
+      expect(typeof hybridRPCService.getBlockByNumber).toBe('function');
+      expect(typeof hybridRPCService.getLatestExtrinsics).toBe('function');
+      expect(typeof hybridRPCService.getChainStats).toBe('function');
+      expect(typeof hybridRPCService.getAccountDetails).toBe('function');
+      expect(typeof hybridRPCService.getValidators).toBe('function');
+      expect(typeof hybridRPCService.getDataSubmissions).toBe('function');
+    });
   });
 
-  describe('Connection Management', () => {
-    it('should handle connection initialization', async () => {
-      const mockInit = jest.fn().mockResolvedValue(true);
-      hybridRPCService.initialize = mockInit;
+  describe('RPC Connection', () => {
+    it('should initialize RPC successfully', async () => {
+      const mockInitialize = jest.fn().mockResolvedValue(undefined);
+      hybridRPCService.initialize = mockInitialize;
       
-      const result = await hybridRPCService.initialize();
-      expect(result).toBe(true);
-      expect(mockInit).toHaveBeenCalledTimes(1);
+      await hybridRPCService.initialize();
+      expect(mockInitialize).toHaveBeenCalled();
     });
 
-    it('should handle connection failures gracefully', async () => {
-      const mockInit = jest.fn().mockRejectedValue(new Error('Connection failed'));
-      hybridRPCService.initialize = mockInit;
+    it('should shutdown RPC successfully', async () => {
+      const mockShutdown = jest.fn().mockResolvedValue(undefined);
+      hybridRPCService.shutdown = mockShutdown;
       
-      await expect(hybridRPCService.initialize()).rejects.toThrow('Connection failed');
+      await hybridRPCService.shutdown();
+      expect(mockShutdown).toHaveBeenCalled();
     });
+  });
 
-    it('should check connection health', async () => {
+  describe('Health Check', () => {
+    it('should check service health', async () => {
       const mockHealthCheck = jest.fn().mockResolvedValue({
         healthy: true,
-        details: 'Connection details',
+        details: {
+          activeConnections: 1,
+          totalConnections: 1,
+          healthChecks: { rpc: true }
+        }
       });
       hybridRPCService.getHealth = mockHealthCheck;
-      
       const health = await hybridRPCService.getHealth();
       expect(health.healthy).toBe(true);
       expect(health.details).toBeDefined();
@@ -64,18 +81,18 @@ describe('HybridRPCService', () => {
       const mockBlocks = {
         blocks: [
           {
-            number: 1000,
+            number: BigInt(1000),
             hash: '0x123',
-            timestamp: 1640995200000,
-            extrinsicsCount: 5,
-          },
+            parentHash: '0x122',
+            stateRoot: '0x456',
+            timestamp: BigInt(1640995200000),
+            extrinsicsCount: 5
+          }
         ],
-        total: 1000,
+        total: 1000
       };
-      
       const mockGetLatestBlocks = jest.fn().mockResolvedValue(mockBlocks);
       hybridRPCService.getLatestBlocks = mockGetLatestBlocks;
-      
       const blocks = await hybridRPCService.getLatestBlocks({ limit: 10 });
       expect(blocks).toEqual(mockBlocks);
       expect(mockGetLatestBlocks).toHaveBeenCalledWith({ limit: 10 });
@@ -83,16 +100,15 @@ describe('HybridRPCService', () => {
 
     it('should fetch block by number', async () => {
       const mockBlock = {
-        number: 1000,
+        number: BigInt(1000),
         hash: '0x123',
         parentHash: '0x122',
-        timestamp: 1640995200000,
-        extrinsicsCount: 5,
+        stateRoot: '0x456',
+        timestamp: BigInt(1640995200000),
+        extrinsicsCount: 5
       };
-      
       const mockGetBlock = jest.fn().mockResolvedValue(mockBlock);
       hybridRPCService.getBlockByNumber = mockGetBlock;
-      
       const block = await hybridRPCService.getBlockByNumber(BigInt(1000));
       expect(block).toEqual(mockBlock);
       expect(mockGetBlock).toHaveBeenCalledWith(BigInt(1000));
@@ -113,19 +129,20 @@ describe('HybridRPCService', () => {
         extrinsics: [
           {
             hash: '0xext1',
-            blockNumber: 1000,
+            blockNumber: BigInt(1000),
             extrinsicIndex: 0,
             module: 'System',
             call: 'remark',
             success: true,
-          },
+            timestamp: BigInt(1640995200000),
+            signer: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
+            fee: BigInt(0)
+          }
         ],
-        total: 100,
+        total: 1
       };
-      
       const mockGetExtrinsics = jest.fn().mockResolvedValue(mockExtrinsics);
       hybridRPCService.getLatestExtrinsics = mockGetExtrinsics;
-      
       const extrinsics = await hybridRPCService.getLatestExtrinsics({ limit: 10 });
       expect(extrinsics).toEqual(mockExtrinsics);
     });
@@ -134,17 +151,18 @@ describe('HybridRPCService', () => {
       const mockExtrinsics = [
         {
           hash: '0xext1',
-          blockNumber: 1000,
+          blockNumber: BigInt(1000),
           extrinsicIndex: 0,
           module: 'System',
           call: 'remark',
           success: true,
-        },
+          timestamp: BigInt(1640995200000),
+          signer: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
+          fee: BigInt(0)
+        }
       ];
-      
       const mockGetExtrinsics = jest.fn().mockResolvedValue(mockExtrinsics);
       hybridRPCService.getExtrinsicsByBlock = mockGetExtrinsics;
-      
       const extrinsics = await hybridRPCService.getExtrinsicsByBlock(BigInt(1000));
       expect(extrinsics).toEqual(mockExtrinsics);
     });
@@ -271,7 +289,7 @@ describe('HybridRPCService', () => {
   });
 
   describe('Error Handling', () => {
-    it('should handle RPC connection errors', async () => {
+    it('should handle API errors gracefully', async () => {
       const mockError = new Error('RPC Connection failed');
       const mockMethod = jest.fn().mockRejectedValue(mockError);
       hybridRPCService.getHealth = mockMethod;
@@ -300,19 +318,43 @@ describe('HybridRPCService', () => {
     });
   });
 
-  describe('Caching', () => {
-    it('should cache frequently accessed data', async () => {
-      const mockData = { cached: true };
-      const mockMethod = jest.fn().mockResolvedValue(mockData);
+  describe('Basic Operations', () => {
+    it('should handle getLatestBlocks call', async () => {
+      const mockResult = { blocks: [], total: 0 };
+      const mockMethod = jest.fn().mockResolvedValue(mockResult);
+      hybridRPCService.getLatestBlocks = mockMethod;
+      
+      const result = await hybridRPCService.getLatestBlocks();
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should handle getChainStats call', async () => {
+      const mockStats = {
+        blockHeight: BigInt(1000),
+        blockTime: 6,
+        totalIssuance: BigInt('1000000000000000000000000'),
+        activeValidators: 100,
+        nominators: 500,
+        minimumStake: BigInt('1000000000000000000'),
+        averageStake: BigInt('5000000000000000000'),
+        inflation: 0.1,
+        stakingRatio: 0.5,
+        lastUpdateTime: BigInt(Date.now())
+      };
+      const mockMethod = jest.fn().mockResolvedValue(mockStats);
       hybridRPCService.getChainStats = mockMethod;
       
-      // First call
-      await hybridRPCService.getChainStats();
-      // Second call (should use cache)
-      await hybridRPCService.getChainStats();
+      const result = await hybridRPCService.getChainStats();
+      expect(result).toEqual(mockStats);
+    });
+
+    it('should handle getValidators call', async () => {
+      const mockValidators: any[] = [];
+      const mockMethod = jest.fn().mockResolvedValue(mockValidators);
+      hybridRPCService.getValidators = mockMethod;
       
-      // Should only call the method once if caching works
-      expect(mockMethod).toHaveBeenCalledTimes(2); // Update based on actual caching implementation
+      const result = await hybridRPCService.getValidators();
+      expect(result).toEqual(mockValidators);
     });
   });
 }); 
