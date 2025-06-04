@@ -8,6 +8,54 @@ import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
 
+// GET /api/accounts/discover - Get sample valid addresses for testing
+router.get('/discover', 
+  cacheMiddleware(config.cache.ttl.validators),
+  async (req: Request, res: Response) => {
+    try {
+      // Get sample validator addresses that should work with the accounts endpoint
+      const validators = await blockchainService.getValidators();
+      
+      const sampleAddresses = validators.slice(0, 5).map(validator => ({
+        address: validator.address,
+        type: 'validator',
+        description: validator.identity?.display || `Validator with ${validator.commission} commission`,
+        active: validator.active,
+        commission: validator.commission,
+        totalStake: validator.totalStake?.toString(),
+      }));
+
+      const response: APIResponse = {
+        success: true,
+        data: {
+          sampleAddresses,
+          usage: {
+            example: `GET /api/accounts/${sampleAddresses[0]?.address}`,
+            note: 'These are real validator addresses on the Avail network that should return account data'
+          },
+          total: sampleAddresses.length,
+        },
+        meta: {
+          source: 'rpc',
+          note: 'Sample validator addresses for testing the accounts endpoint',
+        },
+      };
+
+      res.json(response);
+    } catch (error) {
+      logError(error as Error, { component: 'accounts-route', action: 'discover' });
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to discover sample addresses',
+        },
+      });
+    }
+  },
+);
+
 // GET /api/accounts/:address - Get account details
 router.get('/:address', 
   cacheMiddleware(config.cache.ttl.accountBalance),
@@ -24,6 +72,10 @@ router.get('/:address',
           error: {
             code: 'NOT_FOUND',
             message: 'Account not found',
+          },
+          meta: {
+            suggestion: 'Use GET /api/accounts/discover to find valid addresses for testing',
+            note: 'Only accounts with on-chain activity or validator status have account data',
           },
         });
       }

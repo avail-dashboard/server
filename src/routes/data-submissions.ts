@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
+import { APIResponse, DataSubmission, DataSubmissionQuery } from '../types';
 import { logError } from '../utils/logger';
-import { APIResponse } from '../types';
 import { pagination } from '../middleware';
+import config from '../config';
 import blockchainService from '../services/blockchain';
 import { keysToCamelCase } from '../utils/caseConverter';
+import { cacheMiddleware } from '../middleware';
 
 const router = Router();
 
@@ -12,44 +14,44 @@ const router = Router();
  * @description Get data submissions with filtering
  * @access Public
  */
-router.get('/', 
+router.get(
+  '/',
   pagination,
+  cacheMiddleware(config.cache.ttl.blocks),
   async (req: Request, res: Response) => {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
-      const appId = req.query.appId ? parseInt(req.query.appId as string) : undefined;
-      const submitter = req.query.submitter as string;
-      const orderBy = (req.query.orderBy as string) || 'timestamp';
-      const order = (req.query.order as 'asc' | 'desc') || 'desc';
-
-      // Fetch data submissions from blockchain service
-      const submissionsResult = await blockchainService.getDataSubmissions({
-        page,
-        limit,
-        appId,
-        submitter,
+      const { page = 1, limit = 10, appId, submitter, orderBy, order } = req.query;
+      
+      const query: DataSubmissionQuery = {
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        appId: appId ? parseInt(appId as string) : undefined,
+        submitter: submitter as string,
         orderBy: orderBy as 'timestamp' | 'size' | 'appId',
-        order,
-      });
+        order: order as 'asc' | 'desc',
+      };
 
-      // Transform submissions using the keysToCamelCase utility
-      const transformedSubmissions = submissionsResult.submissions.map((submission) => 
-        keysToCamelCase(submission),
-      );
+      const result = await blockchainService.getDataSubmissions(query);
+      
+      // Convert BigInts to strings for JSON serialization
+      const serializedSubmissions = result.submissions.map(submission => ({
+        ...submission,
+        blockNumber: submission.blockNumber.toString(),
+        timestamp: submission.timestamp.toString(),
+      }));
 
-      const response: APIResponse = {
+      const response: APIResponse<typeof serializedSubmissions> = {
         success: true,
-        data: transformedSubmissions,
+        data: serializedSubmissions,
         meta: {
-          page,
-          limit,
-          total: submissionsResult.total,
-          source: 'rpc',
+          page: query.page,
+          limit: query.limit,
+          total: result.total,
+          source: 'rpc' as const,
         },
       };
 
-      res.json(response);
+      res.json(keysToCamelCase(response));
     } catch (error) {
       logError(error as Error, { component: 'data-submissions-route', action: 'getSubmissions' });
       
@@ -69,24 +71,22 @@ router.get('/',
  * @description Get data submission statistics
  * @access Public
  */
-router.get('/stats', 
+router.get(
+  '/stats',
+  cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      // Fetch data submission stats
       const stats = await blockchainService.getDataSubmissionStats();
 
-      // Transform stats using the keysToCamelCase utility
-      const transformedStats = keysToCamelCase(stats);
-
-      const response: APIResponse = {
+      const response: APIResponse<typeof stats> = {
         success: true,
-        data: transformedStats,
+        data: stats,
         meta: {
-          source: 'rpc',
+          source: 'rpc' as const,
         },
       };
 
-      res.json(response);
+      res.json(keysToCamelCase(response));
     } catch (error) {
       logError(error as Error, { component: 'data-submissions-route', action: 'getStats' });
       

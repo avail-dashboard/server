@@ -568,100 +568,19 @@ export class HybridRPCService extends EventEmitter {
   }
 
   async getDataSubmissions(query: DataSubmissionQuery = {}) {
+    rpcLogger.error('hybridRPC_getDataSubmissions_CALLED', { query });
     this.ensureInitialized();
     
-    // Try DirectWS first for Avail-specific methods
-    if (this.directWS?.isHealthy()) {
-      try {
-        // DirectWS doesn't have getDataSubmissions yet, so use getLatestBlocks and extract data submissions
-        const latestBlocks = await this.directWS.getLatestBlocks(10);
-        const submissions: any[] = [];
-        
-        for (const block of latestBlocks) {
-          try {
-            const extrinsics = await this.directWS.getExtrinsicsByBlock(block.number);
-            for (const extrinsic of extrinsics) {
-              // Check if this is a data submission extrinsic
-              if (this.isDataSubmissionExtrinsic(extrinsic)) {
-                const dataSubmission = this.extractDataSubmission(extrinsic, block);
-                if (dataSubmission) {
-                  // Apply filters
-                  if (query.appId && dataSubmission.appId !== query.appId) continue;
-                  if (query.submitter && dataSubmission.submitter !== query.submitter) continue;
-                  
-                  submissions.push(dataSubmission);
-                }
-              }
-            }
-          } catch (error) {
-            rpcLogger.warn(`DirectWS: Failed to process block ${block.number} for data submissions`, { error });
-          }
-        }
-        
-        // Sort and paginate
-        const orderBy = query.orderBy || 'timestamp';
-        const order = query.order || 'desc';
-        submissions.sort((a, b) => {
-          const aValue = orderBy === 'timestamp' ? Number(a.timestamp) : 
-            orderBy === 'size' ? a.size : a.appId;
-          const bValue = orderBy === 'timestamp' ? Number(b.timestamp) : 
-            orderBy === 'size' ? b.size : b.appId;
-          
-          return order === 'desc' ? bValue - aValue : aValue - bValue;
-        });
-        
-        const page = query.page || 1;
-        const limit = query.limit || 10;
-        const startIndex = (page - 1) * limit;
-        const paginatedSubmissions = submissions.slice(startIndex, startIndex + limit);
-        
-        rpcLogger.info(`DirectWS: Found ${submissions.length} data submissions from ${latestBlocks.length} blocks`);
-        
-        return {
-          submissions: paginatedSubmissions,
-          total: submissions.length,
-        };
-      } catch (error) {
-        rpcLogger.warn('DirectWS getDataSubmissions failed, falling back to Avail RPC', { error });
-      }
-    }
-
-    // Fallback to Avail RPC
+    // For data submissions, skip DirectWS as it has issues with extrinsic extraction
+    // Go directly to AvailRPC where our enhanced method is implemented
+    rpcLogger.error('hybridRPC_skipping_DirectWS_for_data_submissions', { reason: 'DirectWS extrinsic extraction issues' });
+    
+    rpcLogger.error('hybridRPC_falling_back_to_AvailRPC', { capabilities: this.capabilities.availSpecific.blobs });
+    // Use Avail RPC directly
     if (!this.capabilities.availSpecific.blobs) {
       throw new Error('Data submissions not supported');
     }
     return this.availRPC.getDataSubmissions(query);
-  }
-
-  private isDataSubmissionExtrinsic(extrinsic: any): boolean {
-    // Check if this is a data availability submission
-    return Boolean(
-      (extrinsic.module === 'dataAvailability' && extrinsic.call === 'submitData') ||
-      (extrinsic.module === 'system' && extrinsic.call === 'submitData') ||
-      (extrinsic.module === 'vector' && extrinsic.call === 'submitData') ||
-      // Check if extrinsic has data in args that looks like a submission
-      (extrinsic.args && (extrinsic.args.data || extrinsic.args.appId))
-    );
-  }
-
-  private extractDataSubmission(extrinsic: any, block: any): any | null {
-    try {
-      return {
-        extrinsicId: `${block.number}-${extrinsic.index || 0}`,
-        blockNumber: BigInt(block.number),
-        extrinsicIndex: extrinsic.index || 0,
-        appId: extrinsic.args?.appId || extrinsic.args?.app_id || 0,
-        size: extrinsic.args?.data ? Buffer.byteLength(extrinsic.args.data, 'utf8') : 0,
-        dataHash: extrinsic.hash || '',
-        submitter: extrinsic.signer || '',
-        timestamp: BigInt(block.timestamp || Date.now()),
-        success: extrinsic.success !== false,
-        data: extrinsic.args?.data,
-      };
-    } catch (error) {
-      rpcLogger.warn('Failed to extract data submission from extrinsic', { error });
-      return null;
-    }
   }
 
   async getBlockDataRoot(blockHash: string): Promise<string | null> {

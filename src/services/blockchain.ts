@@ -17,8 +17,11 @@ class BlockchainService {
 
   constructor() {
     this.hybridRPC = new HybridRPCService();
-    // Initialize the RPC service
-    this.initialize();
+    // Don't auto-initialize - let the server explicitly call init()
+  }
+
+  public async init(): Promise<void> {
+    return this.initialize();
   }
 
   private async initialize(): Promise<void> {
@@ -185,12 +188,14 @@ class BlockchainService {
   }
 
   async getDataSubmissions(query: DataSubmissionQuery = {}) {
-    this.ensureInitialized();
+    rpcLogger.error('blockchainService_getDataSubmissions_CALLED', { query });
     try {
+      rpcLogger.error('blockchainService_calling_hybridRPC', { query });
       return await this.hybridRPC.getDataSubmissions(query);
     } catch (error) {
+      rpcLogger.error('blockchainService_getDataSubmissions_ERROR', { error: (error as Error).message });
       logError(error as Error, { operation: 'getDataSubmissions', query });
-      return { submissions: [], total: 0 };
+      throw error;
     }
   }
 

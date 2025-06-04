@@ -250,8 +250,16 @@ class AvailExplorerServer {
         }),
       );
 
-      // Blockchain service initializes automatically in constructor
-      // No explicit connection needed as it's handled internally
+      // Initialize blockchain service explicitly
+      // The constructor calls initialize() asynchronously, so we need to wait for it
+      services.push(
+        blockchainService.init().then(() => {
+          logger.info('Blockchain service: Initialization completed');
+        }).catch(err => {
+          logger.error('Failed to initialize blockchain service', { error: err.message });
+          throw err;
+        }),
+      );
 
       // Wait for all critical services
       await Promise.all(services);
