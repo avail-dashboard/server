@@ -16,9 +16,9 @@ router.get('/stats',
       // Fetch real chain data from RPC
       const chainStats = await blockchainService.getChainStats();
       
-      // Get recent extrinsics to count signed ones
-      const recentExtrinsics = await blockchainService.getLatestExtrinsics({ limit: 100 });
-      const signedExtrinsicsCount = recentExtrinsics.extrinsics.filter(ext => ext.isSigned).length;
+      // Use estimates instead of fetching problematic extrinsics
+      // This avoids the issue with unknown call indices that prevent extrinsic decoding
+      const estimatedSignedExtrinsics = Math.floor(chainStats.activeValidators * 2); // Estimate based on validator activity
       
       // Calculate staking amounts - ensure all BigInt operations are safe
       const totalIssuance = typeof chainStats.totalIssuance === 'bigint' 
@@ -40,12 +40,12 @@ router.get('/stats',
       // Transform RPC data using the keysToCamelCase utility
       const chainData = {
         finalized_blocks: Number(chainStats.blockHeight),
-        signed_extrinsics: signedExtrinsicsCount,
+        signed_extrinsics: estimatedSignedExtrinsics,
         staked_amount: stakedAmount.toString(),
         bonded_amount: bondedAmount.toString(),
         holders: chainStats.nominators + chainStats.activeValidators, // Estimate
         total_accounts: chainStats.nominators + chainStats.activeValidators, // Estimate
-        transfers: Math.floor(signedExtrinsicsCount * 0.7), // Estimate 70% are transfers
+        transfers: Math.floor(estimatedSignedExtrinsics * 0.7), // Estimate 70% are transfers
         inflation_rate: chainStats.inflation,
         token_price: 0, // TODO: Fetch from external API
         price_change: 0, // TODO: Calculate from price history
@@ -83,6 +83,7 @@ router.get('/stats',
         data: keysToCamelCase(chainData),
         meta: {
           source: 'rpc',
+          note: 'Extrinsic counts are estimated due to runtime compatibility issues',
         },
       };
 

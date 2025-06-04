@@ -102,13 +102,13 @@ export const config = {
   dataSources: {
     rpc: {
       endpoints: [
-        // Official Avail endpoints
-        'wss://mainnet.avail-rpc.com/',
-        'https://mainnet-rpc.avail.so/rpc',
+        // Official Avail endpoints - UPDATED to use correct endpoints
+        'wss://mainnet-rpc.avail.so/ws',
+        // 'https://mainnet-rpc.avail.so/rpc',
         // Third-party provider endpoints for redundancy
-        'https://rpc.ankr.com/avail',
-        'https://avail-mainnet.public.blastapi.io/',
-        'wss://avail-mainnet.public.blastapi.io/',
+        // 'https://rpc.ankr.com/avail',
+        // 'https://avail-mainnet.public.blastapi.io/',
+        // 'wss://avail-mainnet.public.blastapi.io/',
       ],
       retryAttempts: 3,
       retryDelay: 1000,
@@ -137,7 +137,7 @@ export const config = {
     // NEW: Additional Avail APIs
     lightClient: {
       httpEndpoint: 'https://mainnet-rpc.avail.so',
-      wsEndpoint: 'wss://mainnet.avail-rpc.com/ws',
+      wsEndpoint: 'wss://mainnet-rpc.avail.so/ws',
       appId: 0,
       timeout: 30000,
     },
