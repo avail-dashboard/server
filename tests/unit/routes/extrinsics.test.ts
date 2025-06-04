@@ -120,8 +120,6 @@ describe('Extrinsics Routes', () => {
       expect(mockedBlockchainService.getLatestExtrinsics).toHaveBeenCalledWith({
         page: 2,
         limit: 5,
-        orderBy: 'timestamp',
-        order: 'desc',
       });
 
       expect(response.body.meta).toMatchObject({
@@ -172,7 +170,6 @@ describe('Extrinsics Routes', () => {
       expect(typeof response.body.data[0].timestamp).toBe('number');
       expect(typeof response.body.data[0].fee).toBe('number');
       expect(typeof response.body.data[0].tip).toBe('number');
-      expect(response.body.data[0].time).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
   });
 

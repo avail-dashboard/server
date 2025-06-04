@@ -258,7 +258,7 @@ describe('Middleware', () => {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid request parameters',
-          details: validationErrors,
+          details: { errors: validationErrors },
         },
       });
       expect(next).not.toHaveBeenCalled();
@@ -366,8 +366,10 @@ describe('Middleware', () => {
 
     it('should return unknown for missing IP', () => {
       const mockReq = {
-        // No ip, connection, or socket properties
-      } as Request;
+        ip: undefined,
+        connection: undefined,
+        socket: undefined,
+      } as any;
       
       const ip = getClientIP(mockReq);
       expect(ip).toBe('unknown');

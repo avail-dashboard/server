@@ -65,9 +65,9 @@ describe('Blockchain Service', () => {
       const mockBlocks = {
         blocks: [
           {
-            number: BigInt(1000),
+            number: '1000',
             hash: '0x123',
-            timestamp: BigInt(1640995200000),
+            timestamp: '1640995200000',
             extrinsicsCount: 5,
           },
         ],
@@ -84,9 +84,9 @@ describe('Blockchain Service', () => {
 
     it('should get block by number', async () => {
       const mockBlock = {
-        number: BigInt(1000),
+        number: '1000',
         hash: '0x123',
-        timestamp: BigInt(1640995200000),
+        timestamp: '1640995200000',
         extrinsicsCount: 5,
       };
 
@@ -100,9 +100,9 @@ describe('Blockchain Service', () => {
 
     it('should get block by hash', async () => {
       const mockBlock = {
-        number: BigInt(1000),
+        number: '1000',
         hash: '0x123',
-        timestamp: BigInt(1640995200000),
+        timestamp: '1640995200000',
         extrinsicsCount: 5,
       };
 
@@ -129,7 +129,7 @@ describe('Blockchain Service', () => {
         extrinsics: [
           {
             hash: '0xext1',
-            blockNumber: BigInt(1000),
+            blockNumber: '1000',
             extrinsicIndex: 0,
             module: 'System',
             call: 'remark',
@@ -151,7 +151,7 @@ describe('Blockchain Service', () => {
       const mockExtrinsics = [
         {
           hash: '0xext1',
-          blockNumber: BigInt(1000),
+          blockNumber: '1000',
           extrinsicIndex: 0,
           module: 'System',
           call: 'remark',
@@ -171,9 +171,9 @@ describe('Blockchain Service', () => {
   describe('Chain Statistics', () => {
     it('should get chain stats', async () => {
       const mockStats = {
-        blockHeight: BigInt(1000),
+        blockHeight: '1000',
         blockTime: 6,
-        totalIssuance: BigInt('1000000000000000000000'),
+        totalIssuance: '1000000000000000000000',
         activeValidators: 100,
         inflation: 0.1,
       };
@@ -201,7 +201,7 @@ describe('Blockchain Service', () => {
         {
           address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
           commission: '10%',
-          totalStake: BigInt('1000000000000000000'),
+          totalStake: '1000000000000000000',
           active: true,
         },
       ];
@@ -220,7 +220,7 @@ describe('Blockchain Service', () => {
       const address = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY';
       const mockAccount = {
         address,
-        balance: BigInt('1000000000000000000'),
+        balance: '1000000000000000000',
         nonce: 5,
       };
 
@@ -241,8 +241,8 @@ describe('Blockchain Service', () => {
             appId: 1,
             size: 1024,
             submitter: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-            blockNumber: BigInt(1000),
-            timestamp: BigInt(1640995200000),
+            blockNumber: '1000',
+            timestamp: '1640995200000',
           },
         ],
         total: 100,

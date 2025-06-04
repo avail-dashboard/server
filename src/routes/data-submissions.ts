@@ -1,11 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { APIResponse, DataSubmission, DataSubmissionQuery } from '../types';
+import { APIResponse, DataSubmissionQuery } from '../types';
 import { logError } from '../utils/logger';
-import { pagination } from '../middleware';
+import { pagination, cacheMiddleware } from '../middleware';
 import config from '../config';
 import blockchainService from '../services/blockchain';
 import { keysToCamelCase } from '../utils/caseConverter';
-import { cacheMiddleware } from '../middleware';
 
 const router = Router();
 

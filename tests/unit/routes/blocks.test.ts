@@ -172,12 +172,12 @@ describe('Blocks Routes', () => {
 
   describe('GET /api/blocks/:numberOrHash', () => {
     const mockBlock = {
-      number: BigInt(1000),
+      number: 1000,
       hash: '0x123abc',
       parentHash: '0x456def',
       stateRoot: '0x789ghi',
       extrinsicsRoot: '0xabcjkl',
-      timestamp: BigInt(1640995200000),
+      timestamp: 1640995200000,
       extrinsicsCount: 5,
       size: 1024,
       finalized: true,
@@ -189,22 +189,22 @@ describe('Blocks Routes', () => {
     const mockExtrinsics = [
       {
         hash: '0xext1',
-        blockNumber: BigInt(1000),
+        blockNumber: 1000,
         extrinsicIndex: 0,
         module: 'timestamp',
         call: 'set',
         success: true,
-        timestamp: BigInt(1640995200000),
+        timestamp: 1640995200000,
         signer: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-        fee: BigInt(1000),
-        tip: BigInt(100),
+        fee: 1000,
+        tip: 100,
         args: {},
       },
     ];
 
     it('should fetch block by number', async () => {
-      mockedBlockchainService.getBlockByNumber.mockResolvedValue(mockBlock);
-      mockedBlockchainService.getExtrinsicsByBlock.mockResolvedValue(mockExtrinsics);
+      (mockedBlockchainService.getBlockByNumber as any).mockResolvedValue(mockBlock);
+      (mockedBlockchainService.getExtrinsicsByBlock as any).mockResolvedValue(mockExtrinsics);
 
       const response = await request(app)
         .get('/api/blocks/1000')
@@ -219,8 +219,8 @@ describe('Blocks Routes', () => {
     });
 
     it('should fetch block by hash', async () => {
-      mockedBlockchainService.getBlockByHash.mockResolvedValue(mockBlock);
-      mockedBlockchainService.getExtrinsicsByBlock.mockResolvedValue(mockExtrinsics);
+      (mockedBlockchainService.getBlockByHash as any).mockResolvedValue(mockBlock);
+      (mockedBlockchainService.getExtrinsicsByBlock as any).mockResolvedValue(mockExtrinsics);
 
       const response = await request(app)
         .get('/api/blocks/0x123abc')
@@ -265,8 +265,8 @@ describe('Blocks Routes', () => {
     });
 
     it('should transform extrinsic data correctly', async () => {
-      mockedBlockchainService.getBlockByNumber.mockResolvedValue(mockBlock);
-      mockedBlockchainService.getExtrinsicsByBlock.mockResolvedValue(mockExtrinsics);
+      (mockedBlockchainService.getBlockByNumber as any).mockResolvedValue(mockBlock);
+      (mockedBlockchainService.getExtrinsicsByBlock as any).mockResolvedValue(mockExtrinsics);
 
       const response = await request(app)
         .get('/api/blocks/1000')
@@ -286,8 +286,8 @@ describe('Blocks Routes', () => {
         },
       ];
 
-      mockedBlockchainService.getBlockByNumber.mockResolvedValue(mockBlock);
-      mockedBlockchainService.getExtrinsicsByBlock.mockResolvedValue(mockExtrinsicsWithoutTip);
+      (mockedBlockchainService.getBlockByNumber as any).mockResolvedValue(mockBlock);
+      (mockedBlockchainService.getExtrinsicsByBlock as any).mockResolvedValue(mockExtrinsicsWithoutTip);
 
       const response = await request(app)
         .get('/api/blocks/1000')

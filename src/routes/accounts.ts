@@ -31,7 +31,7 @@ router.get('/discover',
           sampleAddresses,
           usage: {
             example: `GET /api/accounts/${sampleAddresses[0]?.address}`,
-            note: 'These are real validator addresses on the Avail network that should return account data'
+            note: 'These are real validator addresses on the Avail network that should return account data',
           },
           total: sampleAddresses.length,
         },
