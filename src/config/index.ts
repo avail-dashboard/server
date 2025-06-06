@@ -68,13 +68,10 @@ if (error) {
 }
 
 // Set up PostgreSQL configuration
-const getDatabaseConfig = () => {
-  const isProd = env.NODE_ENV === 'production';
-  
+const getDatabaseConfig = () => { 
   return {
     type: 'postgresql' as const,
     url: env.DATABASE_URL,
-    ssl: isProd ? { rejectUnauthorized: false } : false,
   };
 };
 
