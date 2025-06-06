@@ -128,7 +128,10 @@ export const cacheLogger = logger.child({ component: 'cache' });
 export const dbLogger = logger.child({ component: 'database' });
 export const rpcLogger = logger.child({ component: 'rpc' });
 export const wsLogger = logger.child({ component: 'websocket' });
-export const jobLogger = logger.child({ component: 'jobs' });
+
+// ===========================================
+// GENERAL LOGGING HELPERS
+// ===========================================
 
 // Request logging middleware helper
 export const logRequest = (req: any, res: any, responseTime?: number) => {
@@ -169,7 +172,10 @@ export const logPerformance = (operation: string, duration: number, context?: Re
   });
 };
 
-// Cache logging helpers
+// ===========================================
+// CACHE LOGGING HELPERS
+// ===========================================
+
 export const logCacheHit = (key: string, ttl?: number) => {
   cacheLogger.debug('Cache Hit', { key, ttl });
 };
@@ -182,7 +188,10 @@ export const logCacheSet = (key: string, ttl: number) => {
   cacheLogger.debug('Cache Set', { key, ttl });
 };
 
-// Database logging helpers
+// ===========================================
+// DATABASE LOGGING HELPERS
+// ===========================================
+
 export const logQuery = (query: string, duration: number, rowCount?: number) => {
   dbLogger.debug('Database Query', {
     query: query.replace(/\s+/g, ' ').trim(),
@@ -191,14 +200,9 @@ export const logQuery = (query: string, duration: number, rowCount?: number) => 
   });
 };
 
-// RPC logging helpers
-export const logRpcCall = (method: string, duration: number, success: boolean) => {
-  rpcLogger.info('RPC Call', {
-    method,
-    duration: `${duration}ms`,
-    success,
-  });
-};
+// ===========================================
+// RPC LOGGING HELPERS
+// ===========================================
 
 // Enhanced RPC logging with detailed information
 export const logDetailedRpcCall = (
@@ -223,10 +227,9 @@ export const logDetailedRpcCall = (
   });
 };
 
-// WebSocket logging helpers
-export const logSocketConnection = (socketId: string, event: string) => {
-  wsLogger.info('Socket Event', { socketId, event });
-};
+// ===========================================
+// WEBSOCKET LOGGING HELPERS
+// ===========================================
 
 // Enhanced WebSocket logging
 export const logWebSocketConnection = (
@@ -261,7 +264,10 @@ export const logWebSocketMessage = (
   });
 };
 
-// Service operation logging
+// ===========================================
+// SERVICE OPERATION LOGGING
+// ===========================================
+
 export const logServiceOperation = (
   service: string,
   operation: string,
@@ -290,26 +296,6 @@ export const logServiceFallback = (
     failedService,
     fallbackService,
     reason,
-  });
-};
-
-// Job logging helpers
-export const logJobStart = (jobName: string, jobId: string) => {
-  jobLogger.info('Job Started', { jobName, jobId });
-};
-
-export const logJobComplete = (jobName: string, jobId: string, duration: number) => {
-  jobLogger.info('Job Completed', { jobName, jobId, duration: `${duration}ms` });
-};
-
-export const logJobFailed = (jobName: string, jobId: string, error: Error) => {
-  jobLogger.error('Job Failed', {
-    jobName,
-    jobId,
-    error: {
-      name: error.name,
-      message: error.message,
-    },
   });
 };
 
@@ -474,45 +460,6 @@ export const logAvailDataSubmission = (
     blockHash,
     success,
     error,
-    timestamp: new Date().toISOString(),
-  });
-};
-
-// Fallback and retry logging
-export const logAvailFallback = (
-  operation: string,
-  failedEndpoint: string,
-  fallbackEndpoint: string,
-  reason: string,
-  attempt: number,
-) => {
-  rpcLogger.warn('Avail Service Fallback', {
-    operation,
-    failedEndpoint,
-    fallbackEndpoint,
-    reason,
-    attempt,
-    timestamp: new Date().toISOString(),
-  });
-};
-
-export const logAvailRetry = (
-  service: string,
-  operation: string,
-  endpoint: string,
-  attempt: number,
-  maxAttempts: number,
-  delay: number,
-  lastError?: string,
-) => {
-  rpcLogger.warn('Avail Operation Retry', {
-    service,
-    operation,
-    endpoint,
-    attempt,
-    maxAttempts,
-    delay: `${delay}ms`,
-    lastError,
     timestamp: new Date().toISOString(),
   });
 };
