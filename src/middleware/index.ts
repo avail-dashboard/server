@@ -222,13 +222,8 @@ export const corsHandler = (req: Request, res: Response, next: NextFunction): vo
   next();
 };
 
-// Cache middleware
-export const cacheMiddleware = (_ttl: number, _keyGenerator?: (req: Request) => string) => {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    // Cache/Redis not implemented - bypassing cache middleware
-    next();
-  };
-};
+// Re-export cache middleware from separate file
+export { cacheMiddleware } from './cache';
 
 // Security headers middleware
 export const securityHeaders = (req: Request, res: Response, next: NextFunction): void => {
