@@ -14,7 +14,6 @@ import {
   securityHeaders,
   getClientIP,
   healthCheck,
-  metricsHandler,
 } from '../../../src/middleware';
 import { logError } from '../../../src/utils/logger';
 
@@ -413,22 +412,6 @@ describe('Middleware', () => {
 
       // Restore original function
       process.uptime = originalUptime;
-    });
-  });
-
-  describe('metricsHandler', () => {
-    it('should return system metrics', () => {
-      metricsHandler(req as Request, res as Response);
-
-      expect(res.set).toHaveBeenCalledWith('Content-Type', 'application/json');
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          uptime: expect.any(Number),
-          memory: expect.any(Object),
-          cpu: expect.any(Object),
-          timestamp: expect.any(Number),
-        }),
-      );
     });
   });
 }); 

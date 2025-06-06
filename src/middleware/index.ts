@@ -293,17 +293,3 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
     });
   }
 };
-
-// Metrics middleware (basic implementation)
-export const metricsHandler = (req: Request, res: Response): void => {
-  // Basic metrics - would be replaced with proper Prometheus metrics
-  const metrics = {
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    cpu: process.cpuUsage(),
-    timestamp: Date.now(),
-  };
-
-  res.set('Content-Type', 'application/json');
-  res.json(metrics);
-}; 

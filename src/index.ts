@@ -21,7 +21,6 @@ import {
   apiRateLimit,
   securityHeaders,
   healthCheck,
-  metricsHandler,
   camelCaseResponse,
 } from './middleware';
 import testCamelCaseValidator from './middleware/testCamelCaseValidator';
@@ -135,10 +134,6 @@ class AvailExplorerServer {
   }
 
   private setupRoutes(): void {
-    // Health check routes (no rate limiting)
-    this.app.get('/health', healthCheck);
-    this.app.get('/metrics', metricsHandler);
-
     // API routes
     const apiRouter = express.Router();
 
