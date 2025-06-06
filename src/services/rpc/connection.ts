@@ -19,7 +19,7 @@ export class RPCConnectionManager extends EventEmitter {
 
   constructor() {
     super();
-    this.config = config.dataSources.rpc;
+    this.config = config.avail.rpc;
     this.setupEventHandlers();
   }
 

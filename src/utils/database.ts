@@ -1,7 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import config from '../config';
 import { logQuery, logError } from './logger';
-import { DatabaseGuardian } from '../services/database-guardian';
 
 interface DatabaseConfig {
   type: 'postgresql';
@@ -14,24 +13,63 @@ interface QueryResult<T = any> {
   rowCount: number;
 }
 
+// Simple retry utility
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000,
+  context: string = 'operation',
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      
+      if (attempt === maxRetries) {
+        logError(lastError, { 
+          component: 'database', 
+          context, 
+          attempt, 
+          maxRetries,
+          message: `Failed after ${maxRetries} attempts`,
+        });
+        throw lastError;
+      }
+      
+      logError(lastError, { 
+        component: 'database', 
+        context, 
+        attempt, 
+        maxRetries,
+        message: `Attempt ${attempt} failed, retrying in ${delayMs}ms`,
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+    }
+  }
+  
+  throw lastError!;
+}
+
 class DatabaseService {
-  private pgPool?: Pool;
+  private pgPool: Pool | null = null;
   private isConnected: boolean = false;
   private dbConfig: DatabaseConfig;
 
   constructor() {
-    this.dbConfig = config.database as DatabaseConfig;
+    this.dbConfig = {
+      type: 'postgresql',
+      url: config.database.url,
+    };
     this.initializeDatabase();
   }
 
   private initializeDatabase(): void {
-    this.initializePostgreSQL();
-  }
-
-  private initializePostgreSQL(): void {
     this.pgPool = new Pool({
       connectionString: this.dbConfig.url,
-      ssl: this.dbConfig.ssl,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
@@ -50,7 +88,7 @@ class DatabaseService {
   }
 
   async connect(): Promise<void> {
-    try {
+    return withRetry(async () => {
       // Ensure pool is initialized
       if (!this.pgPool) {
         this.initializeDatabase();
@@ -62,12 +100,7 @@ class DatabaseService {
       
       this.isConnected = true;
       console.log('Database: Connected to PostgreSQL');
-    } catch (err) {
-      this.isConnected = false;
-      logError(err as Error, { component: 'database', action: 'connect' });
-      // Use database guardian for centralized exit logic
-      await DatabaseGuardian.handleDatabaseError(err as Error, 'database-connect');
-    }
+    }, 3, 2000, 'database-connect');
   }
 
   async disconnect(): Promise<void> {
@@ -85,26 +118,14 @@ class DatabaseService {
   async query<T = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
     const start = Date.now();
 
-    try {
+    return withRetry(async () => {
       const result = await this.executePostgreSQLQuery<T>(text, params);
 
       const duration = Date.now() - start;
       logQuery(text, duration, result.rowCount);
       
       return result;
-    } catch (err) {
-      const duration = Date.now() - start;
-      logError(err as Error, { 
-        component: 'database', 
-        action: 'query', 
-        query: text,
-        duration, 
-      });
-      // Use database guardian for centralized exit logic
-      await DatabaseGuardian.handleDatabaseError(err as Error, 'database-query');
-      // This line should never be reached due to handleDatabaseError's never return type
-      throw err;
-    }
+    }, 2, 1000, 'database-query');
   }
 
   private async executePostgreSQLQuery<T>(text: string, params?: any[]): Promise<QueryResult<T>> {
@@ -112,21 +133,17 @@ class DatabaseService {
       throw new Error('PostgreSQL pool not initialized');
     }
 
-    const client = await this.pgPool.connect();
-    
-    try {
-      const result = await client.query(text, params);
-      return {
-        rows: result.rows as T[],
-        rowCount: result.rowCount || 0,
-      };
-    } finally {
-      client.release();
-    }
+    const result = await this.pgPool.query(text, params);
+    return {
+      rows: result.rows,
+      rowCount: result.rowCount || 0,
+    };
   }
 
   async transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
-    return this.postgresTransaction(callback);
+    return withRetry(async () => {
+      return this.postgresTransaction(callback);
+    }, 2, 1000, 'database-transaction');
   }
 
   private async postgresTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -146,28 +163,29 @@ class DatabaseService {
     } catch (err) {
       await client.query('ROLLBACK');
       logError(err as Error, { component: 'database', action: 'transaction' });
-      // Use database guardian for centralized exit logic
-      await DatabaseGuardian.handleDatabaseError(err as Error, 'database-transaction');
-      // This line should never be reached due to handleDatabaseError's never return type
       throw err;
     } finally {
       client.release();
     }
   }
 
-  async getHealth(): Promise<{ connected: boolean; latency?: number; type: string }> {
-    if (!this.isConnected) {
-      return { connected: false, type: this.dbConfig.type };
-    }
-
+  // Simple health check method
+  async checkHealth(): Promise<boolean> {
     try {
-      const start = Date.now();
-      await this.query('SELECT 1 as test');
-      const latency = Date.now() - start;
-      return { connected: true, latency, type: this.dbConfig.type };
-    } catch {
-      return { connected: false, type: this.dbConfig.type };
+      await this.query('SELECT 1 as health_check');
+      return true;
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'database', 
+        action: 'health-check',
+        message: 'Database health check failed',
+      });
+      return false;
     }
+  }
+
+  get connected(): boolean {
+    return this.isConnected;
   }
 
   // Helper methods for common operations

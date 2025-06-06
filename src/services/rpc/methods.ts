@@ -33,7 +33,6 @@ import {
   DataSubmission,
   DataSubmissionQuery,
 } from '../../types';
-import { DatabaseGuardian } from '../database-guardian';
 
 export class RPCMethodsService {
   private connectionManager: RPCConnectionManager;

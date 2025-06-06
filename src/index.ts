@@ -10,7 +10,6 @@ import { logger } from './utils/logger';
 import { cache } from './utils/cache';
 import { db, createTables } from './utils/database';
 import blockchainService from './services/blockchain';
-import { DatabaseGuardian } from './services/database-guardian';
 
 // Middleware imports
 import {
@@ -219,11 +218,6 @@ class AvailExplorerServer {
 
   private async connectServices(): Promise<void> {
     try {
-      // Check database health before starting any services
-      const isDatabaseHealthy = await DatabaseGuardian.checkDatabaseHealth();
-      if (!isDatabaseHealthy) {
-        throw new Error('Database is not available at startup');
-      }
 
       const services = [];
 
@@ -271,9 +265,7 @@ class AvailExplorerServer {
       logger.info('Services: All services connected successfully');
     } catch (error) {
       logger.error('Failed to connect services', { error: (error as Error).message });
-      
-      // Use Database Guardian for centralized database failure handling
-      await DatabaseGuardian.handleDatabaseError(error as Error, 'server-startup');
+      throw error;
     }
   }
 
@@ -323,10 +315,10 @@ class AvailExplorerServer {
           await this.disconnectServices();
 
           logger.info('Server: Graceful shutdown completed');
-          process.exit(0);
+          throw new Error('Graceful shutdown completed');
         } catch (error) {
           logger.error('Server: Error during graceful shutdown', { error });
-          process.exit(1);
+          throw error;
         }
       });
     });
@@ -334,13 +326,13 @@ class AvailExplorerServer {
     // Handle uncaught exceptions
     process.on('uncaughtException', (error) => {
       logger.error('Server: Uncaught exception', { error });
-      process.exit(1);
+      throw error;
     });
 
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (reason, promise) => {
       logger.error('Server: Unhandled promise rejection', { reason, promise });
-      process.exit(1);
+      throw new Error(`Unhandled promise rejection: ${reason}`);
     });
   }
 
@@ -378,7 +370,7 @@ class AvailExplorerServer {
 
     } catch (error) {
       logger.error('Server: Failed to start', { error });
-      process.exit(1);
+      throw error;
     }
   }
 
