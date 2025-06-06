@@ -6,7 +6,7 @@ dotenv.config();
 
 // Configuration schema validation
 const configSchema = Joi.object({
-  // Server
+  // Server Configuration
   PORT: Joi.number().default(3001),
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   CORS_ORIGIN: Joi.string().default('http://localhost:3000'),
@@ -15,47 +15,43 @@ const configSchema = Joi.object({
   DATABASE_URL: Joi.string().required(),
   DATABASE_TYPE: Joi.string().valid('postgresql').default('postgresql'),
   
+  // Redis Configuration
   REDIS_URL: Joi.string().default('redis://localhost:6379'),
+  REDIS_QUEUE_DB: Joi.number().default(1),
 
-  // Blockchain Data Sources
+  // Avail Blockchain Configuration
   AVAIL_RPC_ENDPOINT: Joi.string().default('wss://mainnet-rpc.avail.so/ws'),
-  
-  // NEW: Additional Avail API Endpoints
-  AVAIL_LIGHT_CLIENT_HTTP: Joi.string(),
-  AVAIL_LIGHT_CLIENT_WS: Joi.string(),
-  AVAIL_BRIDGE_API: Joi.string(),
-  AVAIL_NEXUS_API: Joi.string(),
-  AVAIL_TURBO_DA_API: Joi.string(),
+  AVAIL_ENABLE_DIRECT_WS: Joi.boolean().default(true),
+  AVAIL_DIRECT_WS_ENDPOINT: Joi.string().default('wss://mainnet-rpc.avail.so/ws'),
+  AVAIL_LIGHT_CLIENT_HTTP: Joi.string().default('https://mainnet-rpc.avail.so'),
+  AVAIL_LIGHT_CLIENT_WS: Joi.string().default('wss://mainnet-rpc.avail.so/ws'),
+  AVAIL_BRIDGE_API: Joi.string().default('https://bridge-api.avail.so'),
+  AVAIL_NEXUS_API: Joi.string().default('https://api.nexus.avail.so'),
+  AVAIL_TURBO_DA_API: Joi.string().default('https://api.turbo.avail.so'),
+  AVAIL_SUPPRESS_WARNINGS: Joi.boolean().default(true),
+  AVAIL_POLKADOT_API_LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('warn'),
 
   // Feature Flags
   ENABLE_WEBSOCKETS: Joi.boolean().default(true),
   ENABLE_CACHING: Joi.boolean().default(true),
   ENABLE_RATE_LIMITING: Joi.boolean().default(true),
   ENABLE_ANALYTICS: Joi.boolean().default(true),
+  ENABLE_METRICS: Joi.boolean().default(true),
 
-  // Security
+  // Security Configuration
   JWT_SECRET: Joi.string().min(32),
   API_RATE_LIMIT: Joi.number().default(100),
 
-  // Logging
+  // Logging Configuration
   LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('info'),
   LOG_MAX_FILES: Joi.string().default('14'),
   LOG_MAX_SIZE: Joi.string().default('20m'),
 
-  // Avail-specific Configuration
-  SUPPRESS_AVAIL_WARNINGS: Joi.boolean().default(true),
-  POLKADOT_API_LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('warn'),
-
-  // Bull Queue
-  REDIS_QUEUE_DB: Joi.number().default(1),
-
-  // Monitoring
-  ENABLE_METRICS: Joi.boolean().default(true),
+  // Monitoring Configuration
   METRICS_PORT: Joi.number().default(9464),
 
-  // NEW: Direct WebSocket connection to Avail mainnet (Primary)
-  ENABLE_DIRECT_WS: Joi.string(),
-  DIRECT_WS_ENDPOINT: Joi.string(),
+  // External API Configuration
+  ETHEREUM_RPC_URL: Joi.string().default('https://eth.llamarpc.com'),
 });
 
 const { error, value: env } = configSchema.validate(process.env, {
@@ -95,17 +91,12 @@ export const config = {
     queueDb: env.REDIS_QUEUE_DB,
   },
 
-  // Blockchain Data Sources
-  dataSources: {
+  // Avail Blockchain Data Sources
+  avail: {
+    // RPC Configuration
     rpc: {
       endpoints: [
-        // Official Avail endpoints - UPDATED to use correct endpoints
         'wss://mainnet-rpc.avail.so/ws',
-        // 'https://mainnet-rpc.avail.so/rpc',
-        // Third-party provider endpoints for redundancy
-        // 'https://rpc.ankr.com/avail',
-        // 'https://avail-mainnet.public.blastapi.io/',
-        // 'wss://avail-mainnet.public.blastapi.io/',
       ],
       retryAttempts: 3,
       retryDelay: 1000,
@@ -120,10 +111,10 @@ export const config = {
       connectionPoolSize: 5,
     },
     
-    // NEW: Direct WebSocket connection to Avail mainnet (Primary)
+    // Direct WebSocket Connection (Primary)
     directWS: {
-      enabled: env.ENABLE_DIRECT_WS !== 'false', // Default enabled
-      endpoint: env.DIRECT_WS_ENDPOINT || 'wss://mainnet-rpc.avail.so/ws',
+      enabled: env.AVAIL_ENABLE_DIRECT_WS,
+      endpoint: env.AVAIL_DIRECT_WS_ENDPOINT,
       reconnectAttempts: 10,
       reconnectDelay: 5000,
       requestTimeout: 30000,
@@ -131,17 +122,18 @@ export const config = {
       priority: 1, // Highest priority
     },
     
-    // NEW: Additional Avail APIs
+    // Light Client Configuration
     lightClient: {
-      httpEndpoint: 'https://mainnet-rpc.avail.so',
-      wsEndpoint: 'wss://mainnet-rpc.avail.so/ws',
+      httpEndpoint: env.AVAIL_LIGHT_CLIENT_HTTP,
+      wsEndpoint: env.AVAIL_LIGHT_CLIENT_WS,
       appId: 0,
       timeout: 30000,
     },
     
+    // Bridge Configuration
     bridge: {
-      apiEndpoint: 'https://bridge-api.avail.so',
-      ethereumRpcUrl: process.env.ETHEREUM_RPC_URL || 'https://eth.llamarpc.com',
+      apiEndpoint: env.AVAIL_BRIDGE_API,
+      ethereumRpcUrl: env.ETHEREUM_RPC_URL,
       contracts: {
         mainnet: {
           vectorX: '0x02993cdC11213985b9B13224f3aF289F03bf298d',
@@ -155,15 +147,24 @@ export const config = {
       timeout: 30000,
     },
     
+    // Nexus Configuration
     nexus: {
-      apiEndpoint: process.env.AVAIL_NEXUS_API_URL || 'https://api.nexus.avail.so',
+      apiEndpoint: env.AVAIL_NEXUS_API,
       timeout: 30000,
     },
     
+    // Turbo DA Configuration
     turboDA: {
-      apiEndpoint: process.env.TURBO_DA_API_URL || 'https://api.turbo.avail.so',
+      apiEndpoint: env.AVAIL_TURBO_DA_API,
       timeout: 30000,
     },
+
+    // Avail-specific Settings
+    suppressWarnings: env.AVAIL_SUPPRESS_WARNINGS,
+    polkadotApiLogLevel: env.AVAIL_POLKADOT_API_LOG_LEVEL,
+    compatibilityMode: true,
+    knownExtensions: ['CheckAppId'],
+    knownRuntimeApis: ['KateApi'],
   },
 
   // Feature Flags
@@ -181,7 +182,7 @@ export const config = {
     apiRateLimit: env.API_RATE_LIMIT,
   },
 
-  // Cache TTL Configuration (in seconds)
+  // Caching Configuration
   cache: {
     ttl: {
       blocks: 5, // Latest blocks - 5 seconds
@@ -199,15 +200,6 @@ export const config = {
     level: env.LOG_LEVEL,
     maxFiles: env.LOG_MAX_FILES,
     maxSize: env.LOG_MAX_SIZE,
-  },
-
-  // Avail-specific Configuration
-  avail: {
-    suppressWarnings: env.SUPPRESS_AVAIL_WARNINGS,
-    polkadotApiLogLevel: env.POLKADOT_API_LOG_LEVEL,
-    compatibilityMode: true,
-    knownExtensions: ['CheckAppId'],
-    knownRuntimeApis: ['KateApi'],
   },
 
   // Monitoring Configuration
@@ -240,18 +232,6 @@ export const config = {
         delay: 5000,
       },
     },
-  },
-
-  // Job Schedules (cron patterns)
-  jobs: {
-    syncLatestBlocks: '*/6 * * * * *', // Every 6 seconds
-    syncChainStats: '*/30 * * * * *', // Every 30 seconds
-    syncValidators: '*/5 * * * *', // Every 5 minutes
-    syncTokenPrice: '0 * * * * *', // Every minute
-    cleanupOldCache: '0 0 * * * *', // Every hour
-    cleanupOldLogs: '0 0 0 * * *', // Every day
-    calculateDailyStats: '0 0 0 * * *', // Every day at midnight
-    updateSearchIndex: '*/10 * * * *', // Every 10 minutes
   },
 
   // API Configuration
