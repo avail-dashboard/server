@@ -1,5 +1,111 @@
 # Avail Explorer Backend - Complete API Documentation
 
+## 🚦 Current API Status (Updated: January 2025)
+
+### ✅ **Fully Working Endpoints**
+These endpoints are fully operational and return real data from Avail RPC:
+
+| Endpoint | Status | Notes |
+|----------|--------|-------|
+| `GET /health` | ✅ Working | Server health check |
+| `GET /metrics` | ✅ Working | Prometheus metrics |
+| `GET /api/health` | ✅ Working | API health with RPC connectivity |
+| `GET /api/blocks` | ✅ Working | Latest blocks with pagination |
+| `GET /api/blocks/{number\|hash}` | ✅ Working | Specific block retrieval |
+| `GET /api/extrinsics` | ✅ Working | Latest extrinsics with robust error handling |
+| `GET /api/extrinsics/{hash}` | ✅ Working | Specific extrinsic by hash |
+| `GET /api/accounts/{address}` | ✅ Working | Account details and balances |
+| `GET /api/search` | ✅ Working | Universal search (blocks, extrinsics, addresses) |
+
+### ⚠️ **Partially Working Endpoints**
+These endpoints work but may have intermittent issues due to Avail runtime compatibility:
+
+| Endpoint | Status | Issues |
+|----------|--------|--------|
+| `GET /api/chain/stats` | ⚠️ Partial | May fail on blocks with unknown call indices |
+| `GET /api/validators` | ⚠️ Partial | Basic list works, detailed info may fail |
+| `GET /api/validators/{address}` | ⚠️ Partial | Individual validator details may be incomplete |
+| `GET /api/validators/staking/overview` | ⚠️ Partial | Staking stats may be incomplete |
+| `GET /api/data-submissions` | ⚠️ Partial | Works but may miss some submissions due to parsing issues |
+| `GET /api/data-submissions/stats` | ⚠️ Partial | Basic stats work, some calculations may be incomplete |
+
+### 🔄 **Mock Data Endpoints**
+These endpoints are implemented but return placeholder/mock data while database integration is being completed:
+
+| Endpoint | Status | Notes |
+|----------|--------|-------|
+| `GET /api/analytics/network` | 🔄 Mock Data | Returns current stats + placeholder historical data |
+| `GET /api/analytics/gas` | 🔄 Mock Data | Gas tracking implementation in progress |
+| `GET /api/analytics/rollups` | 🔄 Mock Data | Rollup analytics pending full implementation |
+| `GET /api/analytics/rollups/{appId}` | 🔄 Mock Data | Individual rollup analytics placeholder |
+| `GET /api/analytics/dataThroughput` | 🔄 Mock Data | Data throughput calculations pending |
+| `GET /api/analytics/validators` | 🔄 Mock Data | Validator analytics placeholder |
+| `GET /api/rollups/leaderboard` | 🔄 Mock Data | Rollup ranking system pending |
+| `GET /api/rollups` | 🔄 Mock Data | Rollup list with sample data |
+| `GET /api/rollups/{appId}` | 🔄 Mock Data | Individual rollup details placeholder |
+| `GET /api/rollups/{appId}/submissions` | 🔄 Mock Data | Rollup submissions filtering pending |
+| `GET /api/rollups/{appId}/blobs` | 🔄 Mock Data | Blob data extraction pending |
+| `GET /api/rollups/{appId}/analytics` | 🔄 Mock Data | Rollup-specific analytics pending |
+| `GET /api/validators/nomination-pools` | 🔄 Mock Data | Nomination pools may not be available on all networks |
+
+### 🔧 **Known Issues & Solutions**
+
+#### **Runtime Compatibility Issues**
+- **Problem**: Avail blockchain runtime upgrades introduced new call indices that Polkadot.js can't decode
+- **Error Examples**: `Unable to find Call with index [104, 29]`, `[100, 29]`, `[76, 29]`, etc.
+- **Current Solution**: Robust error handling that skips problematic extrinsics instead of failing completely
+- **Impact**: Some extrinsics may be missing from results, but endpoints remain functional
+
+#### **Database Integration Status**
+- **RPC-First Approach**: All working endpoints fetch data directly from Avail RPC nodes
+- **Caching**: Redis-based caching with appropriate TTL values
+- **Database**: PostgreSQL integration pending for historical analytics and rollup tracking
+
+#### **Performance Optimizations**
+- **Connection Pooling**: Multiple RPC endpoints with health checking
+- **Error Handling**: Graceful degradation and circuit breaker patterns
+- **Pagination**: Implemented across all list endpoints
+- **Rate Limiting**: Configurable rate limiting to prevent abuse
+
+### 📊 **Testing Status**
+
+#### **Recommended Test Endpoints**
+```bash
+# ✅ Guaranteed to work
+curl "http://localhost:3001/api/health"
+curl "http://localhost:3001/api/blocks?page=1&limit=5"
+curl "http://localhost:3001/api/extrinsics?page=1&limit=5"
+
+# ⚠️ May have issues but generally work
+curl "http://localhost:3001/api/chain/stats"
+curl "http://localhost:3001/api/validators?limit=10"
+
+# 🔄 Returns mock data
+curl "http://localhost:3001/api/analytics/network"
+curl "http://localhost:3001/api/rollups"
+```
+
+#### **Pagination Guidelines**
+- **Working endpoints**: Use `page=1` for best results
+- **Default limits**: blocks (10), extrinsics (20), validators (50)
+- **Maximum limits**: Most endpoints cap at 100 items per page
+- **Empty results**: Check `meta.total` to understand if pagination is the issue
+
+### 🚀 **Deployment Recommendations**
+
+#### **Production Readiness**
+- ✅ **Core block/extrinsic APIs**: Ready for production
+- ⚠️ **Chain stats & validators**: Usable with monitoring
+- 🔄 **Analytics & rollups**: Development/demo use only
+
+#### **Monitoring Required**
+- Monitor RPC connection health
+- Watch for unknown call index errors
+- Track cache hit rates
+- Monitor endpoint response times
+
+---
+
 ## Base URL
 ```
 http://localhost:3001

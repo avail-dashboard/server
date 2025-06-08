@@ -1,8 +1,8 @@
 {
   "info": {
     "name": "Avail Explorer Backend API",
-    "description": "Complete API collection for Avail Explorer Backend with all endpoints, examples, and documentation",
-    "version": "1.0.0",
+    "description": "Complete API collection for Avail Explorer Backend with current status indicators\n\n🚦 STATUS LEGEND:\n✅ = Fully Working (Real Data)\n⚠️ = Partially Working (May have issues)\n🔄 = Mock Data (Placeholder responses)\n\n⚠️ KNOWN ISSUES:\n- Some endpoints may fail due to Avail runtime upgrade compatibility\n- Unknown call indices [104,29], [100,29], etc. cause some extrinsics to be skipped\n- Analytics and rollup endpoints return mock data while database integration is pending\n\n📋 TESTING RECOMMENDATIONS:\n- Use page=1 for extrinsics API for best results\n- Monitor response times and error rates\n- Check meta.total for pagination understanding",
+    "version": "2.0.0",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -19,10 +19,10 @@
   ],
   "item": [
     {
-      "name": "Health & Monitoring",
+      "name": "Health & Monitoring ✅",
       "item": [
         {
-          "name": "Health Check",
+          "name": "✅ Health Check",
           "request": {
             "method": "GET",
             "header": [],
@@ -31,12 +31,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["health"]
             },
-            "description": "Check server health status"
+            "description": "✅ WORKING - Check server health status. Returns uptime and basic server info."
           },
           "response": []
         },
         {
-          "name": "Metrics",
+          "name": "✅ Metrics",
           "request": {
             "method": "GET",
             "header": [],
@@ -45,12 +45,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["metrics"]
             },
-            "description": "Get Prometheus metrics"
+            "description": "✅ WORKING - Get Prometheus metrics for monitoring server performance."
           },
           "response": []
         },
         {
-          "name": "API Health Check",
+          "name": "✅ API Health Check",
           "request": {
             "method": "GET",
             "header": [],
@@ -59,17 +59,17 @@
               "host": ["{{baseUrl}}"],
               "path": ["{{apiPrefix}}", "health"]
             },
-            "description": "Health check under API versioning"
+            "description": "✅ WORKING - Health check under API versioning with RPC connectivity test."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Blocks",
+      "name": "Blocks ✅",
       "item": [
         {
-          "name": "Get Latest Blocks",
+          "name": "✅ Get Latest Blocks",
           "request": {
             "method": "GET",
             "header": [],
@@ -90,12 +90,12 @@
                 }
               ]
             },
-            "description": "Retrieve the latest blocks with pagination"
+            "description": "✅ WORKING - Retrieve the latest blocks with pagination. Real-time data from Avail RPC."
           },
           "response": []
         },
         {
-          "name": "Get Latest Blocks (Default)",
+          "name": "✅ Get Latest Blocks (Default)",
           "request": {
             "method": "GET",
             "header": [],
@@ -104,12 +104,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["{{apiPrefix}}", "blocks"]
             },
-            "description": "Get latest blocks with default pagination"
+            "description": "✅ WORKING - Get latest blocks with default pagination (10 blocks)."
           },
           "response": []
         },
         {
-          "name": "Get Block by Number",
+          "name": "✅ Get Block by Number",
           "request": {
             "method": "GET",
             "header": [],
@@ -118,12 +118,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["{{apiPrefix}}", "blocks", "1000000"]
             },
-            "description": "Retrieve a specific block by block number"
+            "description": "✅ WORKING - Retrieve a specific block by block number. Use recent block numbers for best results."
           },
           "response": []
         },
         {
-          "name": "Get Block by Hash",
+          "name": "✅ Get Block by Hash",
           "request": {
             "method": "GET",
             "header": [],
@@ -132,17 +132,17 @@
               "host": ["{{baseUrl}}"],
               "path": ["{{apiPrefix}}", "blocks", "0x1234567890abcdef"]
             },
-            "description": "Retrieve a specific block by block hash"
+            "description": "✅ WORKING - Retrieve a specific block by block hash. Use valid block hashes from the chain."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Extrinsics",
+      "name": "Extrinsics ✅",
       "item": [
         {
-          "name": "Get Latest Extrinsics",
+          "name": "✅ Get Latest Extrinsics",
           "request": {
             "method": "GET",
             "header": [],
@@ -154,7 +154,7 @@
                 {
                   "key": "page",
                   "value": "1",
-                  "description": "Page number (default: 1)"
+                  "description": "Page number (default: 1) - Use page=1 for best results"
                 },
                 {
                   "key": "limit",
@@ -163,12 +163,12 @@
                 }
               ]
             },
-            "description": "Retrieve extrinsics with pagination"
+            "description": "✅ WORKING - Retrieve extrinsics with robust error handling. Some extrinsics with unknown call indices may be skipped but endpoint remains functional."
           },
           "response": []
         },
         {
-          "name": "Get Extrinsics by Block",
+          "name": "✅ Get Extrinsics by Block",
           "request": {
             "method": "GET",
             "header": [],
@@ -184,12 +184,12 @@
                 }
               ]
             },
-            "description": "Get extrinsics for a specific block"
+            "description": "✅ WORKING - Get extrinsics for a specific block. May skip some extrinsics with parsing issues."
           },
           "response": []
         },
         {
-          "name": "Get Extrinsic by Hash",
+          "name": "✅ Get Extrinsic by Hash",
           "request": {
             "method": "GET",
             "header": [],
@@ -198,17 +198,17 @@
               "host": ["{{baseUrl}}"],
               "path": ["{{apiPrefix}}", "extrinsics", "0x1234567890abcdef"]
             },
-            "description": "Retrieve a specific extrinsic by its hash"
+            "description": "✅ WORKING - Retrieve a specific extrinsic by its hash. Searches through recent blocks."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Chain",
+      "name": "Chain ⚠️",
       "item": [
         {
-          "name": "Get Chain Statistics",
+          "name": "⚠️ Get Chain Statistics",
           "request": {
             "method": "GET",
             "header": [],
@@ -217,17 +217,17 @@
               "host": ["{{baseUrl}}"],
               "path": ["{{apiPrefix}}", "chain", "stats"]
             },
-            "description": "Retrieve comprehensive chain statistics"
+            "description": "⚠️ PARTIAL - Retrieve comprehensive chain statistics. May fail intermittently due to blocks with unknown call indices. Generally works but monitor for errors."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Search",
+      "name": "Search ✅",
       "item": [
         {
-          "name": "Search by Block Number",
+          "name": "✅ Search by Block Number",
           "request": {
             "method": "GET",
             "header": [],
@@ -243,12 +243,12 @@
                 }
               ]
             },
-            "description": "Search for blocks, extrinsics, or accounts by block number"
+            "description": "✅ WORKING - Search for blocks, extrinsics, or accounts by block number. Universal search functionality."
           },
           "response": []
         },
         {
-          "name": "Search by Hash",
+          "name": "✅ Search by Hash",
           "request": {
             "method": "GET",
             "header": [],
@@ -264,12 +264,12 @@
                 }
               ]
             },
-            "description": "Search by block or extrinsic hash"
+            "description": "✅ WORKING - Search by block or extrinsic hash. Intelligent hash detection and routing."
           },
           "response": []
         },
         {
-          "name": "Search by Account Address",
+          "name": "✅ Search by Account Address",
           "request": {
             "method": "GET",
             "header": [],
@@ -285,17 +285,17 @@
                 }
               ]
             },
-            "description": "Search by account address"
+            "description": "✅ WORKING - Search by account address. Supports SS58 address format."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Accounts",
+      "name": "Accounts ✅",
       "item": [
         {
-          "name": "Get Account Details",
+          "name": "✅ Get Account Details",
           "request": {
             "method": "GET",
             "header": [],
@@ -304,17 +304,17 @@
               "host": ["{{baseUrl}}"],
               "path": ["{{apiPrefix}}", "accounts", "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"]
             },
-            "description": "Retrieve account details by address"
+            "description": "✅ WORKING - Retrieve account details by address including balance and nonce. Real-time data from chain state."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Data Submissions",
+      "name": "Data Submissions ⚠️",
       "item": [
         {
-          "name": "Get All Data Submissions",
+          "name": "⚠️ Get All Data Submissions",
           "request": {
             "method": "GET",
             "header": [],
@@ -335,7 +335,7 @@
                 }
               ]
             },
-            "description": "Retrieve all data submissions with pagination"
+            "description": "⚠️ PARTIAL - Retrieve all data submissions with pagination. May miss some submissions due to parsing issues with unknown call indices."
           },
           "response": []
         },
@@ -424,7 +424,7 @@
       ]
     },
     {
-      "name": "Validators",
+      "name": "Validators ⚠️",
       "item": [
         {
           "name": "Get Validators List",
@@ -497,10 +497,10 @@
       ]
     },
     {
-      "name": "Analytics",
+      "name": "Analytics 🔄",
       "item": [
         {
-          "name": "Get Network Analytics (24h)",
+          "name": "🔄 Get Network Analytics (24h)",
           "request": {
             "method": "GET",
             "header": [],
@@ -516,7 +516,7 @@
                 }
               ]
             },
-            "description": "Get comprehensive network analytics for 24 hours"
+            "description": "🔄 MOCK DATA - Get comprehensive network analytics for 24 hours. Returns current stats + placeholder historical data."
           },
           "response": []
         },
@@ -652,10 +652,10 @@
       ]
     },
     {
-      "name": "Rollups",
+      "name": "Rollups 🔄",
       "item": [
         {
-          "name": "Get Rollup Leaderboard (Data Size)",
+          "name": "🔄 Get Rollup Leaderboard (Data Size)",
           "request": {
             "method": "GET",
             "header": [],
@@ -676,7 +676,7 @@
                 }
               ]
             },
-            "description": "Get rollup leaderboard by data size"
+            "description": "🔄 MOCK DATA - Get rollup leaderboard by data size. Returns sample ranking data while database integration is pending."
           },
           "response": []
         },
