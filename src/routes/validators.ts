@@ -3,7 +3,6 @@ import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import blockchainService from '../services/blockchain';
 import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
@@ -13,40 +12,7 @@ router.get('/',
   cacheMiddleware(config.cache.ttl.validators),
   async (req: Request, res: Response) => {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 50;
-
-      // Get validators from blockchain service
-      const validators = await blockchainService.getValidators();
-
-      // Apply pagination
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedValidators = validators.slice(startIndex, endIndex);
-
-      // Transform validators data using keysToCamelCase utility
-      const transformedValidators = paginatedValidators.map(validator => keysToCamelCase(validator));
-
-      const validatorsData = {
-        validators: transformedValidators,
-        total_count: validators.length,
-        active_count: validators.filter(v => v.active).length,
-        waiting_count: validators.filter(v => !v.active).length,
-        slashed_count: 0, // TODO: Implement slashing detection
-      };
-
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(validatorsData),
-        meta: {
-          page,
-          limit,
-          total: validators.length,
-          source: 'rpc',
-        },
-      };
-
-      res.json(response);
+      throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'validators-route', action: 'list' });
       res.status(500).json({
@@ -79,40 +45,7 @@ router.get('/:address',
       }
 
       // Get all validators and find the specific one
-      const validators = await blockchainService.getValidators();
-      const validator = validators.find(v => v.address === address);
-
-      if (!validator) {
-        return res.status(404).json({
-          success: false,
-          error: {
-            code: 'VALIDATOR_NOT_FOUND',
-            message: `Validator with address ${address} not found`,
-          },
-        });
-      }
-
-      const validatorData = {
-        ...validator,
-        nominations: [], // TODO: Implement nominations fetching
-        recent_blocks: [], // TODO: Implement recent blocks fetching
-        slashing_history: [], // TODO: Implement slashing history
-        performance_metrics: {
-          blocks_authored: 0, // TODO: Calculate from blockchain data
-          uptime_percentage: 0, // TODO: Calculate uptime
-          average_block_time: 0, // TODO: Calculate average block time
-        },
-      };
-
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(validatorData),
-        meta: {
-          source: 'rpc',
-        },
-      };
-
-      res.json(response);
+      throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'validators-route', action: 'getDetails', address: req.params.address });
       res.status(500).json({
@@ -131,46 +64,7 @@ router.get('/staking/overview',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const [chainStats, validators] = await Promise.all([
-        blockchainService.getChainStats(),
-        blockchainService.getValidators(),
-      ]);
-
-      const activeValidators = validators.filter(v => v.active);
-      
-      // Calculate total staked from validators' totalStake (bigint)
-      const totalStaked = activeValidators.reduce((sum, v) => {
-        const stakeAmount = v.totalStake || BigInt(0);
-        return sum + stakeAmount;
-      }, BigInt(0));
-      
-      // Calculate average commission from validators' commission (string percentage)
-      const averageCommission = activeValidators.length > 0 
-        ? activeValidators.reduce((sum, v) => {
-          const commission = parseFloat(v.commission || '0');
-          return sum + (isNaN(commission) ? 0 : commission);
-        }, 0) / activeValidators.length
-        : 0;
-
-      const stakingOverview = {
-        total_staked: totalStaked.toString(),
-        active_validators: activeValidators.length,
-        total_nominators: chainStats.nominators,
-        current_era: 0, // TODO: Get current era from RPC
-        inflation_rate: chainStats.inflation,
-        average_commission: averageCommission,
-        nomination_pools: [], // TODO: Implement nomination pools
-      };
-
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(stakingOverview),
-        meta: {
-          source: 'rpc',
-        },
-      };
-
-      res.json(response);
+      throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'validators-route', action: 'getStakingOverview' });
       res.status(500).json({

@@ -3,7 +3,6 @@ import { APIResponse, DataSubmissionQuery } from '../types';
 import { logError } from '../utils/logger';
 import { pagination, cacheMiddleware } from '../middleware';
 import config from '../config';
-import blockchainService from '../services/blockchain';
 import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
@@ -30,27 +29,7 @@ router.get(
         order: order as 'asc' | 'desc',
       };
 
-      const result = await blockchainService.getDataSubmissions(query);
-      
-      // Convert BigInts to strings for JSON serialization
-      const serializedSubmissions = result.submissions.map(submission => ({
-        ...submission,
-        blockNumber: submission.blockNumber.toString(),
-        timestamp: submission.timestamp.toString(),
-      }));
-
-      const response: APIResponse<typeof serializedSubmissions> = {
-        success: true,
-        data: serializedSubmissions,
-        meta: {
-          page: query.page,
-          limit: query.limit,
-          total: result.total,
-          source: 'rpc' as const,
-        },
-      };
-
-      res.json(keysToCamelCase(response));
+      throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'data-submissions-route', action: 'getSubmissions' });
       
@@ -75,17 +54,7 @@ router.get(
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const stats = await blockchainService.getDataSubmissionStats();
-
-      const response: APIResponse<typeof stats> = {
-        success: true,
-        data: stats,
-        meta: {
-          source: 'rpc' as const,
-        },
-      };
-
-      res.json(keysToCamelCase(response));
+      throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'data-submissions-route', action: 'getStats' });
       

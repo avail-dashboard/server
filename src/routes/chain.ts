@@ -3,7 +3,6 @@ import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import blockchainService from '../services/blockchain';
 import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
@@ -14,80 +13,7 @@ router.get('/stats',
   async (req: Request, res: Response) => {
     try {
       // Fetch real chain data from RPC
-      const chainStats = await blockchainService.getChainStats();
-      
-      // Use estimates instead of fetching problematic extrinsics
-      // This avoids the issue with unknown call indices that prevent extrinsic decoding
-      const estimatedSignedExtrinsics = Math.floor(chainStats.activeValidators * 2); // Estimate based on validator activity
-      
-      // Calculate staking amounts - ensure all BigInt operations are safe
-      const totalIssuance = typeof chainStats.totalIssuance === 'bigint' 
-        ? chainStats.totalIssuance 
-        : BigInt(String(chainStats.totalIssuance || '1000000000000000000000')); // 1M AVAIL default
-      
-      // Safely convert staking ratio to integer percentage
-      const stakingRatio = typeof chainStats.stakingRatio === 'number' ? chainStats.stakingRatio : 0.5;
-      const stakingRatioPercent = Math.max(0, Math.min(100, Math.floor(stakingRatio * 100)));
-      
-      // Ensure we have valid BigInt values
-      const stakedAmount = (totalIssuance * BigInt(stakingRatioPercent)) / BigInt(100);
-      const bondedAmount = stakedAmount; // In Substrate, staked = bonded
-      
-      // Estimate circulating supply (total - treasury - locked)
-      const treasuryAmount = totalIssuance / BigInt(20); // Estimate 5% in treasury
-      const circulatingAmount = totalIssuance - treasuryAmount - stakedAmount;
-      
-      // Transform RPC data using the keysToCamelCase utility
-      const chainData = {
-        finalized_blocks: Number(chainStats.blockHeight),
-        signed_extrinsics: estimatedSignedExtrinsics,
-        staked_amount: stakedAmount.toString(),
-        bonded_amount: bondedAmount.toString(),
-        holders: chainStats.nominators + chainStats.activeValidators, // Estimate
-        total_accounts: chainStats.nominators + chainStats.activeValidators, // Estimate
-        transfers: Math.floor(estimatedSignedExtrinsics * 0.7), // Estimate 70% are transfers
-        inflation_rate: chainStats.inflation,
-        token_price: 0, // TODO: Fetch from external API
-        price_change: 0, // TODO: Calculate from price history
-        total_issuance: totalIssuance.toString(),
-        circulating: { 
-          amount: circulatingAmount.toString(), 
-          percentage: totalIssuance > BigInt(0) ? Number(circulatingAmount * BigInt(100) / totalIssuance) : 0,
-        },
-        staking: { 
-          amount: stakedAmount.toString(), 
-          percentage: stakingRatioPercent,
-        },
-        treasury: { 
-          amount: treasuryAmount.toString(), 
-          percentage: totalIssuance > BigInt(0) ? Number(treasuryAmount * BigInt(100) / totalIssuance) : 0,
-        },
-        others: { 
-          amount: '0', 
-          percentage: 0,
-        },
-        
-        // Additional fields for compatibility
-        market_cap: 0, // TODO: Calculate from price and supply
-        total_supply: Number(totalIssuance),
-        circulating_supply: Number(circulatingAmount),
-        staking_ratio: chainStats.stakingRatio,
-        inflation: chainStats.inflation,
-        active_validators: chainStats.activeValidators,
-        block_time: chainStats.blockTime,
-        last_block_timestamp: Number(chainStats.lastUpdateTime),
-      };
-
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(chainData),
-        meta: {
-          source: 'rpc',
-          note: 'Extrinsic counts are estimated due to runtime compatibility issues',
-        },
-      };
-
-      res.json(response);
+      throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'chain-route', action: 'getStats' });
       

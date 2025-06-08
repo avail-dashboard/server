@@ -3,7 +3,6 @@ import { logError } from '../utils/logger';
 import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import blockchainService from '../services/blockchain';
 import { keysToCamelCase } from '../utils/caseConverter';
 
 const router = Router();
@@ -30,10 +29,7 @@ const getDataSubmissionStatsWithFallback = async (): Promise<DataSubmissionStats
   };
 
   try {
-    const result = await blockchainService.getDataSubmissionStats();
-    // Since the method currently throws, this line won't be reached
-    // but we include it for when the method is properly implemented
-    return result as unknown as DataSubmissionStats;
+    throw new Error('Missing service');
   } catch (error) {
     // getDataSubmissionStats is not implemented yet, use defaults
     logError(error as Error, { 
@@ -50,45 +46,7 @@ router.get('/network',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const period = req.query.period as string || '24h';
-      
-      const chainStats = await blockchainService.getChainStats();
-      const dataSubmissionStats = await getDataSubmissionStatsWithFallback();
-
-      // TODO: Implement time-series data collection for trends
-      const networkAnalytics = {
-        current_stats: {
-          block_height: chainStats.blockHeight.toString(),
-          total_extrinsics: 0, // TODO: Get from database
-          total_data_size: dataSubmissionStats.totalDataSize,
-          total_fees: 0, // TODO: Calculate total fees
-          active_validators: chainStats.activeValidators,
-          total_staked: chainStats.totalIssuance.toString(),
-          inflation_rate: chainStats.inflation,
-          network_utilization: 0, // TODO: Calculate utilization
-          average_block_time: chainStats.blockTime,
-        },
-        historical_data: [], // TODO: Implement historical snapshots
-        gas_price_trend: [], // TODO: Implement gas price tracking
-        rollup_distribution: [], // TODO: Implement rollup analytics
-        data_throughput: {
-          submissions_24h: dataSubmissionStats.submissionsToday,
-          data_size_24h: dataSubmissionStats.dataSizeToday,
-          unique_apps_24h: dataSubmissionStats.uniqueApps,
-          average_submission_size: dataSubmissionStats.averageSize,
-        },
-      };
-
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(networkAnalytics),
-        meta: {
-          source: 'rpc',
-          period,
-        },
-      };
-
-      res.json(response);
+      throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'analytics-route', action: 'getNetworkAnalytics' });
       res.status(500).json({
@@ -333,54 +291,7 @@ router.get('/validators',
   cacheMiddleware(config.cache.ttl.validators),
   async (req: Request, res: Response) => {
     try {
-      const [chainStats, validators] = await Promise.all([
-        blockchainService.getChainStats(),
-        blockchainService.getValidators(),
-      ]);
-
-      const activeValidators = validators.filter(v => v.active);
-      
-      // Calculate staking distribution
-      const totalStaked = activeValidators.reduce((sum, v) => {
-        const stakeAmount = v.totalStake || BigInt(0);
-        return sum + stakeAmount;
-      }, BigInt(0));
-
-      const validatorAnalytics = {
-        staking_overview: {
-          total_staked: totalStaked.toString(),
-          staking_ratio: chainStats.stakingRatio,
-          inflation_rate: chainStats.inflation,
-          minimum_stake: chainStats.minimumStake.toString(),
-          average_stake: chainStats.averageStake.toString(),
-        },
-        validator_distribution: {
-          active_validators: activeValidators.length,
-          waiting_validators: validators.length - activeValidators.length,
-          total_nominators: chainStats.nominators,
-        },
-        commission_analytics: {
-          average_commission: 0, // TODO: Calculate from validators
-          median_commission: 0,
-          commission_distribution: [], // TODO: Histogram of commission rates
-        },
-        performance_metrics: {
-          average_uptime: 0, // TODO: Calculate validator uptime
-          block_production_distribution: [], // TODO: Blocks per validator
-          slashing_events: [], // TODO: Recent slashing events
-        },
-        // TODO: Add era analytics, rewards tracking, nomination flows
-      };
-
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(validatorAnalytics),
-        meta: {
-          source: 'rpc',
-        },
-      };
-
-      res.json(response);
+      throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'analytics-route', action: 'getValidatorAnalytics' });
       res.status(500).json({

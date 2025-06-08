@@ -9,7 +9,6 @@ import config from './config';
 import { logger } from './utils/logger';
 import { cache } from './utils/cache';
 import { db, createTables } from './utils/database';
-import blockchainService from './services/blockchain';
 
 // Middleware imports
 import {
@@ -241,14 +240,14 @@ class AvailExplorerServer {
 
       // Initialize blockchain service explicitly
       // The constructor calls initialize() asynchronously, so we need to wait for it
-      services.push(
-        blockchainService.init().then(() => {
-          logger.info('Blockchain service: Initialization completed');
-        }).catch(err => {
-          logger.error('Failed to initialize blockchain service', { error: err.message });
-          throw err;
-        }),
-      );
+      // services.push(
+      //   blockchainService.init().then(() => {
+      //     logger.info('Blockchain service: Initialization completed');
+      //   }).catch(err => {
+      //     logger.error('Failed to initialize blockchain service', { error: err.message });
+      //     throw err;
+      //   }),
+      // );
 
       // Wait for all critical services
       await Promise.all(services);
@@ -281,7 +280,7 @@ class AvailExplorerServer {
     disconnections.push(db.disconnect());
 
     // Disconnect from blockchain service
-    disconnections.push(blockchainService.shutdown());
+    // disconnections.push(blockchainService.shutdown());
 
     await Promise.all(disconnections);
     logger.info('Services: All services disconnected');
