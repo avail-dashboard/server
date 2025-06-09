@@ -8,7 +8,7 @@ const router = Router();
  * @route GET /api/extrinsics
  * @description Get latest extrinsics with pagination
  * @access Public
- * @note Now uses DirectWS (wss://mainnet-rpc.avail.so/ws) as primary data source when enabled
+ * @note Now uses DirectWS (wss://avail-mainnet.public.blastapi.io/) as primary data source when enabled
  */
 router.get('/', 
   pagination,

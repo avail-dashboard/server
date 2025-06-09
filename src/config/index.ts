@@ -20,23 +20,10 @@ const configSchema = Joi.object({
 
   // Database Configuration
   DATABASE_URL: Joi.string().required(),
-  DATABASE_TYPE: Joi.string().valid('postgresql').default('postgresql'),
   
   // Redis Configuration
   REDIS_URL: Joi.string().default('redis://localhost:6379'),
   REDIS_QUEUE_DB: Joi.number().default(1),
-
-  // Avail Blockchain Configuration
-  AVAIL_RPC_ENDPOINT: Joi.string().default('wss://mainnet-rpc.avail.so/ws'),
-  AVAIL_ENABLE_DIRECT_WS: Joi.boolean().default(true),
-  AVAIL_DIRECT_WS_ENDPOINT: Joi.string().default('wss://mainnet-rpc.avail.so/ws'),
-  AVAIL_LIGHT_CLIENT_HTTP: Joi.string().default('https://mainnet-rpc.avail.so'),
-  AVAIL_LIGHT_CLIENT_WS: Joi.string().default('wss://mainnet-rpc.avail.so/ws'),
-  AVAIL_BRIDGE_API: Joi.string().default('https://bridge-api.avail.so'),
-  AVAIL_NEXUS_API: Joi.string().default('https://api.nexus.avail.so'),
-  AVAIL_TURBO_DA_API: Joi.string().default('https://api.turbo.avail.so'),
-  AVAIL_SUPPRESS_WARNINGS: Joi.boolean().default(true),
-  AVAIL_POLKADOT_API_LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('warn'),
 
   // Feature Flags
   ENABLE_WEBSOCKETS: Joi.boolean().default(true),
@@ -56,9 +43,6 @@ const configSchema = Joi.object({
 
   // Monitoring Configuration
   METRICS_PORT: Joi.number().default(9464),
-
-  // External API Configuration
-  ETHEREUM_RPC_URL: Joi.string().allow('').default('https://eth.llamarpc.com'),
 });
 
 const { error, value: env } = configSchema.validate(process.env, {
@@ -103,7 +87,11 @@ export const config = {
     // RPC Configuration
     rpc: {
       endpoints: [
-        'wss://mainnet-rpc.avail.so/ws',
+        'wss://mainnet-rpc.avail.so/ws',           // Official Avail endpoint
+        'wss://avail-mainnet.public.blastapi.io/', // BlastAPI - high performance
+        'wss://mainnet.avail-rpc.com/',            // Ankr - reliable
+        'wss://avail.api.onfinality.io/public-ws', // OnFinality - enterprise grade
+        'wss://avail-rpc.lgns.net/',               // LugaNodes - community
       ],
       retryAttempts: 3,
       retryDelay: 1000,
@@ -117,61 +105,6 @@ export const config = {
       maxRetryDelay: 30000,
       connectionPoolSize: 5,
     },
-    
-    // Direct WebSocket Connection (Primary)
-    directWS: {
-      enabled: env.AVAIL_ENABLE_DIRECT_WS,
-      endpoint: env.AVAIL_DIRECT_WS_ENDPOINT,
-      reconnectAttempts: 10,
-      reconnectDelay: 5000,
-      requestTimeout: 30000,
-      pingInterval: 30000,
-      priority: 1, // Highest priority
-    },
-    
-    // Light Client Configuration
-    lightClient: {
-      httpEndpoint: env.AVAIL_LIGHT_CLIENT_HTTP,
-      wsEndpoint: env.AVAIL_LIGHT_CLIENT_WS,
-      appId: 0,
-      timeout: 30000,
-    },
-    
-    // Bridge Configuration
-    bridge: {
-      apiEndpoint: env.AVAIL_BRIDGE_API,
-      ethereumRpcUrl: env.ETHEREUM_RPC_URL,
-      contracts: {
-        mainnet: {
-          vectorX: '0x02993cdC11213985b9B13224f3aF289F03bf298d',
-          bridge: '0x054fd961708d8e2b9c10a63f6157c74458889f0a',
-        },
-        testnet: {
-          vectorX: '0xe542db219a7e2b29c7aeaeace242c9a2cd528f96',
-          bridge: '0x967F7DdC4ec508462231849AE81eeaa68Ad01389',
-        },
-      },
-      timeout: 30000,
-    },
-    
-    // Nexus Configuration
-    nexus: {
-      apiEndpoint: env.AVAIL_NEXUS_API,
-      timeout: 30000,
-    },
-    
-    // Turbo DA Configuration
-    turboDA: {
-      apiEndpoint: env.AVAIL_TURBO_DA_API,
-      timeout: 30000,
-    },
-
-    // Avail-specific Settings
-    suppressWarnings: env.AVAIL_SUPPRESS_WARNINGS,
-    polkadotApiLogLevel: env.AVAIL_POLKADOT_API_LOG_LEVEL,
-    compatibilityMode: true,
-    knownExtensions: ['CheckAppId'],
-    knownRuntimeApis: ['KateApi'],
   },
 
   // Feature Flags
@@ -214,20 +147,6 @@ export const config = {
     metricsPort: env.METRICS_PORT,
   },
 
-  // Bull Queue Configuration
-  queue: {
-    redis: env.REDIS_URL,
-    defaultJobOptions: {
-      removeOnComplete: 10,
-      removeOnFail: 50,
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 5000,
-      },
-    },
-  },
-
   // API Configuration
   api: {
     prefix: '/api',
@@ -244,23 +163,6 @@ export const config = {
     },
     pingTimeout: 60000,
     pingInterval: 25000,
-  },
-
-  // Performance Targets
-  performance: {
-    responseTime: {
-      cached: 50, // ms
-      fresh: 500, // ms
-      search: 200, // ms
-      websocket: 100, // ms
-    },
-    cache: {
-      hitRate: {
-        blocks: 0.8,
-        chainStats: 0.9,
-        accounts: 0.7,
-      },
-    },
   },
 };
 
