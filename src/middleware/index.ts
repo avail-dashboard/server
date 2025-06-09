@@ -263,21 +263,53 @@ export const getClientIP = (req: Request): string => {
 // Health check middleware
 export const healthCheck = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Check database health
+    let databaseHealth = { connected: false, note: 'Database check failed' };
+    try {
+      const { db } = await import('../utils/database');
+      const isDbHealthy = await db.checkHealth();
+      databaseHealth = { connected: isDbHealthy, note: isDbHealthy ? 'Connected' : 'Connection failed' };
+    } catch (error) {
+      databaseHealth = { connected: false, note: `Database error: ${(error as Error).message}` };
+    }
+
+    // Check cache health
+    let cacheHealth = { connected: false, ping: undefined as number | undefined, note: 'Cache check failed' };
+    try {
+      if (config.features.caching) {
+        const { cache } = await import('../utils/cache');
+        const cacheStatus = await cache.getHealth();
+        cacheHealth = { 
+          connected: cacheStatus.connected, 
+          ping: cacheStatus.ping,
+          note: cacheStatus.connected ? 'Connected' : 'Connection failed',
+        };
+      } else {
+        cacheHealth = { connected: false, ping: undefined, note: 'Caching disabled' };
+      }
+    } catch (error) {
+      cacheHealth = { connected: false, ping: undefined, note: `Cache error: ${(error as Error).message}` };
+    }
+
+    // Overall health status
+    const isHealthy = databaseHealth.connected && (cacheHealth.connected || !config.features.caching);
+    
     const health = {
-      status: 'healthy',
+      status: isHealthy ? 'healthy' : 'degraded',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       version: '1.0.0',
       environment: config.server.env,
       services: {
-        database: { connected: false, note: 'Database not implemented' },
-        caching: { connected: false, note: 'Redis/cache not implemented' },
-        websocket: config.features.websockets,
+        database: databaseHealth,
+        caching: cacheHealth,
+        websocket: { enabled: config.features.websockets },
       },
     };
 
-    res.status(200).json({
-      success: true,
+    const statusCode = isHealthy ? 200 : 503;
+    res.status(statusCode).json({
+      success: isHealthy,
       data: health,
       timestamp: new Date().toISOString(),
     });

@@ -1,8 +1,15 @@
 import dotenv from 'dotenv';
 import Joi from 'joi';
+import path from 'path';
 
 // Load environment variables
-dotenv.config();
+// Use ENV_FILE environment variable to specify which env file to load
+const envFile = process.env.ENV_FILE || '.env';
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+// Always load .env as fallback without overriding existing vars
+if (envFile !== '.env') {
+  dotenv.config();
+}
 
 // Configuration schema validation
 const configSchema = Joi.object({
@@ -51,7 +58,7 @@ const configSchema = Joi.object({
   METRICS_PORT: Joi.number().default(9464),
 
   // External API Configuration
-  ETHEREUM_RPC_URL: Joi.string().default('https://eth.llamarpc.com'),
+  ETHEREUM_RPC_URL: Joi.string().allow('').default('https://eth.llamarpc.com'),
 });
 
 const { error, value: env } = configSchema.validate(process.env, {
@@ -209,20 +216,7 @@ export const config = {
 
   // Bull Queue Configuration
   queue: {
-    redis: {
-      host: env.REDIS_URL.includes('://') ? 
-        (env.REDIS_URL.includes('@') ? env.REDIS_URL.split('@')[1]?.split(':')[0] : 'localhost') : 
-        'localhost',
-      port: env.REDIS_URL.includes('://') ? 
-        parseInt((env.REDIS_URL.includes('@') ? 
-          env.REDIS_URL.split('@')[1]?.split(':')[1] : 
-          env.REDIS_URL.split(':').pop()) || '6379') : 
-        6379,
-      db: env.REDIS_QUEUE_DB,
-      password: env.REDIS_URL.includes('://') && env.REDIS_URL.includes(':') ? 
-        (env.REDIS_URL.match(/:([^:@]+)@/) ? env.REDIS_URL.match(/:([^:@]+)@/)[1] : undefined) :
-        undefined,
-    },
+    redis: env.REDIS_URL,
     defaultJobOptions: {
       removeOnComplete: 10,
       removeOnFail: 50,

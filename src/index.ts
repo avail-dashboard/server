@@ -132,6 +132,9 @@ class AvailExplorerServer {
   }
 
   private setupRoutes(): void {
+    // Root health endpoint (outside of API versioning)
+    this.app.get('/health', healthCheck);
+
     // API routes
     const apiRouter = express.Router();
 

@@ -1,6 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import config from '../config';
 import { logQuery, logError } from './logger';
+import { retryConfigs, withRetry } from './retry';
 
 interface DatabaseConfig {
   type: 'postgresql';
@@ -11,47 +12,6 @@ interface DatabaseConfig {
 interface QueryResult<T = any> {
   rows: T[];
   rowCount: number;
-}
-
-// Simple retry utility
-async function withRetry<T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3,
-  delayMs: number = 1000,
-  context: string = 'operation',
-): Promise<T> {
-  let lastError: Error;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error as Error;
-      
-      if (attempt === maxRetries) {
-        logError(lastError, { 
-          component: 'database', 
-          context, 
-          attempt, 
-          maxRetries,
-          message: `Failed after ${maxRetries} attempts`,
-        });
-        throw lastError;
-      }
-      
-      logError(lastError, { 
-        component: 'database', 
-        context, 
-        attempt, 
-        maxRetries,
-        message: `Attempt ${attempt} failed, retrying in ${delayMs}ms`,
-      });
-      
-      await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
-    }
-  }
-  
-  throw lastError!;
 }
 
 class DatabaseService {
@@ -100,7 +60,7 @@ class DatabaseService {
       
       this.isConnected = true;
       console.log('Database: Connected to PostgreSQL');
-    }, 3, 2000, 'database-connect');
+    }, retryConfigs.database, 'database-connect');
   }
 
   async disconnect(): Promise<void> {
@@ -125,7 +85,7 @@ class DatabaseService {
       logQuery(text, duration, result.rowCount);
       
       return result;
-    }, 2, 1000, 'database-query');
+    }, retryConfigs.database, 'database-query');
   }
 
   private async executePostgreSQLQuery<T>(text: string, params?: any[]): Promise<QueryResult<T>> {
@@ -143,7 +103,7 @@ class DatabaseService {
   async transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
     return withRetry(async () => {
       return this.postgresTransaction(callback);
-    }, 2, 1000, 'database-transaction');
+    }, retryConfigs.database, 'database-transaction');
   }
 
   private async postgresTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -225,13 +185,11 @@ class DatabaseService {
     }
 
     if (options?.limit) {
-      query += ` LIMIT $${values.length + 1}`;
-      values.push(options.limit);
+      query += ` LIMIT ${options.limit}`;
     }
 
     if (options?.offset) {
-      query += ` OFFSET $${values.length + 1}`;
-      values.push(options.offset);
+      query += ` OFFSET ${options.offset}`;
     }
 
     const result = await this.query<T>(query, values);
@@ -242,9 +200,8 @@ class DatabaseService {
     const keys = Object.keys(data);
     const values = Object.values(data);
     const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
-    const columns = keys.join(', ');
-
-    const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`;
+    
+    const query = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`;
     const result = await this.query<T>(query, values);
     
     return result.rows[0];
@@ -256,13 +213,13 @@ class DatabaseService {
     where: Record<string, any>,
   ): Promise<T | null> {
     const dataKeys = Object.keys(data);
-    const dataValues = Object.values(data);
     const whereKeys = Object.keys(where);
+    const dataValues = Object.values(data);
     const whereValues = Object.values(where);
-
+    
     const setClause = dataKeys.map((key, index) => `${key} = $${index + 1}`).join(', ');
-    const whereClause = whereKeys.map((key, index) => `${key} = $${dataValues.length + index + 1}`).join(' AND ');
-
+    const whereClause = whereKeys.map((key, index) => `${key} = $${dataKeys.length + index + 1}`).join(' AND ');
+    
     const query = `UPDATE ${table} SET ${setClause} WHERE ${whereClause} RETURNING *`;
     const result = await this.query<T>(query, [...dataValues, ...whereValues]);
     
@@ -273,11 +230,11 @@ class DatabaseService {
     const keys = Object.keys(where);
     const values = Object.values(where);
     const conditions = keys.map((key, index) => `${key} = $${index + 1}`).join(' AND ');
-
+    
     const query = `DELETE FROM ${table} WHERE ${conditions}`;
     const result = await this.query(query, values);
     
-    return result.rowCount || 0;
+    return result.rowCount;
   }
 
   async count(table: string, where?: Record<string, any>): Promise<number> {
@@ -291,9 +248,8 @@ class DatabaseService {
       values.push(...Object.values(where));
     }
 
-    const result = await this.query<{ count: string | number }>(query, values);
-    const count = result.rows[0].count;
-    return typeof count === 'string' ? parseInt(count, 10) : count;
+    const result = await this.query<{ count: string }>(query, values);
+    return parseInt(result.rows[0].count, 10);
   }
 
   async paginate<T = any>(
@@ -313,9 +269,11 @@ class DatabaseService {
     };
   }> {
     const offset = (page - 1) * limit;
+    
+    // Get total count
     const total = await this.count(table, where);
-    const totalPages = Math.ceil(total / limit);
-
+    
+    // Get paginated data
     const data = await this.findMany<T>(table, where, {
       orderBy,
       order,
@@ -329,88 +287,72 @@ class DatabaseService {
         page,
         limit,
         total,
-        totalPages,
+        totalPages: Math.ceil(total / limit),
       },
     };
   }
 }
 
-// Create database service instance
-export const db = new DatabaseService();
+// Singleton instance
+const db = new DatabaseService();
 
-// Database migration utilities
+export default db;
+export { db };
+
+// Table creation utilities
 export const createTables = async (): Promise<void> => {
-  const queries = [
-    // Blocks table
-    `CREATE TABLE IF NOT EXISTS blocks (
-      number BIGINT PRIMARY KEY,
-      hash VARCHAR(66) UNIQUE NOT NULL,
-      parent_hash VARCHAR(66),
-      state_root VARCHAR(66),
-      timestamp BIGINT NOT NULL,
-      extrinsics_count INTEGER DEFAULT 0,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
+  try {
+    // Example table creation - customize as needed
+    const createAccountsTable = `
+      CREATE TABLE IF NOT EXISTS accounts (
+        id SERIAL PRIMARY KEY,
+        address VARCHAR(255) UNIQUE NOT NULL,
+        balance BIGINT DEFAULT 0,
+        nonce INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
 
-    // Indexes for blocks table
-    'CREATE INDEX IF NOT EXISTS idx_blocks_timestamp ON blocks(timestamp)',
-    'CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash)',
+    const createBlocksTable = `
+      CREATE TABLE IF NOT EXISTS blocks (
+        id SERIAL PRIMARY KEY,
+        hash VARCHAR(255) UNIQUE NOT NULL,
+        number BIGINT UNIQUE NOT NULL,
+        parent_hash VARCHAR(255),
+        state_root VARCHAR(255),
+        extrinsics_root VARCHAR(255),
+        timestamp TIMESTAMP,
+        validator VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
 
-    // Extrinsics table
-    `CREATE TABLE IF NOT EXISTS extrinsics (
-      id SERIAL PRIMARY KEY,
-      hash VARCHAR(66) UNIQUE NOT NULL,
-      block_number BIGINT REFERENCES blocks(number),
-      extrinsic_index INTEGER,
-      module VARCHAR(50),
-      call VARCHAR(50),
-      success BOOLEAN,
-      timestamp BIGINT,
-      signer VARCHAR(48),
-      fee BIGINT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
+    const createExtrinsicsTable = `
+      CREATE TABLE IF NOT EXISTS extrinsics (
+        id SERIAL PRIMARY KEY,
+        hash VARCHAR(255) UNIQUE NOT NULL,
+        block_number BIGINT,
+        block_hash VARCHAR(255),
+        index_in_block INTEGER,
+        method VARCHAR(255),
+        section VARCHAR(255),
+        signer VARCHAR(255),
+        nonce INTEGER,
+        tip BIGINT,
+        success BOOLEAN,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (block_number) REFERENCES blocks(number)
+      );
+    `;
 
-    // Indexes for extrinsics table
-    'CREATE INDEX IF NOT EXISTS idx_extrinsics_block ON extrinsics(block_number)',
-    'CREATE INDEX IF NOT EXISTS idx_extrinsics_hash ON extrinsics(hash)',
-    'CREATE INDEX IF NOT EXISTS idx_extrinsics_signer ON extrinsics(signer)',
-    'CREATE INDEX IF NOT EXISTS idx_extrinsics_timestamp ON extrinsics(timestamp)',
+    await db.query(createAccountsTable);
+    await db.query(createBlocksTable);
+    await db.query(createExtrinsicsTable);
 
-    // Accounts table
-    `CREATE TABLE IF NOT EXISTS accounts (
-      address VARCHAR(48) PRIMARY KEY,
-      balance BIGINT,
-      nonce INTEGER,
-      last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
-
-    // Indexes for accounts table
-    'CREATE INDEX IF NOT EXISTS idx_accounts_balance ON accounts(balance)',
-
-    // Watchlists table
-    `CREATE TABLE IF NOT EXISTS watchlists (
-      id SERIAL PRIMARY KEY,
-      user_id VARCHAR(255),
-      address VARCHAR(48),
-      label VARCHAR(100),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
-
-    // Indexes for watchlists table
-    'CREATE INDEX IF NOT EXISTS idx_watchlists_user ON watchlists(user_id)',
-  ];
-
-  for (const query of queries) {
-    try {
-      await db.query(query);
-    } catch (err) {
-      logError(err as Error, { component: 'database', action: 'createTables', query });
-      throw err;
-    }
+    console.log('✅ Database tables created successfully');
+  } catch (error) {
+    console.error('❌ Error creating tables:', error);
+    throw error;
   }
-
-  console.log('Database: Tables created successfully (PostgreSQL)');
-};
-
-export default db; 
+}; 
