@@ -30,6 +30,7 @@
     "lint:check": "eslint src/**/*.ts --max-warnings 0",
     "format": "prettier --write src/**/*.ts",
     "validate:workflows": "node .github/validate-workflows.js",
+    "verify:blockchain": "tsx scripts/verify-avail-connection.ts",
     "pre-commit": "npm run test:critical",
     "prepare": "husky install"
   },
