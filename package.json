@@ -31,6 +31,7 @@
     "format": "prettier --write src/**/*.ts",
     "validate:workflows": "node .github/validate-workflows.js",
     "verify:blockchain": "tsx scripts/verify-avail-connection.ts",
+    "demo:queue": "ENV_FILE=.env.local npx tsx scripts/test-queue-service.ts",
     "pre-commit": "npm run test:critical",
     "prepare": "husky install"
   },

@@ -82,6 +82,22 @@ export const config = {
     queueDb: env.REDIS_QUEUE_DB,
   },
 
+  // Queue Service Configuration
+  queue: {
+    concurrency: 5,
+    jobTimeout: 30000, // 30 seconds
+    retentionDays: 7,
+    defaultJobOptions: {
+      removeOnComplete: 10,
+      removeOnFail: 5,
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      },
+    },
+  },
+
   // Avail Blockchain Data Sources
   avail: {
     // RPC Configuration

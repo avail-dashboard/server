@@ -3,7 +3,9 @@
 
 // Core Services
 export { BlockchainService, blockchainService } from './core/blockchain';
+export { QueueService, queueService } from './core/queue';
 import { blockchainService } from './core/blockchain';
+import { queueService } from './core/queue';
 
 // Service Types
 export * from './types/service';
@@ -46,9 +48,11 @@ export class ServiceFactory {
   async initializeCoreServices(): Promise<void> {
     // Register core services
     this.register('blockchain', blockchainService);
+    this.register('queue', queueService);
 
     // Start core services
     await blockchainService.start();
+    await queueService.start();
   }
 
   // Shutdown all services
@@ -59,6 +63,12 @@ export class ServiceFactory {
     if (this.has('blockchain')) {
       const blockchain = this.get<typeof blockchainService>('blockchain');
       shutdownPromises.push(blockchain.stop());
+    }
+
+    // Stop queue service
+    if (this.has('queue')) {
+      const queue = this.get<typeof queueService>('queue');
+      shutdownPromises.push(queue.stop());
     }
 
     await Promise.all(shutdownPromises);
@@ -72,6 +82,11 @@ export class ServiceFactory {
     if (this.has('blockchain')) {
       const blockchain = this.get<typeof blockchainService>('blockchain');
       healthStatus.blockchain = await blockchain.getHealth();
+    }
+
+    if (this.has('queue')) {
+      const queue = this.get<typeof queueService>('queue');
+      healthStatus.queue = await queue.getHealth();
     }
 
     return healthStatus;

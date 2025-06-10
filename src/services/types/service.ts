@@ -58,4 +58,51 @@ export interface ServiceLifecycle {
   startedAt?: Date;
   stoppedAt?: Date;
   restartCount: number;
+}
+
+// Queue Service Types
+export interface QueueJob<T = any> {
+  id: string;
+  type: string;
+  data: T;
+  priority?: number;
+  delay?: number;
+  attempts?: number;
+}
+
+export interface QueueJobResult<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  duration?: number;
+}
+
+export interface QueueStats {
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+  paused: number;
+}
+
+export interface QueueServiceInterface {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  addJob<T>(type: string, data: T, options?: any): Promise<QueueJob<T>>;
+  getStats(): Promise<QueueStats>;
+  getHealth(): Promise<{ status: string; stats: QueueStats }>;
+  pauseQueue(): Promise<void>;
+  resumeQueue(): Promise<void>;
+  clearQueue(): Promise<void>;
+}
+
+// Job Types
+export enum JobType {
+  BLOCK_INDEXING = 'block_indexing',
+  EXTRINSIC_PROCESSING = 'extrinsic_processing',
+  ANALYTICS_CALCULATION = 'analytics_calculation',
+  ROLLUP_STATISTICS = 'rollup_statistics',
+  DATA_SYNC = 'data_sync',
+  HEALTH_CHECK = 'health_check',
 } 
