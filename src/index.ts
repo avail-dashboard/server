@@ -9,6 +9,7 @@ import config from './config';
 import { logger } from './utils/logger';
 import { cache } from './utils/cache';
 import { db, createTables } from './utils/database';
+import { serviceFactory } from './services';
 
 // Middleware imports
 import {
@@ -220,7 +221,6 @@ class AvailExplorerServer {
 
   private async connectServices(): Promise<void> {
     try {
-
       const services = [];
 
       // Connect to Redis cache
@@ -241,18 +241,7 @@ class AvailExplorerServer {
         }),
       );
 
-      // Initialize blockchain service explicitly
-      // The constructor calls initialize() asynchronously, so we need to wait for it
-      // services.push(
-      //   blockchainService.init().then(() => {
-      //     logger.info('Blockchain service: Initialization completed');
-      //   }).catch(err => {
-      //     logger.error('Failed to initialize blockchain service', { error: err.message });
-      //     throw err;
-      //   }),
-      // );
-
-      // Wait for all critical services
+      // Wait for database and cache connections
       await Promise.all(services);
 
       // Create database tables if they don't exist
@@ -261,6 +250,15 @@ class AvailExplorerServer {
         logger.info('Database: Tables verified/created successfully');
       } catch (error) {
         logger.error('Database: Failed to create tables', { error });
+        throw error;
+      }
+
+      // Initialize ALL services (core + domain) through ServiceFactory
+      try {
+        await serviceFactory.initializeAllServices();
+        logger.info('Services: All services initialized successfully');
+      } catch (error) {
+        logger.error('Services: Failed to initialize', { error });
         throw error;
       }
 
@@ -274,6 +272,14 @@ class AvailExplorerServer {
   private async disconnectServices(): Promise<void> {
     const disconnections = [];
 
+    // Shutdown all services through ServiceFactory (blockchain, queue, domain services)
+    try {
+      await serviceFactory.shutdown();
+      logger.info('Services: All services shutdown completed');
+    } catch (error) {
+      logger.error('Services: Shutdown error', { error });
+    }
+
     // Disconnect from cache
     if (config.features.caching) {
       disconnections.push(cache.disconnect());
@@ -281,9 +287,6 @@ class AvailExplorerServer {
 
     // Disconnect from database
     disconnections.push(db.disconnect());
-
-    // Disconnect from blockchain service
-    // disconnections.push(blockchainService.shutdown());
 
     await Promise.all(disconnections);
     logger.info('Services: All services disconnected');
@@ -386,6 +389,15 @@ class AvailExplorerServer {
   // Getter for the Express app (useful for testing)
   public getApp(): express.Application {
     return this.app;
+  }
+
+  // Public methods for testing - allow tests to use the same service setup
+  public async initializeServicesForTesting(): Promise<void> {
+    await this.connectServices();
+  }
+
+  public async shutdownServicesForTesting(): Promise<void> {
+    await this.disconnectServices();
   }
 }
 

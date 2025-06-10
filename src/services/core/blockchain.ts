@@ -47,7 +47,7 @@ const AVAIL_RPC_PROVIDERS: ConnectionProvider[] = [
 class CircuitBreaker {
   private state: CircuitBreakerState = {
     state: 'CLOSED',
-    failureCount: 0
+    failureCount: 0,
   };
   
   private readonly failureThreshold = 5;
@@ -133,7 +133,7 @@ class SubscriptionManagerImpl implements SubscriptionManager {
 
   async unsubscribeAll(): Promise<void> {
     const unsubscribePromises = Array.from(this.subscriptions.keys()).map(key => 
-      this.unsubscribe(key)
+      this.unsubscribe(key),
     );
     await Promise.all(unsubscribePromises);
   }
@@ -155,11 +155,11 @@ export class BlockchainService implements BaseService {
       requestCount: 0,
       errorCount: 0,
       averageResponseTime: 0,
-      uptime: 0
+      uptime: 0,
     };
     this.lifecycle = {
       status: 'STOPPED',
-      restartCount: 0
+      restartCount: 0,
     };
     
     // Use existing retry configuration or defaults
@@ -187,7 +187,7 @@ export class BlockchainService implements BaseService {
       this.lifecycle.status = 'RUNNING';
       logger.info('BlockchainService: Service started successfully', { 
         component: 'blockchain',
-        primaryProvider: this.currentConnection?.url 
+        primaryProvider: this.currentConnection?.url, 
       });
       
     } catch (error) {
@@ -235,14 +235,14 @@ export class BlockchainService implements BaseService {
           details: {
             status: this.lifecycle.status,
             connections: this.connections.size,
-            metrics: this.metrics
-          }
+            metrics: this.metrics,
+          },
         };
       }
 
       // Test the connection with a simple RPC call
       const chainInfo = await this.withRetry(() => 
-        this.currentConnection!.api.rpc.system.chain()
+        this.currentConnection!.api.rpc.system.chain(),
       );
 
       return {
@@ -255,8 +255,8 @@ export class BlockchainService implements BaseService {
           connections: this.connections.size,
           subscriptions: this.subscriptionManager.subscriptions.size,
           metrics: this.metrics,
-          uptime: this.lifecycle.startedAt ? now.getTime() - this.lifecycle.startedAt.getTime() : 0
-        }
+          uptime: this.lifecycle.startedAt ? now.getTime() - this.lifecycle.startedAt.getTime() : 0,
+        },
       };
       
     } catch (error) {
@@ -267,8 +267,8 @@ export class BlockchainService implements BaseService {
         details: {
           status: this.lifecycle.status,
           connections: this.connections.size,
-          metrics: this.metrics
-        }
+          metrics: this.metrics,
+        },
       };
     }
   }
@@ -294,7 +294,7 @@ export class BlockchainService implements BaseService {
       api.rpc.system.chain(),
       api.rpc.system.name(),
       api.rpc.system.version(),
-      api.rpc.state.getRuntimeVersion()
+      api.rpc.state.getRuntimeVersion(),
     ]);
 
     return {
@@ -308,8 +308,8 @@ export class BlockchainService implements BaseService {
       properties: {
         ss58Format: api.registry.chainSS58 || 0,
         tokenDecimals: api.registry.chainDecimals || [18],
-        tokenSymbol: api.registry.chainTokens || ['AVAIL']
-      }
+        tokenSymbol: api.registry.chainTokens || ['AVAIL'],
+      },
     };
   }
 
@@ -328,7 +328,7 @@ export class BlockchainService implements BaseService {
     
     const [block, events] = await Promise.all([
       api.rpc.chain.getBlock(hash),
-      api.query.system.events.at(hash)
+      api.query.system.events.at(hash),
     ]);
 
     // Transform the data to our BlockData interface
@@ -340,7 +340,7 @@ export class BlockchainService implements BaseService {
       extrinsicsRoot: block.block.header.extrinsicsRoot.toString(),
       timestamp: Date.now(), // This should be extracted from timestamp extrinsic
       extrinsics: [], // Will be populated by ExtrinsicService
-      events: [] // Will be populated from events query
+      events: [], // Will be populated from events query
     };
   }
 
@@ -373,7 +373,7 @@ export class BlockchainService implements BaseService {
           component: 'blockchain',
           provider: provider.provider,
           url: provider.url,
-          type: provider.type
+          type: provider.type,
         });
         
       } catch (error) {
@@ -381,7 +381,7 @@ export class BlockchainService implements BaseService {
           component: 'blockchain',
           action: 'initializeConnection',
           provider: provider.provider,
-          url: provider.url
+          url: provider.url,
         });
       }
     }
@@ -400,7 +400,7 @@ export class BlockchainService implements BaseService {
       provider: wsProvider,
       url: provider.url,
       isConnected: true,
-      lastActivity: new Date()
+      lastActivity: new Date(),
     };
   }
 
@@ -426,7 +426,7 @@ export class BlockchainService implements BaseService {
         logger.info('BlockchainService: Primary connection established', {
           component: 'blockchain',
           url,
-          provider: AVAIL_RPC_PROVIDERS.find(p => p.url === url)?.provider
+          provider: AVAIL_RPC_PROVIDERS.find(p => p.url === url)?.provider,
         });
         
         return;
@@ -435,7 +435,7 @@ export class BlockchainService implements BaseService {
         logError(error as Error, {
           component: 'blockchain',
           action: 'establishPrimaryConnection',
-          url
+          url,
         });
       }
     }
@@ -485,7 +485,7 @@ export class BlockchainService implements BaseService {
         
         const delay = Math.min(
           this.retryConfig.baseDelay * Math.pow(this.retryConfig.exponentialFactor, attempt - 1),
-          this.retryConfig.maxDelay
+          this.retryConfig.maxDelay,
         );
         
         const jitter = this.retryConfig.jitterEnabled 
@@ -508,7 +508,7 @@ export class BlockchainService implements BaseService {
       } catch (error) {
         logError(error as Error, { 
           component: 'blockchain', 
-          action: 'healthCheck' 
+          action: 'healthCheck', 
         });
       }
     }, interval);
@@ -522,7 +522,7 @@ export class BlockchainService implements BaseService {
         logError(error as Error, { 
           component: 'blockchain', 
           action: 'disconnect',
-          url: connection.url 
+          url: connection.url, 
         });
       }
     });
@@ -545,14 +545,14 @@ export class BlockchainService implements BaseService {
     return Array.from(this.connections.entries()).map(([url, connection]) => ({
       url,
       isConnected: connection.isConnected,
-      provider: AVAIL_RPC_PROVIDERS.find(p => p.url === url)?.provider || 'Unknown'
+      provider: AVAIL_RPC_PROVIDERS.find(p => p.url === url)?.provider || 'Unknown',
     }));
   }
 
   getCircuitBreakerStates(): Array<{ url: string; state: CircuitBreakerState }> {
     return Array.from(this.circuitBreakers.entries()).map(([url, breaker]) => ({
       url,
-      state: breaker.getState()
+      state: breaker.getState(),
     }));
   }
 }

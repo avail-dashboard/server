@@ -7,6 +7,18 @@ export { QueueService, queueService } from './core/queue';
 import { blockchainService } from './core/blockchain';
 import { queueService } from './core/queue';
 
+// Domain Services
+export { 
+  BlockService, 
+  ExtrinsicService, 
+  DataAvailabilityService,
+  DomainServiceFactory,
+  domainServiceFactory,
+  getBlockService,
+  getExtrinsicService,
+  getDataAvailabilityService,
+} from './domain';
+
 // Service Types
 export * from './types/service';
 export * from './types/blockchain';
@@ -55,6 +67,23 @@ export class ServiceFactory {
     await queueService.start();
   }
 
+  // Initialize domain services (after core services are ready)
+  async initializeDomainServices(): Promise<void> {
+    // Import domain services factory
+    const { domainServiceFactory } = await import('./domain');
+    
+    // Register domain services
+    this.register('blockService', domainServiceFactory.getBlockService());
+    this.register('extrinsicService', domainServiceFactory.getExtrinsicService());
+    this.register('dataAvailabilityService', domainServiceFactory.getDataAvailabilityService());
+  }
+
+  // Initialize all services (core + domain)
+  async initializeAllServices(): Promise<void> {
+    await this.initializeCoreServices();
+    await this.initializeDomainServices();
+  }
+
   // Shutdown all services
   async shutdown(): Promise<void> {
     const shutdownPromises: Promise<void>[] = [];
@@ -88,6 +117,13 @@ export class ServiceFactory {
       const queue = this.get<typeof queueService>('queue');
       healthStatus.queue = await queue.getHealth();
     }
+
+    // Domain services don't have health checks yet, but we can check if they're registered
+    healthStatus.domainServices = {
+      blockService: this.has('blockService'),
+      extrinsicService: this.has('extrinsicService'),
+      dataAvailabilityService: this.has('dataAvailabilityService'),
+    };
 
     return healthStatus;
   }
