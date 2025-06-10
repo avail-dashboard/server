@@ -2,9 +2,15 @@
 // Simple service factory and dependency injection
 
 // Core Services
-export { BlockchainService, blockchainService } from './core/blockchain';
+export { BlockchainService, blockchainService, connectionManager, lifecycleManager } from './core/blockchain';
+export { ConnectionManager } from './core/connection-manager';
+export { ServiceLifecycleManager } from './core/service-lifecycle-manager';
 export { QueueService, queueService } from './core/queue';
-import { blockchainService } from './core/blockchain';
+
+// Integration Services
+// (No integration services currently)
+
+import { blockchainService, connectionManager, lifecycleManager } from './core/blockchain';
 import { queueService } from './core/queue';
 
 // Domain Services
@@ -58,11 +64,13 @@ export class ServiceFactory {
 
   // Initialize all core services
   async initializeCoreServices(): Promise<void> {
-    // Register core services
+    // Register core services (using shared instances from blockchain service)
+    this.register('connectionManager', connectionManager);
+    this.register('lifecycleManager', lifecycleManager);
     this.register('blockchain', blockchainService);
     this.register('queue', queueService);
 
-    // Start core services
+    // Start core services - blockchain service will start its internal managers
     await blockchainService.start();
     await queueService.start();
   }
@@ -88,7 +96,7 @@ export class ServiceFactory {
   async shutdown(): Promise<void> {
     const shutdownPromises: Promise<void>[] = [];
 
-    // Stop blockchain service
+    // Stop blockchain service (will stop its internal managers)
     if (this.has('blockchain')) {
       const blockchain = this.get<typeof blockchainService>('blockchain');
       shutdownPromises.push(blockchain.stop());
@@ -113,6 +121,16 @@ export class ServiceFactory {
       healthStatus.blockchain = await blockchain.getHealth();
     }
 
+    if (this.has('connectionManager')) {
+      const connMgr = this.get<typeof connectionManager>('connectionManager');
+      healthStatus.connectionManager = await connMgr.getHealth();
+    }
+
+    if (this.has('lifecycleManager')) {
+      const lifecycleMgr = this.get<typeof lifecycleManager>('lifecycleManager');
+      healthStatus.lifecycleManager = await lifecycleMgr.getHealth();
+    }
+
     if (this.has('queue')) {
       const queue = this.get<typeof queueService>('queue');
       healthStatus.queue = await queue.getHealth();
@@ -126,6 +144,27 @@ export class ServiceFactory {
     };
 
     return healthStatus;
+  }
+
+  // Get detailed metrics from all services
+  getMetrics(): Record<string, any> {
+    const metrics: Record<string, any> = {};
+
+    if (this.has('blockchain')) {
+      const blockchain = this.get<typeof blockchainService>('blockchain');
+      metrics.blockchain = {
+        service: blockchain.getMetrics(),
+        connection: blockchain.getConnectionMetrics(),
+        lifecycle: blockchain.getLifecycle(),
+      };
+    }
+
+    if (this.has('connectionManager')) {
+      const connMgr = this.get<typeof connectionManager>('connectionManager');
+      metrics.connectionManager = connMgr.getMetrics();
+    }
+
+    return metrics;
   }
 }
 
