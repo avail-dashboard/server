@@ -339,11 +339,10 @@ src/services/
 - **Test**: Create and inject dependencies
 
 ### Phase 2: Domain Services (Week 2)
-**Goal**: Implement core domain logic
+**Goal**: Implement core domain logic (database first pattern)
 
 #### 2.1 BlockService (Priority 1)
 - Block data fetching
-- Cache integration
 - Database persistence
 - **Test**: Fetch and cache block data
 
