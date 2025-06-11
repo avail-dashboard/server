@@ -19,21 +19,21 @@ const AVAIL_RPC_PROVIDERS: ConnectionProvider[] = [
   { url: 'https://avail-mainnet.public.blastapi.io/', type: 'http', priority: 2, provider: 'BlastAPI', region: 'global' },
   
   { url: 'wss://mainnet.avail-rpc.com/', type: 'ws', priority: 3, provider: 'Ankr', region: 'global' },
-  { url: 'https://mainnet.avail-rpc.com/', type: 'http', priority: 3, provider: 'Ankr', region: 'global' },
+  // { url: 'https://mainnet.avail-rpc.com/', type: 'http', priority: 3, provider: 'Ankr', region: 'global' },
   
-  // Regional providers
-  { url: 'wss://avail-us.brightlystake.com', type: 'ws', priority: 4, provider: 'BrightlyStake', region: 'us' },
-  { url: 'https://avail-us.brightlystake.com', type: 'http', priority: 4, provider: 'BrightlyStake', region: 'us' },
+  // // Regional providers
+  // { url: 'wss://avail-us.brightlystake.com', type: 'ws', priority: 4, provider: 'BrightlyStake', region: 'us' },
+  // { url: 'https://avail-us.brightlystake.com', type: 'http', priority: 4, provider: 'BrightlyStake', region: 'us' },
   
-  { url: 'wss://rpc-avail.globalstake.io', type: 'ws', priority: 5, provider: 'GlobalStake', region: 'global' },
-  { url: 'https://rpc-avail.globalstake.io', type: 'http', priority: 5, provider: 'GlobalStake', region: 'global' },
+  // { url: 'wss://rpc-avail.globalstake.io', type: 'ws', priority: 5, provider: 'GlobalStake', region: 'global' },
+  // { url: 'https://rpc-avail.globalstake.io', type: 'http', priority: 5, provider: 'GlobalStake', region: 'global' },
   
-  // Community providers
-  { url: 'wss://avail.api.onfinality.io/public-ws', type: 'ws', priority: 6, provider: 'OnFinality', region: 'global' },
-  { url: 'https://avail.api.onfinality.io/public', type: 'http', priority: 6, provider: 'OnFinality', region: 'global' },
+  // // Community providers
+  // { url: 'wss://avail.api.onfinality.io/public-ws', type: 'ws', priority: 6, provider: 'OnFinality', region: 'global' },
+  // { url: 'https://avail.api.onfinality.io/public', type: 'http', priority: 6, provider: 'OnFinality', region: 'global' },
   
-  { url: 'wss://avail-rpc.lgns.net/', type: 'ws', priority: 7, provider: 'LugaNodes', region: 'global' },
-  { url: 'https://avail-rpc.lgns.net/', type: 'http', priority: 7, provider: 'LugaNodes', region: 'global' },
+  // { url: 'wss://avail-rpc.lgns.net/', type: 'ws', priority: 7, provider: 'LugaNodes', region: 'global' },
+  // { url: 'https://avail-rpc.lgns.net/', type: 'http', priority: 7, provider: 'LugaNodes', region: 'global' },
 ];
 
 class CircuitBreaker {
@@ -148,27 +148,58 @@ export class ConnectionManager {
     
     const providers = this.getPreferredProviders();
     
-    for (const provider of providers) {
+    // Create connection promises with individual timeouts for each provider
+    const connectionPromises = providers.map(async (provider) => {
       try {
-        const connection = await this.createConnection(provider);
-        this.connections.set(provider.url, connection);
-        this.circuitBreakers.set(provider.url, new CircuitBreaker());
-        this.connectionMetrics.totalConnections++;
+        // Create connection with 10-second timeout
+        const connection = await Promise.race([
+          this.createConnection(provider),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Connection timeout after 30 seconds')), 30000),
+          ),
+        ]);
         
-        logger.info('ConnectionManager: Connection initialized', {
-          component: 'connection-manager',
-          provider: provider.provider,
-          url: provider.url,
-          type: provider.type,
-        });
-        
+        return { provider, connection, success: true };
       } catch (error) {
-        this.connectionMetrics.failedConnections++;
-        logError(error as Error, {
+        return { provider, error, success: false };
+      }
+    });
+
+    // Attempt all connections in parallel
+    const results = await Promise.allSettled(connectionPromises);
+    
+    // Process results
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const { provider, connection, success, error } = result.value;
+        
+        if (success && connection) {
+          // Successfully connected
+          this.connections.set(provider.url, connection);
+          this.circuitBreakers.set(provider.url, new CircuitBreaker());
+          this.connectionMetrics.totalConnections++;
+          
+          logger.info('ConnectionManager: Connection initialized', {
+            component: 'connection-manager',
+            provider: provider.provider,
+            url: provider.url,
+            type: provider.type,
+          });
+        } else {
+          // Connection failed
+          this.connectionMetrics.failedConnections++;
+          logError(error as Error, {
+            component: 'connection-manager',
+            action: 'initializeConnection',
+            provider: provider.provider,
+            url: provider.url,
+          });
+        }
+      } else {
+        // Promise itself was rejected (shouldn't happen with our error handling, but just in case)
+        logger.error('ConnectionManager: Unexpected promise rejection', {
           component: 'connection-manager',
-          action: 'initializeConnection',
-          provider: provider.provider,
-          url: provider.url,
+          error: result.reason,
         });
       }
     }
@@ -209,16 +240,16 @@ export class ConnectionManager {
   /**
    * Test connection health
    */
-     async testConnection(connection: BlockchainConnection): Promise<boolean> {
-     try {
-       await connection.api.rpc.system.chain();
-       connection.lastActivity = new Date();
-       return true;
-     } catch {
-       connection.isConnected = false;
-       return false;
-     }
-   }
+  async testConnection(connection: BlockchainConnection): Promise<boolean> {
+    try {
+      await connection.api.rpc.system.chain();
+      connection.lastActivity = new Date();
+      return true;
+    } catch {
+      connection.isConnected = false;
+      return false;
+    }
+  }
 
   /**
    * Get connection health status
