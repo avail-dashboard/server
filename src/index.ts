@@ -320,10 +320,12 @@ class AvailExplorerServer {
           await this.disconnectServices();
 
           logger.info('Server: Graceful shutdown completed');
-          throw new Error('Graceful shutdown completed');
+          // eslint-disable-next-line no-process-exit
+          process.exit(0);
         } catch (error) {
           logger.error('Server: Error during graceful shutdown', { error });
-          throw error;
+          // eslint-disable-next-line no-process-exit
+          process.exit(1);
         }
       });
     });
@@ -408,6 +410,7 @@ export const server = new AvailExplorerServer();
 if (require.main === module) {
   server.start().catch((error) => {
     console.error('Failed to start server:', error);
+    // eslint-disable-next-line no-process-exit
     process.exit(1);
   });
 }
