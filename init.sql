@@ -62,4 +62,32 @@ CREATE INDEX IF NOT EXISTS idx_watchlists_user ON watchlists(user_id);
 
 -- Grant permissions to the avail_user
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO avail_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO avail_user; 
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO avail_user;
+
+-- Sync State table for tracking blockchain synchronization
+CREATE TABLE IF NOT EXISTS sync_state (
+  id SERIAL PRIMARY KEY,
+  last_synced_block BIGINT NOT NULL DEFAULT 0,
+  target_block BIGINT,
+  sync_status VARCHAR(20) DEFAULT 'idle' CHECK (sync_status IN ('idle', 'syncing', 'paused', 'error', 'completed')),
+  sync_mode VARCHAR(20) DEFAULT 'incremental' CHECK (sync_mode IN ('full', 'incremental', 'live')),
+  blocks_per_minute INTEGER,
+  estimated_completion TIMESTAMP,
+  error_count INTEGER DEFAULT 0,
+  last_error TEXT,
+  last_error_block BIGINT,
+  started_at TIMESTAMP,
+  paused_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for sync_state table
+CREATE INDEX IF NOT EXISTS idx_sync_state_status ON sync_state(sync_status);
+CREATE INDEX IF NOT EXISTS idx_sync_state_last_synced ON sync_state(last_synced_block);
+
+-- Insert initial sync state record
+INSERT INTO sync_state (last_synced_block, sync_status, sync_mode) 
+VALUES (0, 'idle', 'incremental') 
+ON CONFLICT DO NOTHING; 

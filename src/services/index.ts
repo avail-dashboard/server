@@ -5,6 +5,7 @@
 export { BlockchainService } from './core/blockchain';
 export { ConnectionManager } from './core/connection-manager';
 export { QueueService, queueService } from './core/queue';
+export { SyncService, createSyncService } from './core/sync';
 
 // Integration Services
 // (No integration services currently)
@@ -13,6 +14,8 @@ export { QueueService, queueService } from './core/queue';
 export { BlockService, createBlockService } from './domain/block';
 export { ExtrinsicService, createExtrinsicService } from './domain/extrinsic';
 export { DataAvailabilityService, createDataAvailabilityService } from './domain/dataAvailability';
+export { BlockIndexerService, createBlockIndexerService } from './domain/indexer';
+export { DataProcessorService, createDataProcessorService } from './domain/processor';
 
 // Service Types
 export * from './types/service';
@@ -27,6 +30,9 @@ import { queueService } from './core/queue';
 import { createBlockService } from './domain/block';
 import { createExtrinsicService } from './domain/extrinsic';
 import { createDataAvailabilityService } from './domain/dataAvailability';
+import { createSyncService } from './core/sync';
+import { createBlockIndexerService } from './domain/indexer';
+import { createDataProcessorService } from './domain/processor';
 
 // Database import
 import db from '../utils/database';
@@ -103,10 +109,25 @@ export class ServiceFactory {
       const extrinsicService = createExtrinsicService(db, blockchainService);
       const dataAvailabilityService = createDataAvailabilityService(db, blockchainService);
       
+      // Create new sync services
+      const syncService = createSyncService(db, blockchainService, queueService);
+      const blockIndexerService = createBlockIndexerService(db, blockchainService);
+      const dataProcessorService = createDataProcessorService(db, blockchainService);
+      
       // Register domain services
       this.register('blockService', blockService);
       this.register('extrinsicService', extrinsicService);
       this.register('dataAvailabilityService', dataAvailabilityService);
+      
+      // Register new sync services
+      this.register('syncService', syncService);
+      this.register('blockIndexerService', blockIndexerService);
+      this.register('dataProcessorService', dataProcessorService);
+      
+      // Start sync services
+      await syncService.start();
+      await blockIndexerService.start();
+      await dataProcessorService.start();
       
       console.log('✅ Domain services initialized successfully');
     } catch (error) {

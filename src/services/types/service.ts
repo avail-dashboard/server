@@ -105,4 +105,7 @@ export enum JobType {
   ROLLUP_STATISTICS = 'rollup_statistics',
   DATA_SYNC = 'data_sync',
   HEALTH_CHECK = 'health_check',
+  SYNC_BLOCK_RANGE = 'sync_block_range',
+  PROCESS_BLOCK_DATA = 'process_block_data',
+  UPDATE_SYNC_STATE = 'update_sync_state',
 } 

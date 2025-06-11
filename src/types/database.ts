@@ -435,6 +435,46 @@ export interface Account {
 }
 
 // ==========================================
+// SYNC STATE TYPES
+// ==========================================
+
+export interface SyncState {
+  id: number;
+  last_synced_block: bigint;
+  target_block?: bigint;
+  sync_status: 'idle' | 'syncing' | 'paused' | 'error' | 'completed';
+  sync_mode: 'full' | 'incremental' | 'live';
+  blocks_per_minute?: number;
+  estimated_completion?: Date;
+  error_count: number;
+  last_error?: string;
+  last_error_block?: bigint;
+  started_at?: Date;
+  paused_at?: Date;
+  completed_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface SyncProgress {
+  current_block: bigint;
+  target_block: bigint;
+  progress_percentage: number;
+  blocks_remaining: bigint;
+  estimated_time_remaining?: number; // seconds
+  current_speed: number; // blocks per minute
+}
+
+export interface SyncMetrics {
+  total_blocks_synced: bigint;
+  total_errors: number;
+  average_blocks_per_minute: number;
+  sync_duration: number; // seconds
+  last_successful_block: bigint;
+  error_rate: number; // percentage
+}
+
+// ==========================================
 // UTILITY TYPES
 // ==========================================
 
@@ -458,7 +498,8 @@ export type DatabaseEntity =
   | UserPreferences
   | Block 
   | Extrinsic 
-  | Account;
+  | Account
+  | SyncState;
 
 export type EntityType = 
   | 'validator' 
@@ -480,4 +521,5 @@ export type EntityType =
   | 'user_preferences'
   | 'block' 
   | 'extrinsic' 
-  | 'account'; 
+  | 'account'
+  | 'sync_state'; 
