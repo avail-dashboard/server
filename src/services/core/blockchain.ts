@@ -10,7 +10,6 @@ import {
   ChainInfo,
 } from '../types/blockchain';
 import { ConnectionManager, connectionManager } from './connection-manager';
-import { ServiceLifecycleManager, serviceLifecycleManager } from './service-lifecycle-manager';
 
 class SubscriptionManagerImpl implements SubscriptionManager {
   public subscriptions = new Map<string, any>();
@@ -52,18 +51,16 @@ class SubscriptionManagerImpl implements SubscriptionManager {
  * Responsibilities:
  * - Domain-specific blockchain operations (getLatestBlock, getChainInfo, etc.)
  * - Subscription management for real-time data
- * - Coordinate ConnectionManager and ServiceLifecycleManager
+ * - Coordinate ConnectionManager
  * - Provide clean API interface for domain services
  */
 export class BlockchainService implements BaseService {
   private connectionManager: ConnectionManager;
-  private lifecycleManager: ServiceLifecycleManager;
   private subscriptionManager: SubscriptionManagerImpl;
 
-  constructor( ) {
+  constructor() {
     // Use provided instances or create new ones
     this.connectionManager = connectionManager;
-    this.lifecycleManager = serviceLifecycleManager;
     this.subscriptionManager = new SubscriptionManagerImpl();
   }
 
@@ -74,14 +71,8 @@ export class BlockchainService implements BaseService {
     try {
       logger.info('BlockchainService: Starting service', { component: 'blockchain' });
       
-      // Start lifecycle manager first
-      await this.lifecycleManager.start();
-      
       // Initialize connection manager
       await this.connectionManager.initialize();
-      
-      // Register self with lifecycle manager for monitoring
-      this.lifecycleManager.registerService('blockchain', this);
       
       logger.info('BlockchainService: Service started successfully', { 
         component: 'blockchain',
@@ -107,9 +98,6 @@ export class BlockchainService implements BaseService {
       // Disconnect from blockchain
       await this.connectionManager.disconnect();
       
-      // Stop lifecycle manager
-      await this.lifecycleManager.stop();
-      
       logger.info('BlockchainService: Service stopped', { component: 'blockchain' });
       
     } catch (error) {
@@ -127,17 +115,13 @@ export class BlockchainService implements BaseService {
     try {
       // Get health from connection manager
       const connectionHealth = await this.connectionManager.getHealth();
-      const lifecycleHealth = await this.lifecycleManager.getHealth();
-      
-      const healthy = connectionHealth.healthy && lifecycleHealth.healthy;
       
       return {
-        healthy,
+        healthy: connectionHealth.healthy,
         lastCheck: now,
-        error: !healthy ? 'Connection or lifecycle issues' : undefined,
+        error: !connectionHealth.healthy ? 'Connection issues' : undefined,
         details: {
           connection: connectionHealth,
-          lifecycle: lifecycleHealth,
           subscriptions: this.subscriptionManager.subscriptions.size,
         },
       };
@@ -158,7 +142,8 @@ export class BlockchainService implements BaseService {
    * Check if service is healthy
    */
   isHealthy(): boolean {
-    return this.lifecycleManager.isHealthy();
+    // Simple health check based on connection manager state
+    return this.connectionManager.getConnections().some(conn => conn.isConnected);
   }
 
   // Domain-specific blockchain operations
@@ -285,20 +270,6 @@ export class BlockchainService implements BaseService {
    */
   getCircuitBreakerStates() {
     return this.connectionManager.getCircuitBreakerStates();
-  }
-
-  /**
-   * Get lifecycle information
-   */
-  getLifecycle() {
-    return this.lifecycleManager.getLifecycle();
-  }
-
-  /**
-   * Get service metrics
-   */
-  getMetrics() {
-    return this.lifecycleManager.getMetrics();
   }
 
   /**
