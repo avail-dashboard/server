@@ -10,14 +10,9 @@ export { QueueService, queueService } from './core/queue';
 // (No integration services currently)
 
 // Domain Services
-export { 
-  BlockService, 
-  ExtrinsicService, 
-  DataAvailabilityService,
-  createBlockService,
-  createExtrinsicService,
-  createDataAvailabilityService,
-} from './domain';
+export { BlockService, createBlockService } from './domain/block';
+export { ExtrinsicService, createExtrinsicService } from './domain/extrinsic';
+export { DataAvailabilityService, createDataAvailabilityService } from './domain/dataAvailability';
 
 // Service Types
 export * from './types/service';
@@ -29,11 +24,9 @@ import { blockchainService } from './core/blockchain';
 import { queueService } from './core/queue';
 
 // Domain services factory functions
-import { 
-  createBlockService,
-  createExtrinsicService,
-  createDataAvailabilityService,
-} from './domain';
+import { createBlockService } from './domain/block';
+import { createExtrinsicService } from './domain/extrinsic';
+import { createDataAvailabilityService } from './domain/dataAvailability';
 
 // Database import
 import db from '../utils/database';
