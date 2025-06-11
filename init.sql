@@ -48,6 +48,24 @@ CREATE TABLE IF NOT EXISTS accounts (
 -- Indexes for accounts table
 CREATE INDEX IF NOT EXISTS idx_accounts_balance ON accounts(balance);
 
+-- Events table
+CREATE TABLE IF NOT EXISTS events (
+  id SERIAL PRIMARY KEY,
+  block_number BIGINT REFERENCES blocks(number),
+  extrinsic_index INTEGER,
+  event_index INTEGER,
+  module VARCHAR(50),
+  event_name VARCHAR(50),
+  data JSONB,
+  timestamp BIGINT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for events table
+CREATE INDEX IF NOT EXISTS idx_events_block ON events(block_number);
+CREATE INDEX IF NOT EXISTS idx_events_module ON events(module);
+CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
+
 -- Watchlists table
 CREATE TABLE IF NOT EXISTS watchlists (
   id SERIAL PRIMARY KEY,

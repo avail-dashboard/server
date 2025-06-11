@@ -126,7 +126,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         blockNumber: blockData.number,
         hash: blockData.hash,
         extrinsicsCount: blockData.extrinsics.length,
-        eventsCount: blockData.events.length
+        eventsCount: blockData.events.length,
       });
 
       // Use transaction to ensure data consistency
@@ -154,7 +154,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       logger.debug('DataProcessorService: Block processed successfully', { 
         component: 'processor', 
         blockNumber: blockData.number,
-        hash: blockData.hash
+        hash: blockData.hash,
       });
       
     } catch (error) {
@@ -162,7 +162,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         component: 'processor', 
         action: 'processBlock',
         blockNumber: blockData.number,
-        hash: blockData.hash
+        hash: blockData.hash,
       });
       throw error;
     }
@@ -174,13 +174,13 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
   async processExtrinsics(
     blockNumber: number, 
     extrinsics: ExtrinsicData[], 
-    client?: any
+    client?: any,
   ): Promise<void> {
     try {
       logger.debug('DataProcessorService: Processing extrinsics', { 
         component: 'processor', 
         blockNumber,
-        count: extrinsics.length
+        count: extrinsics.length,
       });
 
       const dbExtrinsics: Partial<Extrinsic>[] = extrinsics.map(ext => ({
@@ -207,7 +207,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       logger.debug('DataProcessorService: Extrinsics processed successfully', { 
         component: 'processor', 
         blockNumber,
-        count: extrinsics.length
+        count: extrinsics.length,
       });
       
     } catch (error) {
@@ -215,7 +215,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         component: 'processor', 
         action: 'processExtrinsics',
         blockNumber,
-        count: extrinsics.length
+        count: extrinsics.length,
       });
       throw error;
     }
@@ -227,13 +227,13 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
   async processEvents(
     blockNumber: number, 
     events: EventData[], 
-    client?: any
+    client?: any,
   ): Promise<void> {
     try {
       logger.debug('DataProcessorService: Processing events', { 
         component: 'processor', 
         blockNumber,
-        count: events.length
+        count: events.length,
       });
 
       const dbEvents: Partial<Event>[] = events.map(event => ({
@@ -259,7 +259,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       logger.debug('DataProcessorService: Events processed successfully', { 
         component: 'processor', 
         blockNumber,
-        count: events.length
+        count: events.length,
       });
       
     } catch (error) {
@@ -267,7 +267,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         component: 'processor', 
         action: 'processEvents',
         blockNumber,
-        count: events.length
+        count: events.length,
       });
       throw error;
     }
@@ -302,12 +302,12 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       logger.debug('DataProcessorService: Updating account states', { 
         component: 'processor', 
         blockNumber: blockData.number,
-        accountCount: addresses.size
+        accountCount: addresses.size,
       });
 
       // Update or insert account records
       const updatePromises = Array.from(addresses).map(address => 
-        this.updateAccountRecord(address, client)
+        this.updateAccountRecord(address, client),
       );
 
       await Promise.all(updatePromises);
@@ -315,14 +315,14 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       logger.debug('DataProcessorService: Account states updated', { 
         component: 'processor', 
         blockNumber: blockData.number,
-        accountCount: addresses.size
+        accountCount: addresses.size,
       });
       
     } catch (error) {
       logError(error as Error, { 
         component: 'processor', 
         action: 'updateAccountStates',
-        blockNumber: blockData.number
+        blockNumber: blockData.number,
       });
       throw error;
     }
@@ -345,13 +345,13 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       // Check if block already exists
       const existingBlock = await client.query(
         'SELECT number FROM blocks WHERE number = $1',
-        [blockRecord.number]
+        [blockRecord.number],
       );
 
       if (existingBlock.rows.length > 0) {
         logger.debug('DataProcessorService: Block already exists, skipping', { 
           component: 'processor', 
-          blockNumber: blockData.number 
+          blockNumber: blockData.number, 
         });
         return;
       }
@@ -366,21 +366,21 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
           blockRecord.parent_hash,
           blockRecord.state_root,
           blockRecord.timestamp,
-          blockRecord.extrinsics_count
-        ]
+          blockRecord.extrinsics_count,
+        ],
       );
 
       logger.debug('DataProcessorService: Block stored successfully', { 
         component: 'processor', 
         blockNumber: blockData.number,
-        hash: blockData.hash
+        hash: blockData.hash,
       });
       
     } catch (error) {
       logError(error as Error, { 
         component: 'processor', 
         action: 'storeBlock',
-        blockNumber: blockData.number
+        blockNumber: blockData.number,
       });
       throw error;
     }
@@ -390,7 +390,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
    * Batch insert extrinsics
    */
   private async batchInsertExtrinsics(extrinsics: Partial<Extrinsic>[], client: any): Promise<void> {
-    if (extrinsics.length === 0) return;
+    if (extrinsics.length === 0) {return;}
 
     try {
       const values: any[] = [];
@@ -399,7 +399,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       extrinsics.forEach((ext, index) => {
         const baseIndex = index * 8;
         placeholders.push(
-          `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7}, $${baseIndex + 8})`
+          `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7}, $${baseIndex + 8})`,
         );
         values.push(
           ext.hash,
@@ -409,7 +409,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
           ext.call,
           ext.success,
           ext.timestamp,
-          ext.signer
+          ext.signer,
         );
       });
 
@@ -425,7 +425,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       logError(error as Error, { 
         component: 'processor', 
         action: 'batchInsertExtrinsics',
-        count: extrinsics.length
+        count: extrinsics.length,
       });
       throw error;
     }
@@ -435,7 +435,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
    * Batch insert events
    */
   private async batchInsertEvents(events: Partial<Event>[], client: any): Promise<void> {
-    if (events.length === 0) return;
+    if (events.length === 0) {return;}
 
     try {
       const values: any[] = [];
@@ -444,7 +444,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       events.forEach((event, index) => {
         const baseIndex = index * 7;
         placeholders.push(
-          `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7})`
+          `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7})`,
         );
         values.push(
           event.block_number,
@@ -453,7 +453,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
           event.module,
           event.event_name,
           JSON.stringify(event.data),
-          event.timestamp
+          event.timestamp,
         );
       });
 
@@ -468,7 +468,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       logError(error as Error, { 
         component: 'processor', 
         action: 'batchInsertEvents',
-        count: events.length
+        count: events.length,
       });
       throw error;
     }
@@ -485,17 +485,17 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       // TODO: Fetch actual balance from blockchain in future iterations
       await queryClient.query(
         `INSERT INTO accounts (address, last_updated)
-         VALUES ($1, CURRENT_TIMESTAMP)
-         ON CONFLICT (address) 
-         DO UPDATE SET last_updated = CURRENT_TIMESTAMP`,
-        [address]
+           VALUES ($1, CURRENT_TIMESTAMP)
+           ON CONFLICT (address) 
+           DO UPDATE SET last_updated = CURRENT_TIMESTAMP`,
+        [address],
       );
       
     } catch (error) {
       logError(error as Error, { 
         component: 'processor', 
         action: 'updateAccountRecord',
-        address
+        address,
       });
       // Don't throw - account updates shouldn't fail the entire block processing
     }
@@ -510,14 +510,14 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         `UPDATE sync_state 
          SET last_synced_block = $1, updated_at = CURRENT_TIMESTAMP
          WHERE id = (SELECT id FROM sync_state ORDER BY id DESC LIMIT 1)`,
-        [blockNumber]
+        [blockNumber],
       );
       
     } catch (error) {
       logError(error as Error, { 
         component: 'processor', 
         action: 'updateSyncProgress',
-        blockNumber
+        blockNumber,
       });
       // Don't throw - sync progress update shouldn't fail block processing
     }
@@ -542,8 +542,8 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         this.db.query<{ count: number }>(
           `SELECT COUNT(*) as count 
            FROM blocks 
-           WHERE created_at >= NOW() - INTERVAL '1 hour'`
-        )
+           WHERE created_at >= NOW() - INTERVAL '1 hour'`,
+        ),
       ]);
 
       return {
@@ -571,7 +571,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
  */
 export const createDataProcessorService = (
   database: typeof db, 
-  blockchain: BlockchainService
+  blockchain: BlockchainService,
 ): DataProcessorService => {
   return new DataProcessorService(database, blockchain);
 };

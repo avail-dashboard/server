@@ -22,3 +22,6 @@ src/routes/chain.ts → Exposes /api/chain/stats
 use these before every standalone script: shutdownServices, initializeServices
 
 singleton database, blockchain, queue
+
+
+ENV_FILE=.env.local etc whenever using env variables

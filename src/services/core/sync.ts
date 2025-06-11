@@ -165,7 +165,6 @@ export class SyncService implements BaseService, ISyncService {
   async getSyncProgress(): Promise<SyncProgress> {
     try {
       const syncState = await this.getCurrentSyncState();
-      const chainInfo = await this.blockchain.getChainInfo();
       const latestBlock = await this.blockchain.getLatestBlock();
       
       const currentBlock = BigInt(syncState.last_synced_block);
@@ -264,9 +263,9 @@ export class SyncService implements BaseService, ISyncService {
         sync_mode: mode,
         target_block: BigInt(targetBlock),
         started_at: new Date(),
-        paused_at: null,
-        completed_at: null,
-        last_error: null,
+        paused_at: undefined,
+        completed_at: undefined,
+        last_error: undefined,
       });
       
       // Queue block range jobs
@@ -328,7 +327,7 @@ export class SyncService implements BaseService, ISyncService {
       
       await this.updateSyncState({
         sync_status: 'syncing',
-        paused_at: null,
+        paused_at: undefined,
       });
       
       // Resume the queue
@@ -357,17 +356,17 @@ export class SyncService implements BaseService, ISyncService {
       // Reset sync state
       await this.updateSyncState({
         last_synced_block: 0n,
-        target_block: null,
+        target_block: undefined,
         sync_status: 'idle',
         sync_mode: 'incremental',
-        blocks_per_minute: null,
-        estimated_completion: null,
+        blocks_per_minute: undefined,
+        estimated_completion: undefined,
         error_count: 0,
-        last_error: null,
-        last_error_block: null,
-        started_at: null,
-        paused_at: null,
-        completed_at: null,
+        last_error: undefined,
+        last_error_block: undefined,
+        started_at: undefined,
+        paused_at: undefined,
+        completed_at: undefined,
       });
       
       logger.info('SyncService: Sync reset completed', { component: 'sync' });
@@ -382,12 +381,22 @@ export class SyncService implements BaseService, ISyncService {
    */
   private async updateSyncState(updates: Partial<SyncState>): Promise<void> {
     try {
-      const updateFields = Object.keys(updates)
-        .map((key, index) => `${key} = $${index + 2}`)
+      // Filter out undefined values to avoid PostgreSQL parameter type issues
+      const filteredUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, value]) => value !== undefined)
+      );
+
+      if (Object.keys(filteredUpdates).length === 0) {
+        // Nothing to update
+        return;
+      }
+
+      const updateFields = Object.keys(filteredUpdates)
+        .map((key, index) => `${key} = $${index + 1}`)
         .join(', ');
       
       const values = [
-        ...Object.values(updates),
+        ...Object.values(filteredUpdates),
         new Date(), // updated_at
       ];
       
@@ -408,7 +417,7 @@ export class SyncService implements BaseService, ISyncService {
    */
   private async initializeSyncState(): Promise<void> {
     try {
-      const result = await this.db.query<SyncState>(
+      const result = await this.db.query<{ count: number }>(
         'SELECT COUNT(*) as count FROM sync_state',
       );
       
