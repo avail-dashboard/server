@@ -15,3 +15,10 @@ src/services/hybrid-rpc.ts → getChainStatsPolkadot()
 src/services/direct-websocket.ts → getChainStats()
 src/routes/chain.ts → Exposes /api/chain/stats
 
+
+
+
+## initialization
+use these before every standalone script: shutdownServices, initializeServices
+
+singleton database, blockchain, queue

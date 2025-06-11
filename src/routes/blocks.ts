@@ -1,59 +1,92 @@
 import { Router, Request, Response } from 'express';
-import { logError } from '../utils/logger';
-import { APIResponse } from '../types';
-import { pagination, cacheMiddleware } from '../middleware';
-import config from '../config';
-import { keysToCamelCase } from '../utils/caseConverter';
+import { serviceFactory, BlockService } from '../services';
 
 const router = Router();
 
-// GET /api/blocks - Get latest blocks
-router.get('/', 
-  pagination, 
-  cacheMiddleware(config.cache.ttl.blocks),
-  async (req: Request, res: Response) => {
-    try {
-      throw new Error('Missing service');
-      const response: APIResponse = {
-        success: true,
-        data: [],
-        meta: {
-        },
-      };
+/**
+ * GET /api/blocks/latest
+ * Get the latest finalized block
+ */
+router.get('/latest', async (req: Request, res: Response) => {
+  try {
+    const blockService = serviceFactory.get<BlockService>('blockService');
+    const block = await blockService.getLatestBlock();
 
-      res.json(response);
-    } catch (error) {
-      logError(error as Error, { component: 'blocks-route', action: 'getBlocks' });
-      
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch blocks',
-        },
-      });
-    }
-  },
-);
+    res.json({
+      success: true,
+      data: block,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error fetching latest block:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch latest block',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
-// GET /api/blocks/:numberOrHash - Get specific block
-router.get('/:numberOrHash', 
-  cacheMiddleware(config.cache.ttl.blockByNumber),
-  async (req: Request, res: Response) => {
-    try {
-      throw new Error('Missing service');
-    } catch (error) {
-      logError(error as Error, { component: 'blocks-route', action: 'getBlock' });
-      
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch block',
-        },
-      });
-    }
-  },
-);
+/**
+ * GET /api/blocks
+ * Get paginated list of blocks
+ */
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const sortBy = (req.query.sort_by as string) || 'number';
+    const sortOrder = (req.query.sort_order as string) || 'desc';
+
+    const blockService = serviceFactory.get<BlockService>('blockService');
+    const result = await blockService.getBlocks(
+      { page, limit },
+      { sort_by: sortBy, sort_order: sortOrder as 'asc' | 'desc' },
+    );
+
+    res.json({
+      success: true,
+      data: result.data,
+      pagination: result.pagination,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error fetching blocks:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch blocks',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
+ * GET /api/blocks/:identifier
+ * Get block by hash or number
+ */
+router.get('/:identifier', async (req: Request, res: Response) => {
+  try {
+    const identifier = req.params.identifier;
+    
+    // Parse as number if it's a valid integer, otherwise treat as hash
+    const blockIdentifier = /^\d+$/.test(identifier) ? parseInt(identifier) : identifier;
+    
+    const blockService = serviceFactory.get<BlockService>('blockService');
+    const block = await blockService.getBlock(blockIdentifier);
+
+    res.json({
+      success: true,
+      data: block,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error fetching block:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch block',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
 export default router; 

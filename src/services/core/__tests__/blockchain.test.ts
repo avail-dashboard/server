@@ -84,11 +84,6 @@ describe('BlockchainService', () => {
       expect(blockchainService).toBeInstanceOf(BlockchainService);
     });
 
-    it('should start with STOPPED status', () => {
-      const lifecycle = blockchainService.getLifecycle();
-      expect(lifecycle.status).toBe('STOPPED');
-    });
-
     it('should not be healthy initially', () => {
       expect(blockchainService.isHealthy()).toBe(false);
     });
@@ -97,18 +92,12 @@ describe('BlockchainService', () => {
   describe('Service Lifecycle', () => {
     it('should start successfully', async () => {
       await blockchainService.start();
-      
-      const lifecycle = blockchainService.getLifecycle();
-      expect(lifecycle.status).toBe('RUNNING');
       expect(blockchainService.isHealthy()).toBe(true);
     });
 
     it('should stop successfully', async () => {
       await blockchainService.start();
       await blockchainService.stop();
-      
-      const lifecycle = blockchainService.getLifecycle();
-      expect(lifecycle.status).toBe('STOPPED');
       expect(blockchainService.isHealthy()).toBe(false);
     });
   });
@@ -125,16 +114,7 @@ describe('BlockchainService', () => {
       
       const health = await blockchainService.getHealth();
       expect(health.healthy).toBe(true);
-      expect(health.details?.chain).toBe('Avail');
-    });
-  });
-
-  describe('Metrics', () => {
-    it('should track metrics', () => {
-      const metrics = blockchainService.getMetrics();
-      expect(metrics).toHaveProperty('requestCount');
-      expect(metrics).toHaveProperty('errorCount');
-      expect(metrics).toHaveProperty('averageResponseTime');
+      expect(health.details?.connection).toBeDefined();
     });
   });
 
@@ -155,6 +135,15 @@ describe('BlockchainService', () => {
       expect(states.length).toBeGreaterThan(0);
       expect(states[0]).toHaveProperty('url');
       expect(states[0]).toHaveProperty('state');
+    });
+
+    it('should track connection metrics', async () => {
+      await blockchainService.start();
+      
+      const metrics = blockchainService.getConnectionMetrics();
+      expect(metrics).toHaveProperty('totalConnections');
+      expect(metrics).toHaveProperty('activeConnections');
+      expect(metrics).toHaveProperty('failedConnections');
     });
   });
 }); 

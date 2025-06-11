@@ -46,7 +46,7 @@ export class BlockService implements IBlockService {
       logger.info('Block not found in database, fetching from blockchain', {
         component: 'block-service',
         identifier: hashOrNumber,
-        source: 'blockchain'
+        source: 'blockchain',
       });
 
       const blockData = await this.fetchBlockFromBlockchain(hashOrNumber);
