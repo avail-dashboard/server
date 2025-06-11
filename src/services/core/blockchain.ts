@@ -9,8 +9,8 @@ import {
   BlockData,
   ChainInfo,
 } from '../types/blockchain';
-import { ConnectionManager } from './connection-manager';
-import { ServiceLifecycleManager } from './service-lifecycle-manager';
+import { ConnectionManager, connectionManager } from './connection-manager';
+import { ServiceLifecycleManager, serviceLifecycleManager } from './service-lifecycle-manager';
 
 class SubscriptionManagerImpl implements SubscriptionManager {
   public subscriptions = new Map<string, any>();
@@ -60,13 +60,10 @@ export class BlockchainService implements BaseService {
   private lifecycleManager: ServiceLifecycleManager;
   private subscriptionManager: SubscriptionManagerImpl;
 
-  constructor(
-    connectionManager?: ConnectionManager,
-    lifecycleManager?: ServiceLifecycleManager,
-  ) {
+  constructor( ) {
     // Use provided instances or create new ones
-    this.connectionManager = connectionManager || new ConnectionManager();
-    this.lifecycleManager = lifecycleManager || new ServiceLifecycleManager();
+    this.connectionManager = connectionManager;
+    this.lifecycleManager = serviceLifecycleManager;
     this.subscriptionManager = new SubscriptionManagerImpl();
   }
 
@@ -312,16 +309,5 @@ export class BlockchainService implements BaseService {
   }
 }
 
-// Create instances with shared lifecycle manager
-const sharedLifecycleManager = new ServiceLifecycleManager();
-const sharedConnectionManager = new ConnectionManager();
-
 // Singleton instance with shared components
-export const blockchainService = new BlockchainService(
-  sharedConnectionManager,
-  sharedLifecycleManager,
-);
-
-// Export the shared managers for other services to use
-export { sharedConnectionManager as connectionManager };
-export { sharedLifecycleManager as lifecycleManager }; 
+export const blockchainService = new BlockchainService();

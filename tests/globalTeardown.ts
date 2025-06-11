@@ -9,7 +9,7 @@ export default async (): Promise<void> => {
     
     if (server) {
       // Shutdown all services (database, cache, all services)
-      await server.shutdownServicesForTesting();
+      await server.shutdownServices();
       console.log('✅ Global teardown: Services shutdown successfully');
     }
   } catch (error) {

@@ -2,7 +2,7 @@
 // Simple service factory and dependency injection
 
 // Core Services
-export { BlockchainService, blockchainService, connectionManager, lifecycleManager } from './core/blockchain';
+export { BlockchainService } from './core/blockchain';
 export { ConnectionManager } from './core/connection-manager';
 export { ServiceLifecycleManager } from './core/service-lifecycle-manager';
 export { QueueService, queueService } from './core/queue';
@@ -10,7 +10,9 @@ export { QueueService, queueService } from './core/queue';
 // Integration Services
 // (No integration services currently)
 
-import { blockchainService, connectionManager, lifecycleManager } from './core/blockchain';
+import { blockchainService } from './core/blockchain';
+import { connectionManager } from './core/connection-manager';
+import { serviceLifecycleManager } from './core/service-lifecycle-manager';
 import { queueService } from './core/queue';
 
 // Domain Services
@@ -66,7 +68,7 @@ export class ServiceFactory {
   async initializeCoreServices(): Promise<void> {
     // Register core services (using shared instances from blockchain service)
     this.register('connectionManager', connectionManager);
-    this.register('lifecycleManager', lifecycleManager);
+    this.register('lifecycleManager', serviceLifecycleManager);
     this.register('blockchain', blockchainService);
     this.register('queue', queueService);
 
@@ -127,7 +129,7 @@ export class ServiceFactory {
     }
 
     if (this.has('lifecycleManager')) {
-      const lifecycleMgr = this.get<typeof lifecycleManager>('lifecycleManager');
+      const lifecycleMgr = this.get<typeof serviceLifecycleManager>('lifecycleManager');
       healthStatus.lifecycleManager = await lifecycleMgr.getHealth();
     }
 

@@ -9,7 +9,7 @@ export default async (): Promise<void> => {
   
   try {
     // Initialize server services (database, cache, all services)
-    await server.initializeServicesForTesting();
+    await server.initializeServices();
     console.log('✅ Global setup: Services initialized successfully');
     
     // Store server reference for teardown

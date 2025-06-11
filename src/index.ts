@@ -392,11 +392,11 @@ class AvailExplorerServer {
   }
 
   // Public methods for testing - allow tests to use the same service setup
-  public async initializeServicesForTesting(): Promise<void> {
+  public async initializeServices(): Promise<void> {
     await this.connectServices();
   }
 
-  public async shutdownServicesForTesting(): Promise<void> {
+  public async shutdownServices(): Promise<void> {
     await this.disconnectServices();
   }
 }
