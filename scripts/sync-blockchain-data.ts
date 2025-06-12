@@ -316,8 +316,6 @@ class StandaloneSyncScript {
       process.on(signal, () => {
         logger.info(`🛑 Received ${signal}, gracefully shutting down...`);
         this.shouldStop = true;
-        // eslint-disable-next-line no-process-exit
-        process.exit(0);
       });
     });
 
@@ -374,7 +372,6 @@ async function main(): Promise<void> {
 if (require.main === module) {
   main().catch((error) => {
     logger.error('💥 Script execution failed:', error);
-    // eslint-disable-next-line no-process-exit
     process.exit(1);
   });
 } 

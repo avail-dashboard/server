@@ -24,4 +24,4 @@ use these before every standalone script: shutdownServices, initializeServices
 singleton database, blockchain, queue
 
 
-ENV_FILE=.env.local etc whenever using env variables
+ENV_FILE=.env.local etc whenever using env variables like `ENV_FILE=.env.local npx scripts/check-block-decode.ts

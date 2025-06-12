@@ -1,0 +1,14 @@
+---
+description: docs primary
+globs: 
+alwaysApply: false
+---
+
+Use these files for reference
+[Service-Layer-Architecture-Plan.md](mdc:Docs/Service-Layer-Architecture-Plan.md)
+[Developer.md](mdc:Docs/Developer.md)
+[API_Endpoint_Specs.md](mdc:Docs/API_Endpoint_Specs.md)
+[Avail DA Explorer Scope.md](mdc:Docs/Avail DA Explorer Scope.md)
+
+
+Also use stored avail docs & polkadot
