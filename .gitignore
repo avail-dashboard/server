@@ -183,11 +183,12 @@ dist/
 *.rar
 
 # Lock files (uncomment if you want to ignore them)
-# package-lock.json
-# yarn.lock
+package-lock.json
+yarn.lock
 
 # Avail specific (if any blockchain data files)
 *.chain
 *.db
 
 # Redis dump files 
+/src/generated/prisma

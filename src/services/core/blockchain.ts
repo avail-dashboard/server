@@ -9,7 +9,7 @@ import {
   BlockData,
   ChainInfo,
 } from '../types/blockchain';
-import { ConnectionManager, connectionManager } from './connection-manager';
+import { ConnectionManager, createConnectionManager } from './connection-manager';
 
 class SubscriptionManagerImpl implements SubscriptionManager {
   public subscriptions = new Map<string, any>();
@@ -59,8 +59,8 @@ export class BlockchainService implements BaseService {
   private subscriptionManager: SubscriptionManagerImpl;
 
   constructor() {
-    // Use provided instances or create new ones
-    this.connectionManager = connectionManager;
+    // Create connection manager instance
+    this.connectionManager = createConnectionManager();
     this.subscriptionManager = new SubscriptionManagerImpl();
   }
 
@@ -280,5 +280,9 @@ export class BlockchainService implements BaseService {
   }
 }
 
-// Singleton instance with shared components
-export const blockchainService = new BlockchainService();
+// Factory function for dependency injection
+export const createBlockchainService = (): BlockchainService => {
+  return new BlockchainService();
+};
+
+// Class exported above with declaration

@@ -438,5 +438,9 @@ export class QueueService implements QueueServiceInterface {
   }
 }
 
-// Create singleton instance
-export const queueService = new QueueService(); 
+// Factory function for dependency injection
+export const createQueueService = (): QueueService => {
+  return new QueueService();
+};
+
+// Class exported above with declaration 

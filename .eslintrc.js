@@ -100,10 +100,6 @@ module.exports = {
     'no-implied-eval': 'error',
     'no-new-func': 'error',
     'no-script-url': 'error',
-    
-    // Node.js specific
-    'no-process-exit': 'error',
-    'no-path-concat': 'error',
   },
   overrides: [
     {

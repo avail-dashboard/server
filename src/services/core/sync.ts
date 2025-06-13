@@ -381,22 +381,12 @@ export class SyncService implements BaseService, ISyncService {
    */
   private async updateSyncState(updates: Partial<SyncState>): Promise<void> {
     try {
-      // Filter out undefined values to avoid PostgreSQL parameter type issues
-      const filteredUpdates = Object.fromEntries(
-        Object.entries(updates).filter(([_, value]) => value !== undefined)
-      );
-
-      if (Object.keys(filteredUpdates).length === 0) {
-        // Nothing to update
-        return;
-      }
-
-      const updateFields = Object.keys(filteredUpdates)
-        .map((key, index) => `${key} = $${index + 1}`)
+      const updateFields = Object.keys(updates)
+        .map((key, index) => `${key} = $${index + 2}`)
         .join(', ');
       
       const values = [
-        ...Object.values(filteredUpdates),
+        ...Object.values(updates),
         new Date(), // updated_at
       ];
       

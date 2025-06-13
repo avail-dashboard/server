@@ -438,5 +438,9 @@ export class ConnectionManager {
   }
 }
 
-// Singleton instance
-export const connectionManager = new ConnectionManager(); 
+// Factory function for dependency injection
+export const createConnectionManager = (): ConnectionManager => {
+  return new ConnectionManager();
+};
+
+// Class exported above with declaration 

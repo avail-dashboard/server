@@ -316,6 +316,7 @@ class StandaloneSyncScript {
       process.on(signal, () => {
         logger.info(`🛑 Received ${signal}, gracefully shutting down...`);
         this.shouldStop = true;
+        process.exit(0);
       });
     });
 

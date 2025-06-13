@@ -397,9 +397,9 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       const placeholders: string[] = [];
       
       extrinsics.forEach((ext, index) => {
-        const baseIndex = index * 8;
+        const baseIndex = index * 9; // Changed from 8 to 9 to include fee
         placeholders.push(
-          `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7}, $${baseIndex + 8})`,
+          `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7}, $${baseIndex + 8}, $${baseIndex + 9})`,
         );
         values.push(
           ext.hash,
@@ -410,11 +410,12 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
           ext.success,
           ext.timestamp,
           ext.signer,
+          ext.fee, // Added fee field
         );
       });
 
       const query = `
-        INSERT INTO extrinsics (hash, block_number, extrinsic_index, module, call, success, timestamp, signer)
+        INSERT INTO extrinsics (hash, block_number, extrinsic_index, module, call, success, timestamp, signer, fee)
         VALUES ${placeholders.join(', ')}
         ON CONFLICT (hash) DO NOTHING
       `;

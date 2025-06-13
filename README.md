@@ -1,275 +1,141 @@
-# Avail Explorer Backend
+Avail Explorer Backend
 
-Backend server for the Avail blockchain explorer with automatic API integration and fallback support.
+## Project Overview
+This is the backend server for the Avail blockchain explorer, providing APIs for blockchain data access with automatic fallback support and real-time features.
 
-## Features
+## Technology Stack
+- **Runtime**: Node.js 18+
+- **Framework**: Express.js with TypeScript
+- **Database**: PostgreSQL (primary), Redis (caching)
+- **Blockchain**: Polkadot API for Avail blockchain integration
+- **Testing**: Jest with supertest
+- **Process Management**: PM2 with ecosystem.config.js
 
-- **PostgreSQL Database**: Production-ready database for all environments
-- **Automatic API Integration**: Direct backend APIs with external API fallbacks
-- **Real-time Updates**: WebSocket support for live data
-- **Health Monitoring**: Comprehensive health checks and monitoring
-- **Development-friendly**: Easy PostgreSQL setup for local development
+## Key Scripts & Commands
 
-## Quick Start (Development)
-
-### Prerequisites
-- Node.js 18+
-- npm or yarn
-- PostgreSQL 12+
-- Redis (optional, for caching)
-
-### Setup
-
-1. **Clone and install:**
+### Development
 ```bash
-git clone <repository>
-cd server
-npm install
+npm run dev              # Start development server with hot reload
+npm run dev:prod         # Start with production env config
+npm run build           # TypeScript compilation
+npm run start           # Start production server
 ```
 
-2. **Quick setup (recommended):**
+### Testing
 ```bash
-npm run setup
-```
-This will:
-- Create `.env` file from template
-- Set up development defaults
-
-3. **Start development server:**
-```bash
-npm run dev
+npm run test            # Run all tests
+npm run test:unit       # Unit tests only
+npm run test:integration # Integration tests only
+npm run test:e2e        # End-to-end tests only
+npm run test:coverage   # Test with coverage report
+npm run test:critical   # Build + lint + unit + e2e tests
 ```
 
-The server will start on `http://localhost:3001` with:
-- ✅ PostgreSQL database connection
-- ✅ API endpoints ready
-- ✅ WebSocket support
-- ⚠️ Redis optional (caching disabled by default)
-
-## Database Configuration
-
-### Development & Production (PostgreSQL)
+### Code Quality
 ```bash
-# .env
-DATABASE_TYPE=postgresql
-DATABASE_URL=postgresql://user:password@host:port/database
-NODE_ENV=development
+npm run lint            # ESLint check
+npm run lint:fix        # ESLint with auto-fix
+npm run lint:check      # ESLint with zero warnings
+npm run format          # Prettier formatting
 ```
 
-**Pros:**
-- ✅ High performance
-- ✅ Concurrent connections
-- ✅ Production-ready
-- ✅ Advanced features
-- ✅ Consistent across environments
-
-**Cons:**
-- ⚠️ Requires PostgreSQL server
-- ⚠️ More complex initial setup
-
-## Environment Variables
-
-### Required
+### Database & Sync
 ```bash
-DATABASE_URL=postgresql://user:password@host:port/database
+npm run db:init         # Initialize database
+npm run sync:full       # Full blockchain sync
+npm run sync:incremental # Incremental sync
+npm run sync:live       # Live sync mode
+npm run sync:test       # Test sync with small range
 ```
 
-### Optional (with defaults)
+### Blockchain Operations
 ```bash
-# Server
-PORT=3001
-NODE_ENV=development
-CORS_ORIGIN=http://localhost:3000
-
-# Database
-DATABASE_TYPE=postgresql
-
-# Features
-ENABLE_WEBSOCKETS=true
-ENABLE_CACHING=false  # Redis required if true
-ENABLE_RATE_LIMITING=true
+npm run verify:blockchain # Test blockchain connection
+npm run demo:queue       # Demo queue service
+npm run sync:e2e        # End-to-end sync test
 ```
 
-## API Endpoints
-
-The server provides these main endpoints:
-
-### Core Data
-- `GET /api/blocks` - Latest blocks with pagination
-- `GET /api/blocks/:numberOrHash` - Specific block details
-- `GET /api/chain/stats` - Chain statistics
-- `GET /api/extrinsics` - Extrinsics with filtering
-- `GET /api/search` - Search functionality
-
-### System
-- `GET /health` - Server health check
-- WebSocket at `/` - Real-time updates
-
-## Development Workflow
-
-### 1. Quick Start
-```bash
-npm run setup  # One-time setup
-npm run dev    # Start development server
-```
-
-### 2. Database Management
-```bash
-# Tables are created automatically on first run
-# Connect to database
-psql $DATABASE_URL
-
-# View tables
-\dt
-
-# View schema
-\d blocks
-```
-
-### 3. Testing API Integration
-```bash
-# Health check
-curl http://localhost:3001/health
-
-# Get latest blocks
-curl http://localhost:3001/api/blocks
-
-# Chain statistics
-curl http://localhost:3001/api/chain/stats
-```
-
-## Production Deployment
-
-### 1. Environment Setup
-```bash
-# Set production environment
-export NODE_ENV=production
-export DATABASE_URL=postgresql://user:password@host:port/database
-
-# Optional: Enable caching
-export ENABLE_CACHING=true
-export REDIS_URL=redis://host:port
-```
-
-### 2. Database Setup
-```bash
-# Build and run migrations
-npm run build
-npm run migrate  # Creates tables in PostgreSQL
-```
-
-### 3. Start Production Server
-```bash
-npm start
-```
-
-### 4. Process Management (Optional)
-For production environments, consider using PM2 for process management:
-```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Start with PM2
-pm2 start ecosystem.config.js
-
-# Monitor
-pm2 status
-pm2 logs
-```
+## Environment Files
+- `.env.local` - Local development
+- `.env.test` - Testing environment
+- `.env.production` - Production environment
+- `env.example` - Template file
 
 ## Architecture
 
-### Database Layer
-```
-┌─────────────────┐    ┌─────────────────┐
-│   Development   │    │   Production    │
-│   PostgreSQL    │    │   PostgreSQL    │
-│                 │    │                 │
-│ • Network DB    │    │ • Network DB    │
-│ • High perf     │    │ • High perf     │
-│ • Scalable      │    │ • Scalable      │
-└─────────────────┘    └─────────────────┘
-         │                       │
-         └───────┬───────────────┘
-                 │
-         ┌─────────────────┐
-         │ Unified DB API  │
-         │                 │
-         │ • Same interface│
-         │ • Auto-detection│
-         │ • Type safety   │
-         └─────────────────┘
-```
+### Core Services
+- **Blockchain Service** (`src/services/core/blockchain.ts`) - Polkadot API integration
+- **Connection Manager** (`src/services/core/connection-manager.ts`) - Connection pooling
+- **Sync Service** (`src/services/core/sync.ts`) - Blockchain data synchronization
+- **Queue Service** (`src/services/core/queue.ts`) - Bull queue for async processing
 
-### API Integration
-```
-Frontend ──┐
-           │
-           ▼
-    ┌─────────────┐     ┌─────────────┐
-    │   Next.js   │────▶│   Backend   │
-    │ API Routes  │     │   Server    │
-    └─────────────┘     └─────────────┘
-                               │
-                               ▼
-                        ┌─────────────┐
-                        │  Database   │
-                        │ PostgreSQL  │
-                        └─────────────┘
-```
+### Domain Services
+- **Block Service** (`src/services/domain/block.ts`) - Block data processing
+- **Extrinsic Service** (`src/services/domain/extrinsic.ts`) - Transaction processing
+- **Data Availability** (`src/services/domain/dataAvailability.ts`) - DA layer integration
 
-## Troubleshooting
+### API Routes
+- `/api/blocks` - Block data endpoints
+- `/api/extrinsics` - Transaction endpoints
+- `/api/data-submissions` - Data availability endpoints
+- `/api/chain` - Chain statistics
+- `/api/search` - Search functionality
+- `/api/validators` - Validator information
+- `/api/analytics` - Analytics endpoints
 
-### Database Issues
-```bash
-# Test connection
-psql $DATABASE_URL -c "SELECT 1"
+## Database Schema
+- **blocks** - Block information
+- **extrinsics** - Transaction data
+- **data_submissions** - Data availability submissions
+- **validators** - Validator information
+- **chain_stats** - Cached chain statistics
 
-# Check tables
-psql $DATABASE_URL -c "\dt"
+## Key Dependencies
+- `@polkadot/api` - Blockchain API integration
+- `express` - Web framework
+- `pg` - PostgreSQL client
+- `bull` - Queue system
+- `ioredis` - Redis client
+- `winston` - Logging
+- `socket.io` - WebSocket support
 
-# Run migrations manually
-npm run migrate
-```
+## Development Workflow
+1. Use `npm run setup` for initial setup
+2. Start with `npm run dev` for development
+3. Run `npm run test:critical` before commits
+4. Use `npm run verify:blockchain` to test connections
+5. Use sync commands for blockchain data management
 
-### Connection Issues
-```bash
-# Check health endpoint
-curl http://localhost:3001/health
+## Deployment
+- Uses PM2 with `ecosystem.config.js`
+- Docker support with `docker-compose-servers.yml`
+- Nginx configuration in `nginx/` directory
+- Health checks available at `/health`
 
-# Check logs
-npm run dev  # Watch console output
+## Testing Strategy
+- Unit tests for core logic
+- Integration tests for services
+- E2E tests for API endpoints
+- Separate test database configuration
+- Coverage reporting with Jest
 
-# Verify environment
-cat .env
-```
+## Performance Features
+- Connection pooling for database
+- Redis caching layer
+- Rate limiting middleware
+- Compression middleware
+- Queue-based async processing
+- Real-time WebSocket updates
 
-### PostgreSQL Issues
-```bash
-# Test connection
-psql $DATABASE_URL -c "SELECT 1"
+## Monitoring & Logging
+- Winston logger with daily rotation
+- Prometheus metrics support
+- Application and error logs in `logs/`
+- Health check endpoint for monitoring
+- PM2 process monitoring
 
-# Check tables
-psql $DATABASE_URL -c "\dt"
-
-# Run migrations manually
-npm run migrate
-```
-
-## Performance Notes
-
-### PostgreSQL
-- **Read performance**: Excellent
-- **Write performance**: Excellent
-- **Concurrent connections**: High
-- **Scalability**: Horizontal and vertical
-
-## Support
-
-For issues:
-1. Check server logs
-2. Verify environment variables
-3. Test database connection
-4. Check health endpoint: `/health`
-
-The system is designed to be production-ready with PostgreSQL for all environments. 
+## Common Issues & Solutions
+- Use `npm run verify:blockchain` for connection issues
+- Check logs in `logs/` directory for debugging
+- Run database migrations with `npm run db:init`
+- Use test sync commands for blockchain sync debugging
