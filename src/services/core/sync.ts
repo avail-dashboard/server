@@ -382,7 +382,7 @@ export class SyncService implements BaseService, ISyncService {
   private async updateSyncState(updates: Partial<SyncState>): Promise<void> {
     try {
       const updateFields = Object.keys(updates)
-        .map((key, index) => `${key} = $${index + 2}`)
+        .map((key, index) => `${key} = $${index + 1}`)
         .join(', ');
       
       const values = [
