@@ -5,9 +5,13 @@ import config from '../config';
 import { APIResponse, APIError } from '../types';
 import { logRequest, logError } from '../utils/logger';
 import { camelCaseResponse } from './camelCaseResponse';
+import { correlationIdMiddleware } from '../utils/correlationId';
 
 // Export the camelCaseResponse middleware
 export { camelCaseResponse };
+
+// Export correlation ID middleware
+export { correlationIdMiddleware };
 
 // Export test camelCase validator middleware
 export { default as testCamelCaseValidator } from './testCamelCaseValidator';

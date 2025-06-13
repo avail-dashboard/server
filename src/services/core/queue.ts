@@ -2,6 +2,7 @@ import Bull, { Queue, Job, JobOptions } from 'bull';
 import Redis from 'ioredis';
 import config from '../../config';
 import { logger } from '../../utils/logger';
+import { runWithCorrelationId, createChildCorrelationId, getCorrelationId } from '../../utils/correlationId';
 import { 
   QueueServiceInterface, 
   QueueJob, 
@@ -123,7 +124,15 @@ export class QueueService implements QueueServiceInterface {
     }
 
     try {
-      const job = await this.queue.add(type, data, {
+      // Capture current correlation ID to pass to job
+      const correlationId = getCorrelationId();
+      
+      const jobData = {
+        ...data,
+        _correlationId: correlationId, // Add correlation ID to job data
+      };
+
+      const job = await this.queue.add(type, jobData, {
         ...config.queue.defaultJobOptions,
         ...options,
       });
@@ -344,36 +353,41 @@ export class QueueService implements QueueServiceInterface {
     this.queue.process('*', config.queue.concurrency, async (job: Job) => {
       const startTime = Date.now();
       
-      try {
-        const processor = this.jobProcessors.get(job.name);
-        
-        if (!processor) {
-          throw new Error(`No processor found for job type: ${job.name}`);
+      // Extract correlation ID from job data and run processor within correlation context
+      const correlationId = job.data._correlationId || createChildCorrelationId('job');
+      
+      return runWithCorrelationId(correlationId, async () => {
+        try {
+          const processor = this.jobProcessors.get(job.name);
+          
+          if (!processor) {
+            throw new Error(`No processor found for job type: ${job.name}`);
+          }
+
+          const result = await processor(job);
+          const duration = Date.now() - startTime;
+
+          this.logger.debug('Job completed successfully', {
+            jobId: job.id,
+            type: job.name,
+            duration,
+          });
+
+          return result;
+
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          
+          this.logger.error('Job failed', {
+            jobId: job.id,
+            type: job.name,
+            duration,
+            error,
+          });
+
+          throw error;
         }
-
-        const result = await processor(job);
-        const duration = Date.now() - startTime;
-
-        this.logger.debug('Job completed successfully', {
-          jobId: job.id,
-          type: job.name,
-          duration,
-        });
-
-        return result;
-
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        
-        this.logger.error('Job failed', {
-          jobId: job.id,
-          type: job.name,
-          duration,
-          error,
-        });
-
-        throw error;
-      }
+      });
     });
   }
 

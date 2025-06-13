@@ -1,14 +1,28 @@
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import config from '../config';
+import { getCorrelationMetadata } from './correlationId';
+
+// Custom format to add correlation ID to all logs
+const addCorrelationId = winston.format((info) => {
+  const correlationMetadata = getCorrelationMetadata();
+  return { ...info, ...correlationMetadata };
+});
 
 // Custom log format
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
+  addCorrelationId(),
   winston.format.json(),
-  winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
-    let log = `${timestamp} [${level.toUpperCase()}]: ${message}`;
+  winston.format.printf(({ timestamp, level, message, stack, correlationId, ...meta }) => {
+    let log = `${timestamp}`;
+    
+    if (correlationId) {
+      log += ` [${correlationId}]`;
+    }
+    
+    log += ` [${level.toUpperCase()}]: ${message}`;
     
     if (Object.keys(meta).length > 0) {
       log += ` ${JSON.stringify(meta)}`;
@@ -26,8 +40,15 @@ const logFormat = winston.format.combine(
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({ format: 'HH:mm:ss' }),
-  winston.format.printf(({ timestamp, level, message, ...meta }) => {
-    let log = `${timestamp} ${level}: ${message}`;
+  addCorrelationId(),
+  winston.format.printf(({ timestamp, level, message, correlationId, ...meta }) => {
+    let log = `${timestamp}`;
+    
+    if (correlationId) {
+      log += ` [${correlationId}]`;
+    }
+    
+    log += ` ${level}: ${message}`;
     
     if (Object.keys(meta).length > 0) {
       log += ` ${JSON.stringify(meta, (key, value) => 
@@ -116,6 +137,7 @@ export const logger = winston.createLogger({
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
+    addCorrelationId(),
     polkadotApiFilter(),
     winston.format.json(),
   ),
