@@ -30,7 +30,8 @@ const consoleFormat = winston.format.combine(
     let log = `${timestamp} ${level}: ${message}`;
     
     if (Object.keys(meta).length > 0) {
-      log += ` ${JSON.stringify(meta, null, 2)}`;
+      log += ` ${JSON.stringify(meta, (key, value) => 
+        typeof value === 'bigint' ? value.toString() : value, 2)}`;
     }
     
     return log;

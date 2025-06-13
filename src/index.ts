@@ -7,8 +7,9 @@ import { Server as SocketIOServer } from 'socket.io';
 
 import config from './config';
 import { logger } from './utils/logger';
+import { initializeCorrelationId } from './utils/correlationId';
 import { cache } from './utils/cache';
-import { db, createTables } from './utils/database';
+import { db } from './utils/database';
 import { serviceFactory } from './services';
 
 // Middleware imports
@@ -21,6 +22,7 @@ import {
   securityHeaders,
   healthCheck,
   camelCaseResponse,
+  correlationIdMiddleware,
 } from './middleware';
 import testCamelCaseValidator from './middleware/testCamelCaseValidator';
 
@@ -41,6 +43,9 @@ class AvailExplorerServer {
   private io: SocketIOServer | null = null;
 
   constructor() {
+    // Initialize correlation ID context
+    initializeCorrelationId();
+    
     this.app = express();
     this.setupMiddleware();
     this.setupRoutes();
@@ -48,6 +53,9 @@ class AvailExplorerServer {
   }
 
   private setupMiddleware(): void {
+    // Correlation ID middleware (must be first to ensure all logs have correlation ID)
+    this.app.use(correlationIdMiddleware);
+    
     // Security middleware
     this.app.use(helmet());
     this.app.use(securityHeaders);
@@ -243,15 +251,6 @@ class AvailExplorerServer {
 
       // Wait for database and cache connections
       await Promise.all(services);
-
-      // Create database tables if they don't exist
-      try {
-        await createTables();
-        logger.info('Database: Tables verified/created successfully');
-      } catch (error) {
-        logger.error('Database: Failed to create tables', { error });
-        throw error;
-      }
 
       // Initialize ALL services (core + domain) through ServiceFactory
       try {

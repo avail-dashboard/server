@@ -1,0 +1,181 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Block {
+  number          BigInt           @id
+  hash            String           @unique @db.VarChar(66)
+  parentHash      String?          @map("parent_hash") @db.VarChar(66)
+  stateRoot       String?          @map("state_root") @db.VarChar(66)
+  timestamp       BigInt
+  extrinsicsCount Int              @default(0) @map("extrinsics_count")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  
+  // Relations
+  extrinsics      Extrinsic[]
+  events          Event[]
+  dataSubmissions DataSubmission[]
+  
+  @@index([timestamp], name: "idx_blocks_timestamp")
+  @@index([hash], name: "idx_blocks_hash")
+  @@map("blocks")
+}
+
+model Extrinsic {
+  id             Int      @id @default(autoincrement())
+  hash           String   @unique @db.VarChar(66)
+  blockNumber    BigInt   @map("block_number")
+  extrinsicIndex Int?     @map("extrinsic_index")
+  module         String?  @db.VarChar(50)
+  call           String?  @db.VarChar(50)
+  success        Boolean?
+  timestamp      BigInt?
+  signer         String?  @db.VarChar(48)
+  fee            BigInt?
+  createdAt      DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  block          Block    @relation(fields: [blockNumber], references: [number])
+  
+  @@index([blockNumber], name: "idx_extrinsics_block")
+  @@index([hash], name: "idx_extrinsics_hash")
+  @@index([signer], name: "idx_extrinsics_signer")
+  @@index([timestamp], name: "idx_extrinsics_timestamp")
+  @@map("extrinsics")
+}
+
+model Account {
+  address     String   @id @db.VarChar(48)
+  balance     BigInt?
+  nonce       Int?
+  lastUpdated DateTime @default(now()) @map("last_updated")
+  
+  @@index([balance], name: "idx_accounts_balance")
+  @@map("accounts")
+}
+
+model Event {
+  id             Int      @id @default(autoincrement())
+  blockNumber    BigInt   @map("block_number")
+  extrinsicIndex Int?     @map("extrinsic_index")
+  eventIndex     Int?     @map("event_index")
+  module         String?  @db.VarChar(50)
+  eventName      String?  @map("event_name") @db.VarChar(50)
+  data           Json?
+  timestamp      BigInt?
+  createdAt      DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  block          Block     @relation(fields: [blockNumber], references: [number])
+  
+  @@index([blockNumber], name: "idx_events_block")
+  @@index([module], name: "idx_events_module")
+  @@index([timestamp], name: "idx_events_timestamp")
+  @@map("events")
+}
+
+model Watchlist {
+  id        Int      @id @default(autoincrement())
+  userId    String?  @map("user_id") @db.VarChar(255)
+  address   String?  @db.VarChar(48)
+  label     String?  @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@index([userId], name: "idx_watchlists_user")
+  @@map("watchlists")
+}
+
+model SyncState {
+  id                  Int       @id @default(autoincrement())
+  lastSyncedBlock     BigInt    @default(0) @map("last_synced_block")
+  targetBlock         BigInt?   @map("target_block")
+  syncStatus          SyncStatus @default(idle) @map("sync_status")
+  syncMode            SyncMode   @default(incremental) @map("sync_mode")
+  blocksPerMinute     Int?      @map("blocks_per_minute")
+  estimatedCompletion DateTime? @map("estimated_completion")
+  errorCount          Int       @default(0) @map("error_count")
+  lastError           String?   @map("last_error")
+  lastErrorBlock      BigInt?   @map("last_error_block")
+  startedAt           DateTime? @map("started_at")
+  pausedAt            DateTime? @map("paused_at")
+  completedAt         DateTime? @map("completed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
+  
+  @@index([syncStatus], name: "idx_sync_state_status")
+  @@index([lastSyncedBlock], name: "idx_sync_state_last_synced")
+  @@map("sync_state")
+}
+
+model DataSubmission {
+  id             Int      @id @default(autoincrement())
+  extrinsicHash  String   @unique @map("extrinsic_hash") @db.VarChar(66)
+  blockNumber    BigInt   @map("block_number")
+  extrinsicIndex Int?     @map("extrinsic_index")
+  appId          Int      @map("app_id")
+  rollupName     String?  @map("rollup_name") @db.VarChar(255)
+  dataSize       BigInt   @map("data_size")
+  dataHash       String   @map("data_hash") @db.VarChar(66)
+  submitter      String   @db.VarChar(48)
+  timestamp      BigInt
+  success        Boolean  @default(true)
+  blobData       Bytes?   @map("blob_data")
+  kateCommitment String?  @map("kate_commitment") @db.VarChar(255)
+  proof          Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  block          Block    @relation(fields: [blockNumber], references: [number])
+  rollup         Rollup   @relation(fields: [appId], references: [appId])
+  
+  @@index([blockNumber], name: "idx_data_submissions_block")
+  @@index([appId], name: "idx_data_submissions_app_id")
+  @@index([submitter], name: "idx_data_submissions_submitter")
+  @@index([timestamp], name: "idx_data_submissions_timestamp")
+  @@index([extrinsicHash], name: "idx_data_submissions_hash")
+  @@map("data_submissions")
+}
+
+model Rollup {
+  appId             Int      @id @map("app_id")
+  name              String   @db.VarChar(255)
+  description       String?
+  firstSeenBlock    BigInt?  @map("first_seen_block")
+  lastActiveBlock   BigInt?  @map("last_active_block")
+  totalSubmissions  Int      @default(0) @map("total_submissions")
+  totalDataSize     BigInt   @default(0) @map("total_data_size")
+  totalFeesPaid     BigInt   @default(0) @map("total_fees_paid")
+  website           String?  @db.VarChar(255)
+  logoUrl           String?  @map("logo_url") @db.VarChar(255)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  // Relations
+  dataSubmissions   DataSubmission[]
+  
+  @@index([name], name: "idx_rollups_name")
+  @@index([lastActiveBlock], name: "idx_rollups_last_active")
+  @@map("rollups")
+}
+
+enum SyncStatus {
+  idle
+  syncing
+  paused
+  error
+  completed
+}
+
+enum SyncMode {
+  full
+  incremental
+  live
+}

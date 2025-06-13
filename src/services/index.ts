@@ -2,9 +2,9 @@
 // Simple service factory and dependency injection
 
 // Core Services
-export { BlockchainService } from './core/blockchain';
-export { ConnectionManager } from './core/connection-manager';
-export { QueueService, queueService } from './core/queue';
+export { BlockchainService, createBlockchainService } from './core/blockchain';
+export { ConnectionManager, createConnectionManager } from './core/connection-manager';
+export { QueueService, createQueueService } from './core/queue';
 export { SyncService, createSyncService } from './core/sync';
 
 // Integration Services
@@ -21,10 +21,10 @@ export { DataProcessorService, createDataProcessorService } from './domain/proce
 export * from './types/service';
 export * from './types/blockchain';
 
-// Core services imports
-import { connectionManager } from './core/connection-manager';
-import { blockchainService } from './core/blockchain';
-import { queueService } from './core/queue';
+// Core services factory functions
+import { createConnectionManager, ConnectionManager } from './core/connection-manager';
+import { createBlockchainService, BlockchainService } from './core/blockchain';
+import { createQueueService, QueueService } from './core/queue';
 
 // Domain services factory functions
 import { createBlockService } from './domain/block';
@@ -34,8 +34,13 @@ import { createSyncService } from './core/sync';
 import { createBlockIndexerService } from './domain/indexer';
 import { createDataProcessorService } from './domain/processor';
 
-// Database import
+// Database imports
 import db from '../utils/database';
+import { 
+  blockRepository, 
+  dataSubmissionRepository, 
+  rollupRepository 
+} from '../database/repositories';
 
 // Service Factory for dependency injection
 export class ServiceFactory {
@@ -58,14 +63,14 @@ export class ServiceFactory {
     console.log(`🔧 Service registered: ${name}`);
   }
 
-  // Get a service instance
-  get<T>(name: string): T {
+  // Get a service instance with proper typing
+  get<T = any>(name: string): T {
     const service = this.services.get(name);
     if (!service) {
       console.error(`❌ Service '${name}' not found. Available services:`, Array.from(this.services.keys()));
       throw new Error(`Service '${name}' not found. Make sure it's registered.`);
     }
-    return service;
+    return service as T;
   }
 
   // Check if service is registered
@@ -82,6 +87,11 @@ export class ServiceFactory {
   async initializeCoreServices(): Promise<void> {
     try {
       console.log('🔧 Initializing core services...');
+      
+      // Create core service instances
+      const connectionManager = createConnectionManager();
+      const blockchainService = createBlockchainService();
+      const queueService = createQueueService();
       
       // Register core services
       this.register('connectionManager', connectionManager);
@@ -104,10 +114,18 @@ export class ServiceFactory {
     try {
       console.log('🔧 Initializing domain services...');
       
-      // Create domain services using factory functions directly
-      const blockService = createBlockService(db, blockchainService);
+      // Get core services from registry with proper typing
+      const blockchainService = this.get<BlockchainService>('blockchain');
+      const queueService = this.get<QueueService>('queue');
+      
+      // Create domain services using factory functions with dependencies
+      const blockService = createBlockService(blockRepository, blockchainService);
       const extrinsicService = createExtrinsicService(db, blockchainService);
-      const dataAvailabilityService = createDataAvailabilityService(db, blockchainService);
+      const dataAvailabilityService = createDataAvailabilityService(
+        dataSubmissionRepository,
+        rollupRepository, 
+        blockchainService
+      );
       
       // Create new sync services
       const syncService = createSyncService(db, blockchainService, queueService);
@@ -167,13 +185,13 @@ export class ServiceFactory {
 
       // Stop blockchain service (will stop its internal managers)
       if (this.has('blockchain')) {
-        const blockchain = this.get<typeof blockchainService>('blockchain');
+        const blockchain = this.get<BlockchainService>('blockchain');
         shutdownPromises.push(blockchain.stop());
       }
 
       // Stop queue service
       if (this.has('queue')) {
-        const queue = this.get<typeof queueService>('queue');
+        const queue = this.get<QueueService>('queue');
         shutdownPromises.push(queue.stop());
       }
 
@@ -196,17 +214,17 @@ export class ServiceFactory {
     healthStatus.registeredServices = this.getRegisteredServices();
 
     if (this.has('blockchain')) {
-      const blockchain = this.get<typeof blockchainService>('blockchain');
+      const blockchain = this.get<BlockchainService>('blockchain');
       healthStatus.blockchain = await blockchain.getHealth();
     }
 
     if (this.has('connectionManager')) {
-      const connMgr = this.get<typeof connectionManager>('connectionManager');
+      const connMgr = this.get<ConnectionManager>('connectionManager');
       healthStatus.connectionManager = await connMgr.getHealth();
     }
 
     if (this.has('queue')) {
-      const queue = this.get<typeof queueService>('queue');
+      const queue = this.get<QueueService>('queue');
       healthStatus.queue = await queue.getHealth();
     }
 
@@ -228,14 +246,14 @@ export class ServiceFactory {
     metrics.registeredServices = this.getRegisteredServices();
 
     if (this.has('blockchain')) {
-      const blockchain = this.get<typeof blockchainService>('blockchain');
+      const blockchain = this.get<BlockchainService>('blockchain');
       metrics.blockchain = {
         connection: blockchain.getConnectionMetrics(),
       };
     }
 
     if (this.has('connectionManager')) {
-      const connMgr = this.get<typeof connectionManager>('connectionManager');
+      const connMgr = this.get<ConnectionManager>('connectionManager');
       metrics.connectionManager = connMgr.getMetrics();
     }
 

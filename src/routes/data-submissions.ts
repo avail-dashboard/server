@@ -166,7 +166,7 @@ router.get('/:submissionId',
 
       const dataAvailabilityService = serviceFactory.get<DataAvailabilityService>('dataAvailabilityService');
       const blockSubmissions = await dataAvailabilityService.getDataSubmissionsForBlock(blockNumber);
-      const submission = blockSubmissions.find(sub => sub.extrinsic_index === extrinsicIndex);
+      const submission = blockSubmissions.find(sub => sub.extrinsicIndex === extrinsicIndex);
 
       if (!submission) {
         return res.status(404).json({

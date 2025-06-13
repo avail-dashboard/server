@@ -1,8 +1,8 @@
 import { logger, logError } from '../../utils/logger';
-import db from '../../utils/database';
 import { BlockchainService } from '../core/blockchain';
+import { BlockRepository, BlockWithExtrinsics } from '../../database/repositories/BlockRepository';
+import { Block } from '../../database';
 import { 
-  Block, 
   BlockWithMetadata, 
   PaginatedResponse,
   PaginationParams,
@@ -17,11 +17,11 @@ export interface IBlockService {
 }
 
 export class BlockService implements IBlockService {
-  private db: typeof db;
+  private blockRepository: BlockRepository;
   private blockchain: BlockchainService;
 
-  constructor(database: typeof db, blockchain: BlockchainService) {
-    this.db = database;
+  constructor(blockRepository: BlockRepository, blockchain: BlockchainService) {
+    this.blockRepository = blockRepository;
     this.blockchain = blockchain;
   }
 
@@ -106,7 +106,7 @@ export class BlockService implements IBlockService {
   }
 
   /**
-   * Get paginated list of blocks (primarily from database for analytics)
+   * Get paginated list of blocks using repository
    */
   async getBlocks(
     pagination: PaginationParams = { page: 1, limit: 20 },
@@ -114,26 +114,31 @@ export class BlockService implements IBlockService {
   ): Promise<PaginatedResponse<Block>> {
     try {
       const { page = 1, limit = 20 } = pagination;
-      const { sort_by: sortBy = 'number', sort_order: sortOrder = 'desc' } = sort;
+      const { sort_order: sortOrder = 'desc' } = sort;
 
-      const result = await this.db.paginate<Block>(
-        'blocks',
+      const { blocks, total } = await this.blockRepository.findMany({
         page,
         limit,
-        undefined, // no where clause
-        sortBy,
-        sortOrder.toUpperCase() as 'ASC' | 'DESC',
-      );
+        orderBy: sortOrder.toLowerCase() as 'asc' | 'desc',
+      });
 
       return {
-        data: result.data,
+        data: blocks.map(block => ({
+          number: block.number,
+          hash: block.hash,
+          parentHash: block.parentHash,
+          stateRoot: block.stateRoot,
+          timestamp: block.timestamp,
+          extrinsicsCount: block.extrinsicsCount,
+          createdAt: block.createdAt,
+        })),
         pagination: {
-          page: result.meta.page,
-          limit: result.meta.limit,
-          total_count: result.meta.total,
-          total_pages: result.meta.totalPages,
-          has_next: result.meta.page < result.meta.totalPages,
-          has_prev: result.meta.page > 1
+          page,
+          limit,
+          total_count: total,
+          total_pages: Math.ceil(total / limit),
+          has_next: page < Math.ceil(total / limit),
+          has_prev: page > 1
         }
       };
 
@@ -147,28 +152,32 @@ export class BlockService implements IBlockService {
   }
 
   /**
-   * Private: Get block from database
+   * Private: Get block from database using repository
    */
   private async getBlockFromDatabase(hashOrNumber: string | number): Promise<BlockWithMetadata | null> {
     try {
-      let whereClause: Record<string, any>;
+      let block: Block | null;
       
       if (typeof hashOrNumber === 'string') {
-        whereClause = { hash: hashOrNumber };
+        block = await this.blockRepository.findByHash(hashOrNumber);
       } else {
-        whereClause = { number: hashOrNumber };
+        block = await this.blockRepository.findByNumber(BigInt(hashOrNumber));
       }
-
-      const block = await this.db.findOne<Block>('blocks', whereClause);
       
       if (!block) {
         return null;
       }
 
-      // For now, return basic block data
+      // Convert to BlockWithMetadata format
       // TODO: Add metadata (events, extrinsics, etc.) in future iterations
       return {
-        ...block,
+        number: block.number,
+        hash: block.hash,
+        parent_hash: block.parentHash,
+        state_root: block.stateRoot,
+        timestamp: block.timestamp,
+        extrinsics_count: block.extrinsicsCount,
+        created_at: block.createdAt,
         events: [],
         logs: [],
         data_submissions: [],
@@ -202,24 +211,28 @@ export class BlockService implements IBlockService {
   }
 
   /**
-   * Private: Persist block to database for analytics
+   * Private: Persist block to database using repository
    */
   private async persistBlockToDatabase(blockData: BlockData): Promise<BlockWithMetadata> {
     try {
-      const blockRecord: Omit<Block, 'created_at'> = {
+      const insertedBlock = await this.blockRepository.create({
         number: BigInt(blockData.number),
         hash: blockData.hash,
-        parent_hash: blockData.parentHash,
-        state_root: blockData.stateRoot,
+        parentHash: blockData.parentHash,
+        stateRoot: blockData.stateRoot,
         timestamp: BigInt(blockData.timestamp),
-        extrinsics_count: blockData.extrinsics?.length || 0
-      };
-
-      const insertedBlock = await this.db.insert<Block>('blocks', blockRecord);
+        extrinsicsCount: blockData.extrinsics?.length || 0
+      });
       
-      // Return as BlockWithMetadata
+      // Convert to BlockWithMetadata format
       return {
-        ...insertedBlock,
+        number: insertedBlock.number,
+        hash: insertedBlock.hash,
+        parent_hash: insertedBlock.parentHash,
+        state_root: insertedBlock.stateRoot,
+        timestamp: insertedBlock.timestamp,
+        extrinsics_count: insertedBlock.extrinsicsCount,
+        created_at: insertedBlock.createdAt,
         events: [],
         logs: [],
         data_submissions: [],
@@ -237,7 +250,7 @@ export class BlockService implements IBlockService {
   }
 }
 
-// Factory function for dependency injection
-export const createBlockService = (database: typeof db, blockchain: BlockchainService): BlockService => {
-  return new BlockService(database, blockchain);
+// Factory function for dependency injection with repository
+export const createBlockService = (blockRepository: BlockRepository, blockchain: BlockchainService): BlockService => {
+  return new BlockService(blockRepository, blockchain);
 }; 

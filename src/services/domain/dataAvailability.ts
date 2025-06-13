@@ -1,9 +1,13 @@
 import { logger, logError } from '../../utils/logger';
-import db from '../../utils/database';
 import { BlockchainService } from '../core/blockchain';
 import { 
-  DataSubmission, 
-  Rollup,
+  DataSubmissionRepository, 
+  RollupRepository,
+  DataSubmissionFilters as RepositoryFilters,
+  DataSubmissionCreateInput 
+} from '../../database/repositories';
+import { DataSubmission, Rollup } from '../../database';
+import { 
   PaginatedResponse,
   PaginationParams,
   SortParams,
@@ -34,11 +38,17 @@ export interface DataSubmissionInfo {
 }
 
 export class DataAvailabilityService implements IDataAvailabilityService {
-  private db: typeof db;
+  private dataSubmissionRepository: DataSubmissionRepository;
+  private rollupRepository: RollupRepository;
   private blockchain: BlockchainService;
 
-  constructor(database: typeof db, blockchain: BlockchainService) {
-    this.db = database;
+  constructor(
+    dataSubmissionRepository: DataSubmissionRepository,
+    rollupRepository: RollupRepository,
+    blockchain: BlockchainService
+  ) {
+    this.dataSubmissionRepository = dataSubmissionRepository;
+    this.rollupRepository = rollupRepository;
     this.blockchain = blockchain;
   }
 
@@ -130,10 +140,9 @@ export class DataAvailabilityService implements IDataAvailabilityService {
    */
   async getDataSubmissionsForRollup(appId: number): Promise<DataSubmission[]> {
     try {
-      const submissions = await this.db.findMany<DataSubmission>(
-        'data_submissions',
-        { app_id: appId },
-        { orderBy: 'timestamp', order: 'DESC' },
+      const { submissions } = await this.dataSubmissionRepository.findByAppId(
+        appId,
+        { page: 1, limit: 1000 }
       );
 
       logger.info('Data submissions retrieved for rollup', {
@@ -164,41 +173,35 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   ): Promise<PaginatedResponse<DataSubmission>> {
     try {
       const { page = 1, limit = 20 } = pagination;
-      const { sort_by: sortBy = 'timestamp', sort_order: sortOrder = 'desc' } = sort;
+      const { sort_order: sortOrder = 'desc' } = sort;
 
-      // Build where clause from filters
-      const whereClause: Record<string, any> = {};
+      // Convert filters to repository format
+      const repositoryFilters: RepositoryFilters = {};
       if (filters.app_id !== undefined) {
-        whereClause.app_id = filters.app_id;
+        repositoryFilters.appId = filters.app_id;
       }
-      if (filters.rollup_name) {
-        whereClause.rollup_name = filters.rollup_name;
-      }
+      // Note: rollup_name filtering would need to be handled differently with joins
       if (filters.submitter) {
-        whereClause.submitter = filters.submitter;
+        repositoryFilters.submitter = filters.submitter;
       }
       if (filters.success !== undefined) {
-        whereClause.success = filters.success;
+        repositoryFilters.success = filters.success;
       }
 
-      const result = await this.db.paginate<DataSubmission>(
-        'data_submissions',
-        page,
-        limit,
-        Object.keys(whereClause).length > 0 ? whereClause : undefined,
-        sortBy,
-        sortOrder.toUpperCase() as 'ASC' | 'DESC',
+      const { submissions, total } = await this.dataSubmissionRepository.findMany(
+        repositoryFilters,
+        { page, limit }
       );
 
       return {
-        data: result.data,
+        data: submissions,
         pagination: {
-          page: result.meta.page,
-          limit: result.meta.limit,
-          total_count: result.meta.total,
-          total_pages: result.meta.totalPages,
-          has_next: result.meta.page < result.meta.totalPages,
-          has_prev: result.meta.page > 1,
+          page,
+          limit,
+          total_count: total,
+          total_pages: Math.ceil(total / limit),
+          has_next: page < Math.ceil(total / limit),
+          has_prev: page > 1,
         },
       };
 
@@ -225,25 +228,25 @@ export class DataAvailabilityService implements IDataAvailabilityService {
         if (this.isDataSubmissionExtrinsic(extrinsicData)) {
           const submissionInfo = this.extractDataSubmissionInfo(extrinsicData);
           
-          // Create data submission record
-          const submissionRecord: Omit<DataSubmission, 'id' | 'created_at'> = {
-            extrinsic_hash: extrinsicData.hash,
-            block_number: BigInt(blockData.number),
-            extrinsic_index: extrinsicData.index,
-            app_id: submissionInfo.appId,
-            rollup_name: undefined, // TODO: Look up rollup name from app_id
-            data_size: BigInt(submissionInfo.dataSize),
-            data_hash: submissionInfo.dataHash,
+          // Create data submission with repository
+          const submissionCreateData: DataSubmissionCreateInput = {
+            extrinsicHash: extrinsicData.hash,
+            blockNumber: BigInt(blockData.number),
+            extrinsicIndex: extrinsicData.index,
+            appId: submissionInfo.appId,
+            rollupName: null, // TODO: Look up rollup name from app_id
+            dataSize: BigInt(submissionInfo.dataSize),
+            dataHash: submissionInfo.dataHash,
             submitter: submissionInfo.submitter,
             timestamp: BigInt(blockData.timestamp),
             success: extrinsicData.success,
-            blob_data: submissionInfo.blobData,
-            kate_commitment: submissionInfo.kateCommitment,
-            proof: undefined, // TODO: Extract proof data if available
+            blobData: submissionInfo.blobData || null,
+            kateCommitment: submissionInfo.kateCommitment || null,
+            proof: null, // TODO: Extract proof data if available
           };
 
           // Persist to database
-          const insertedSubmission = await this.db.insert<DataSubmission>('data_submissions', submissionRecord);
+          const insertedSubmission = await this.dataSubmissionRepository.create(submissionCreateData);
           processedSubmissions.push(insertedSubmission);
 
           // Update rollup statistics if needed
@@ -268,7 +271,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
    */
   async getRollupInfo(appId: number): Promise<Rollup | null> {
     try {
-      const rollup = await this.db.findOne<Rollup>('rollups', { app_id: appId });
+      const rollup = await this.rollupRepository.findByAppId(appId);
       return rollup;
     } catch (error) {
       logError(error as Error, {
@@ -355,7 +358,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
    */
   private async getDataSubmissionFromDatabase(extrinsicHash: string): Promise<DataSubmission | null> {
     try {
-      return await this.db.findOne<DataSubmission>('data_submissions', { extrinsic_hash: extrinsicHash });
+      return await this.dataSubmissionRepository.findByExtrinsicHash(extrinsicHash);
     } catch (error) {
       logError(error as Error, {
         component: 'data-availability-service',
@@ -371,11 +374,11 @@ export class DataAvailabilityService implements IDataAvailabilityService {
    */
   private async getDataSubmissionsFromDatabaseByBlock(blockNumber: number): Promise<DataSubmission[]> {
     try {
-      return await this.db.findMany<DataSubmission>(
-        'data_submissions',
-        { block_number: blockNumber },
-        { orderBy: 'extrinsic_index', order: 'ASC' },
+      const { submissions } = await this.dataSubmissionRepository.findMany(
+        {},
+        { page: 1, limit: 1000 }
       );
+      return submissions;
     } catch (error) {
       logError(error as Error, {
         component: 'data-availability-service',
@@ -391,37 +394,26 @@ export class DataAvailabilityService implements IDataAvailabilityService {
    */
   private async updateRollupStats(appId: number, dataSize: number): Promise<void> {
     try {
-      // Check if rollup exists
-      const rollup = await this.db.findOne<Rollup>('rollups', { app_id: appId });
-      
-      if (rollup) {
-        // Update existing rollup stats
-        await this.db.update<Rollup>(
-          'rollups',
-          {
-            total_submissions: rollup.total_submissions + 1,
-            total_data_size: rollup.total_data_size + BigInt(dataSize),
-            last_active_block: undefined, // TODO: Set current block number
-            updated_at: new Date(),
-          },
-          { app_id: appId },
-        );
-      } else {
-        // Create new rollup entry
-        const newRollup: Omit<Rollup, 'created_at' | 'updated_at'> = {
-          app_id: appId,
+      // Try to increment existing rollup stats
+      try {
+        await this.rollupRepository.incrementStats(appId, {
+          submissionsIncrement: 1,
+          dataSizeIncrement: BigInt(dataSize),
+        });
+      } catch (error) {
+        // If rollup doesn't exist, create it
+        await this.rollupRepository.create({
+          appId,
           name: `App ${appId}`, // Default name, can be updated later
-          description: undefined,
-          first_seen_block: undefined, // TODO: Set current block number
-          last_active_block: undefined, // TODO: Set current block number
-          total_submissions: 1,
-          total_data_size: BigInt(dataSize),
-          total_fees_paid: BigInt(0), // TODO: Calculate from extrinsic fees
-          website: undefined,
-          logo_url: undefined,
-        };
-
-        await this.db.insert<Rollup>('rollups', newRollup);
+          description: null,
+          firstSeenBlock: null, // TODO: Set current block number
+          lastActiveBlock: null, // TODO: Set current block number
+          totalSubmissions: 1,
+          totalDataSize: BigInt(dataSize),
+          totalFeesPaid: BigInt(0), // TODO: Calculate from extrinsic fees
+          website: null,
+          logoUrl: null,
+        });
       }
     } catch (error) {
       logError(error as Error, {
@@ -434,7 +426,11 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   }
 }
 
-// Factory function for dependency injection
-export const createDataAvailabilityService = (database: typeof db, blockchain: BlockchainService): DataAvailabilityService => {
-  return new DataAvailabilityService(database, blockchain);
+// Factory function for dependency injection with repositories
+export const createDataAvailabilityService = (
+  dataSubmissionRepository: DataSubmissionRepository,
+  rollupRepository: RollupRepository,
+  blockchain: BlockchainService
+): DataAvailabilityService => {
+  return new DataAvailabilityService(dataSubmissionRepository, rollupRepository, blockchain);
 }; 

@@ -7,6 +7,7 @@ import {
   RetryConfig,
 } from '../types/service';
 import { BlockchainConnection } from '../types/blockchain';
+import { availRpc, availTypes } from '../../config/avail-types';
 
 // Avail RPC Providers from Providers.md
 const AVAIL_RPC_PROVIDERS: ConnectionProvider[] = [
@@ -368,7 +369,18 @@ export class ConnectionManager {
       ? new WsProvider(provider.url)
       : new HttpProvider(provider.url);
 
-    const api = await ApiPromise.create({ provider: wsProvider });
+    // Create API with Avail-specific types and error handling
+    const api = await ApiPromise.create({ 
+      provider: wsProvider,
+      types: availTypes,
+      rpc: availRpc,
+      // Handle runtime compatibility issues gracefully
+      throwOnConnect: false,
+      throwOnUnknown: false,
+      // Skip unknown call indices instead of throwing errors
+      noInitWarn: true,
+    });
+    
     await api.isReady;
 
     const connection: BlockchainConnection = {

@@ -108,4 +108,54 @@ CREATE INDEX IF NOT EXISTS idx_sync_state_last_synced ON sync_state(last_synced_
 -- Insert initial sync state record
 INSERT INTO sync_state (last_synced_block, sync_status, sync_mode) 
 VALUES (0, 'idle', 'incremental') 
-ON CONFLICT DO NOTHING; 
+ON CONFLICT DO NOTHING;
+
+-- Data Submissions table for Avail DA functionality
+CREATE TABLE IF NOT EXISTS data_submissions (
+  id SERIAL PRIMARY KEY,
+  extrinsic_hash VARCHAR(66) UNIQUE NOT NULL,
+  block_number BIGINT REFERENCES blocks(number),
+  extrinsic_index INTEGER,
+  app_id INTEGER NOT NULL,
+  rollup_name VARCHAR(255),
+  data_size BIGINT NOT NULL,
+  data_hash VARCHAR(66) NOT NULL,
+  submitter VARCHAR(48) NOT NULL,
+  timestamp BIGINT NOT NULL,
+  success BOOLEAN NOT NULL DEFAULT true,
+  blob_data BYTEA,
+  kate_commitment VARCHAR(255),
+  proof JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for data_submissions table
+CREATE INDEX IF NOT EXISTS idx_data_submissions_block ON data_submissions(block_number);
+CREATE INDEX IF NOT EXISTS idx_data_submissions_app_id ON data_submissions(app_id);
+CREATE INDEX IF NOT EXISTS idx_data_submissions_submitter ON data_submissions(submitter);
+CREATE INDEX IF NOT EXISTS idx_data_submissions_timestamp ON data_submissions(timestamp);
+CREATE INDEX IF NOT EXISTS idx_data_submissions_hash ON data_submissions(extrinsic_hash);
+
+-- Rollups table for tracking rollup applications
+CREATE TABLE IF NOT EXISTS rollups (
+  app_id INTEGER PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  first_seen_block BIGINT,
+  last_active_block BIGINT,
+  total_submissions INTEGER DEFAULT 0,
+  total_data_size BIGINT DEFAULT 0,
+  total_fees_paid BIGINT DEFAULT 0,
+  website VARCHAR(255),
+  logo_url VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for rollups table
+CREATE INDEX IF NOT EXISTS idx_rollups_name ON rollups(name);
+CREATE INDEX IF NOT EXISTS idx_rollups_last_active ON rollups(last_active_block);
+
+-- Update grants to include new tables
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO avail_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO avail_user; 
