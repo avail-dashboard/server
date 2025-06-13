@@ -1,6 +1,6 @@
 import { logger, logError } from '../../utils/logger';
 import { BlockchainService } from '../core/blockchain';
-import { BlockRepository, BlockWithExtrinsics } from '../../database/repositories/BlockRepository';
+import { BlockRepository } from '../../database/repositories/BlockRepository';
 import { Block } from '../../database';
 import { 
   BlockWithMetadata, 
@@ -37,7 +37,7 @@ export class BlockService implements IBlockService {
         logger.info('Block found in database', { 
           component: 'block-service',
           identifier: hashOrNumber,
-          source: 'database'
+          source: 'database',
         });
         return existingBlock;
       }
@@ -66,7 +66,7 @@ export class BlockService implements IBlockService {
       logError(error as Error, {
         component: 'block-service',
         action: 'getBlock',
-        identifier: hashOrNumber
+        identifier: hashOrNumber,
       });
       throw error;
     }
@@ -91,7 +91,7 @@ export class BlockService implements IBlockService {
       
       logger.info('Latest block fetched and persisted', {
         component: 'block-service',
-        blockNumber: persistedBlock.number
+        blockNumber: persistedBlock.number,
       });
 
       return persistedBlock;
@@ -99,7 +99,7 @@ export class BlockService implements IBlockService {
     } catch (error) {
       logError(error as Error, {
         component: 'block-service',
-        action: 'getLatestBlock'
+        action: 'getLatestBlock',
       });
       throw error;
     }
@@ -138,14 +138,14 @@ export class BlockService implements IBlockService {
           total_count: total,
           total_pages: Math.ceil(total / limit),
           has_next: page < Math.ceil(total / limit),
-          has_prev: page > 1
-        }
+          has_prev: page > 1,
+        },
       };
 
     } catch (error) {
       logError(error as Error, {
         component: 'block-service',
-        action: 'getBlocks'
+        action: 'getBlocks',
       });
       throw error;
     }
@@ -161,7 +161,7 @@ export class BlockService implements IBlockService {
       if (typeof hashOrNumber === 'string') {
         block = await this.blockRepository.findByHash(hashOrNumber);
       } else {
-        block = await this.blockRepository.findByNumber(BigInt(hashOrNumber));
+        block = await this.blockRepository.findByNumber(hashOrNumber);
       }
       
       if (!block) {
@@ -181,14 +181,14 @@ export class BlockService implements IBlockService {
         events: [],
         logs: [],
         data_submissions: [],
-        transfers: []
+        transfers: [],
       } as BlockWithMetadata;
 
     } catch (error) {
       logError(error as Error, {
         component: 'block-service',
         action: 'getBlockFromDatabase',
-        identifier: hashOrNumber
+        identifier: hashOrNumber,
       });
       throw error;
     }
@@ -204,7 +204,7 @@ export class BlockService implements IBlockService {
       logError(error as Error, {
         component: 'block-service',
         action: 'fetchBlockFromBlockchain',
-        identifier: hashOrNumber
+        identifier: hashOrNumber,
       });
       throw error;
     }
@@ -216,12 +216,12 @@ export class BlockService implements IBlockService {
   private async persistBlockToDatabase(blockData: BlockData): Promise<BlockWithMetadata> {
     try {
       const insertedBlock = await this.blockRepository.create({
-        number: BigInt(blockData.number),
+        number: blockData.number,
         hash: blockData.hash,
         parentHash: blockData.parentHash,
         stateRoot: blockData.stateRoot,
-        timestamp: BigInt(blockData.timestamp),
-        extrinsicsCount: blockData.extrinsics?.length || 0
+        timestamp: new Date(blockData.timestamp),
+        extrinsicsCount: blockData.extrinsics?.length || 0,
       });
       
       // Convert to BlockWithMetadata format
@@ -236,21 +236,20 @@ export class BlockService implements IBlockService {
         events: [],
         logs: [],
         data_submissions: [],
-        transfers: []
+        transfers: [],
       } as BlockWithMetadata;
 
     } catch (error) {
       logError(error as Error, {
         component: 'block-service',
         action: 'persistBlockToDatabase',
-        blockNumber: blockData.number
+        blockNumber: blockData.number,
       });
       throw error;
     }
   }
 }
 
-// Factory function for dependency injection with repository
 export const createBlockService = (blockRepository: BlockRepository, blockchain: BlockchainService): BlockService => {
   return new BlockService(blockRepository, blockchain);
 }; 

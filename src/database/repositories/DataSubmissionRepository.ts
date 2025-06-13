@@ -7,14 +7,14 @@ export type DataSubmissionWithRollup = DataSubmission & {
 
 export type DataSubmissionCreateInput = {
   extrinsicHash: string;
-  blockNumber: bigint;
+  blockNumber: number;
   extrinsicIndex?: number | null;
   appId: number;
   rollupName?: string | null;
-  dataSize: bigint;
+  dataSize: number;
   dataHash: string;
   submitter: string;
-  timestamp: bigint;
+  timestamp: Date;
   success?: boolean;
   blobData?: Buffer | null;
   kateCommitment?: string | null;
@@ -25,10 +25,10 @@ export interface DataSubmissionFilters {
   appId?: number;
   submitter?: string;
   success?: boolean;
-  fromTimestamp?: bigint;
-  toTimestamp?: bigint;
-  fromBlock?: bigint;
-  toBlock?: bigint;
+  fromTimestamp?: Date;
+  toTimestamp?: Date;
+  fromBlock?: number;
+  toBlock?: number;
 }
 
 export class DataSubmissionRepository extends BaseRepository {
@@ -44,7 +44,7 @@ export class DataSubmissionRepository extends BaseRepository {
   /**
    * Get data submissions for a block
    */
-  async findByBlock(blockNumber: bigint): Promise<DataSubmission[]> {
+  async findByBlock(blockNumber: number): Promise<DataSubmission[]> {
     return this.prisma.dataSubmission.findMany({
       where: { blockNumber },
       orderBy: { extrinsicIndex: 'asc' },
@@ -183,7 +183,7 @@ export class DataSubmissionRepository extends BaseRepository {
       totalSubmissions: totalCount,
       successfulSubmissions: successCount,
       failedSubmissions: totalCount - successCount,
-      totalDataSize: totalDataSize._sum.dataSize || 0n,
+      totalDataSize: totalDataSize._sum.dataSize || 0,
       uniqueSubmitters: uniqueSubmitters.length,
       uniqueRollups: uniqueRollups.length,
     };

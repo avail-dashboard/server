@@ -39,7 +39,8 @@ import db from '../utils/database';
 import { 
   blockRepository, 
   dataSubmissionRepository, 
-  rollupRepository 
+  rollupRepository,
+  extrinsicRepository,
 } from '../database/repositories';
 
 // Service Factory for dependency injection
@@ -120,11 +121,11 @@ export class ServiceFactory {
       
       // Create domain services using factory functions with dependencies
       const blockService = createBlockService(blockRepository, blockchainService);
-      const extrinsicService = createExtrinsicService(db, blockchainService);
+      const extrinsicService = createExtrinsicService(extrinsicRepository, blockRepository, blockchainService);
       const dataAvailabilityService = createDataAvailabilityService(
         dataSubmissionRepository,
         rollupRepository, 
-        blockchainService
+        blockchainService,
       );
       
       // Create new sync services

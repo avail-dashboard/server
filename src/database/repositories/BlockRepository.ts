@@ -1,4 +1,4 @@
-import { Block, Prisma } from '@prisma/client';
+import { Block } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 
 export type BlockWithExtrinsics = Block & {
@@ -15,7 +15,7 @@ export class BlockRepository extends BaseRepository {
   /**
    * Find block by number
    */
-  async findByNumber(blockNumber: bigint): Promise<Block | null> {
+  async findByNumber(blockNumber: number): Promise<Block | null> {
     return this.prisma.block.findUnique({
       where: { number: blockNumber },
     });
@@ -84,7 +84,7 @@ export class BlockRepository extends BaseRepository {
   /**
    * Get block with related data
    */
-  async findWithRelations(blockNumber: bigint): Promise<BlockWithExtrinsics | null> {
+  async findWithRelations(blockNumber: number): Promise<BlockWithExtrinsics | null> {
     return this.prisma.block.findUnique({
       where: { number: blockNumber },
       include: {
@@ -102,7 +102,7 @@ export class BlockRepository extends BaseRepository {
   /**
    * Get blocks in range
    */
-  async findInRange(fromBlock: bigint, toBlock: bigint): Promise<Block[]> {
+  async findInRange(fromBlock: number, toBlock: number): Promise<Block[]> {
     return this.prisma.block.findMany({
       where: {
         number: {
@@ -124,7 +124,7 @@ export class BlockRepository extends BaseRepository {
   /**
    * Update block
    */
-  async update(blockNumber: bigint, data: Partial<BlockCreateInput>): Promise<Block> {
+  async update(blockNumber: number, data: Partial<BlockCreateInput>): Promise<Block> {
     return this.prisma.block.update({
       where: { number: blockNumber },
       data,
@@ -134,7 +134,7 @@ export class BlockRepository extends BaseRepository {
   /**
    * Delete block
    */
-  async delete(blockNumber: bigint): Promise<Block> {
+  async delete(blockNumber: number): Promise<Block> {
     return this.prisma.block.delete({
       where: { number: blockNumber },
     });

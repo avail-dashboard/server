@@ -36,7 +36,6 @@
     "sync:test": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode range --from 1000000 --to 1000010 --batch-size 5",
     "sync:e2e": "ENV_FILE=.env.local tsx scripts/test-sync-e2e.ts",
     "db:init": "ENV_FILE=.env.local tsx scripts/init-database.ts",
-    "db:migrate:data-submissions": "ENV_FILE=.env.local tsx scripts/migrate-add-data-submissions.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:pull": "prisma db pull",

@@ -9,15 +9,15 @@ export interface Validator {
   address: string;
   name?: string;
   commission_rate?: number;
-  self_bonded: bigint;
-  total_bonded: bigint;
+  self_bonded: number;
+  total_bonded: number;
   nominators_count: number;
   is_active: boolean;
   is_waiting: boolean;
   is_slashed: boolean;
   session_keys?: object;
-  last_seen_block?: bigint;
-  first_seen_block?: bigint;
+  last_seen_block?: number;
+  first_seen_block?: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -26,7 +26,7 @@ export interface Nomination {
   id: number;
   nominator_address: string;
   validator_address: string;
-  bonded_amount: bigint;
+  bonded_amount: number;
   era: number;
   is_active: boolean;
   created_at: Date;
@@ -40,7 +40,7 @@ export interface NominationPool {
   nominator_account?: string;
   state_toggler_account?: string;
   member_count: number;
-  total_bonded: bigint;
+  total_bonded: number;
   commission?: number;
   max_members?: number;
   created_at: Date;
@@ -51,9 +51,9 @@ export interface PoolMember {
   id: number;
   pool_id: number;
   member_address: string;
-  bonded_amount: bigint;
-  reward_pool_total_earnings: bigint;
-  unbonding_eras?: Array<{ era: number; amount: bigint }>;
+  bonded_amount: number;
+  reward_pool_total_earnings: number;
+  unbonding_eras?: Array<{ era: number; amount: number }>;
   joined_at: Date;
   updated_at: Date;
 }
@@ -65,14 +65,14 @@ export interface PoolMember {
 export interface DataSubmission {
   id: number;
   extrinsic_hash: string;
-  block_number: bigint;
+  block_number: number;
   extrinsic_index: number;
   app_id: number;
   rollup_name?: string;
-  data_size: bigint;
+  data_size: number;
   data_hash: string;
   submitter: string;
-  timestamp: bigint;
+  timestamp: Date;
   success: boolean;
   blob_data?: Buffer;
   kate_commitment?: string;
@@ -84,11 +84,11 @@ export interface Rollup {
   app_id: number;
   name: string;
   description?: string;
-  first_seen_block?: bigint;
-  last_active_block?: bigint;
+  first_seen_block?: number;
+  last_active_block?: number;
   total_submissions: number;
-  total_data_size: bigint;
-  total_fees_paid: bigint;
+  total_data_size: number;
+  total_fees_paid: number;
   website?: string;
   logo_url?: string;
   created_at: Date;
@@ -101,20 +101,20 @@ export interface Rollup {
 
 export interface Event {
   id: number;
-  block_number: bigint;
+  block_number: number;
   extrinsic_index?: number;
   event_index: number;
   module: string;
   event_name: string;
   data?: object;
   topics?: string[];
-  timestamp: bigint;
+  timestamp: Date;
   created_at: Date;
 }
 
 export interface Log {
   id: number;
-  block_number: bigint;
+  block_number: number;
   log_index: number;
   log_type: string;
   engine?: string;
@@ -129,14 +129,14 @@ export interface Log {
 export interface Transfer {
   id: number;
   extrinsic_hash: string;
-  block_number: bigint;
+  block_number: number;
   from_address: string;
   to_address: string;
-  amount: bigint;
+  amount: number;
   asset_id: number;
-  fee?: bigint;
+  fee?: number;
   success: boolean;
-  timestamp: bigint;
+  timestamp: Date;
   created_at: Date;
 }
 
@@ -146,9 +146,9 @@ export interface Reward {
   validator_address: string;
   recipient_address: string;
   reward_type: 'validator' | 'nominator' | 'pool';
-  amount: bigint;
-  block_number?: bigint;
-  timestamp?: bigint;
+  amount: number;
+  block_number?: number;
+  timestamp?: Date;
   claimed: boolean;
   claimed_at?: Date;
   created_at: Date;
@@ -158,10 +158,10 @@ export interface SlashingEvent {
   id: number;
   era: number;
   validator_address: string;
-  slash_amount: bigint;
+  slash_amount: number;
   reason?: string;
-  block_number?: bigint;
-  timestamp?: bigint;
+  block_number?: number;
+  timestamp?: Date;
   created_at: Date;
 }
 
@@ -171,12 +171,12 @@ export interface SlashingEvent {
 
 export interface Era {
   era_index: number;
-  start_block?: bigint;
-  end_block?: bigint;
-  start_timestamp?: bigint;
-  end_timestamp?: bigint;
-  total_stake?: bigint;
-  total_reward?: bigint;
+  start_block?: number;
+  end_block?: number;
+  start_timestamp?: Date;
+  end_timestamp?: Date;
+  total_stake?: number;
+  total_reward?: number;
   validator_count?: number;
   nominator_count?: number;
   created_at: Date;
@@ -184,25 +184,25 @@ export interface Era {
 
 export interface GasPriceHistory {
   id: number;
-  block_number: bigint;
-  timestamp: bigint;
-  gas_price: bigint;
-  gas_used?: bigint;
-  gas_limit?: bigint;
-  average_fee?: bigint;
+  block_number: number;
+  timestamp: Date;
+  gas_price: number;
+  gas_used?: number;
+  gas_limit?: number;
+  average_fee?: number;
   created_at: Date;
 }
 
 export interface NetworkStatsSnapshot {
   id: number;
   snapshot_time: Date;
-  block_number: bigint;
-  total_blocks?: bigint;
-  total_extrinsics?: bigint;
-  total_data_size?: bigint;
-  total_fees?: bigint;
+  block_number: number;
+  total_blocks?: number;
+  total_extrinsics?: number;
+  total_data_size?: number;
+  total_fees?: number;
   active_validators?: number;
-  total_staked?: bigint;
+  total_staked?: number;
   inflation_rate?: number;
   network_utilization?: number;
   average_block_time?: number;
@@ -216,10 +216,10 @@ export interface RollupAnalytics {
   period_end: Date;
   period_type: 'hour' | 'day' | 'week' | 'month';
   submission_count: number;
-  total_data_size: bigint;
-  total_fees: bigint;
+  total_data_size: number;
+  total_fees: number;
   unique_submitters: number;
-  average_submission_size: bigint;
+  average_submission_size: number;
   created_at: Date;
 }
 
@@ -271,9 +271,9 @@ export interface ExtrinsicWithMetadata extends Extrinsic {
   transfers?: Transfer[];
   data_submission?: DataSubmission;
   gas_info?: {
-    gas_used?: bigint;
-    gas_limit?: bigint;
-    gas_price?: bigint;
+    gas_used?: number;
+    gas_limit?: number;
+    gas_price?: number;
   };
 }
 
@@ -313,12 +313,12 @@ export interface NetworkAnalyticsResponse {
     app_id: number;
     name: string;
     percentage: number;
-    data_size: bigint;
+    data_size: number;
   }>;
 }
 
 export interface StakingOverviewResponse {
-  total_staked: bigint;
+  total_staked: number;
   active_validators: number;
   total_nominators: number;
   current_era: number;
@@ -335,10 +335,10 @@ export interface DataSubmissionFilters {
   app_id?: number;
   rollup_name?: string;
   submitter?: string;
-  start_timestamp?: bigint;
-  end_timestamp?: bigint;
-  min_size?: bigint;
-  max_size?: bigint;
+  start_timestamp?: number;
+  end_timestamp?: number;
+  min_size?: number;
+  max_size?: number;
   success?: boolean;
 }
 
@@ -348,26 +348,26 @@ export interface ValidatorFilters {
   is_slashed?: boolean;
   min_commission?: number;
   max_commission?: number;
-  min_total_bonded?: bigint;
+  min_total_bonded?: number;
   has_name?: boolean;
 }
 
 export interface EventFilters {
   module?: string;
   event_name?: string;
-  block_number?: bigint;
-  start_timestamp?: bigint;
-  end_timestamp?: bigint;
+  block_number?: number;
+  start_timestamp?: number;
+  end_timestamp?: number;
 }
 
 export interface TransferFilters {
   from_address?: string;
   to_address?: string;
   asset_id?: number;
-  min_amount?: bigint;
-  max_amount?: bigint;
-  start_timestamp?: bigint;
-  end_timestamp?: bigint;
+  min_amount?: number;
+  max_amount?: number;
+  start_timestamp?: number;
+  end_timestamp?: number;
   success?: boolean;
 }
 
@@ -404,11 +404,11 @@ export interface PaginatedResponse<T> {
 
 // Re-export existing types if they exist
 export interface Block {
-  number: bigint;
+  number: number;
   hash: string;
   parent_hash?: string;
   state_root?: string;
-  timestamp: bigint;
+  timestamp: Date;
   extrinsics_count: number;
   created_at: Date;
 }
@@ -416,20 +416,20 @@ export interface Block {
 export interface Extrinsic {
   id: number;
   hash: string;
-  block_number: bigint;
+  block_number: number;
   extrinsic_index?: number;
   module?: string;
   call?: string;
   success?: boolean;
-  timestamp?: bigint;
+  timestamp?: Date;
   signer?: string;
-  fee?: bigint;
+  fee?: number;
   created_at: Date;
 }
 
 export interface Account {
   address: string;
-  balance?: bigint;
+  balance?: number;
   nonce?: number;
   last_updated: Date;
 }
@@ -440,15 +440,15 @@ export interface Account {
 
 export interface SyncState {
   id: number;
-  last_synced_block: bigint;
-  target_block?: bigint;
+  last_synced_block: number;
+  target_block?: number;
   sync_status: 'idle' | 'syncing' | 'paused' | 'error' | 'completed';
   sync_mode: 'full' | 'incremental' | 'live';
   blocks_per_minute?: number;
   estimated_completion?: Date;
   error_count: number;
   last_error?: string;
-  last_error_block?: bigint;
+  last_error_block?: number;
   started_at?: Date;
   paused_at?: Date;
   completed_at?: Date;
@@ -457,20 +457,20 @@ export interface SyncState {
 }
 
 export interface SyncProgress {
-  current_block: bigint;
-  target_block: bigint;
+  current_block: number;
+  target_block: number;
   progress_percentage: number;
-  blocks_remaining: bigint;
+  blocks_remaining: number;
   estimated_time_remaining?: number; // seconds
   current_speed: number; // blocks per minute
 }
 
 export interface SyncMetrics {
-  total_blocks_synced: bigint;
+  total_blocks_synced: number;
   total_errors: number;
   average_blocks_per_minute: number;
   sync_duration: number; // seconds
-  last_successful_block: bigint;
+  last_successful_block: number;
   error_rate: number; // percentage
 }
 

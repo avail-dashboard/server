@@ -185,14 +185,14 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
 
       const dbExtrinsics: Partial<Extrinsic>[] = extrinsics.map(ext => ({
         hash: ext.hash,
-        block_number: BigInt(blockNumber),
+        block_number: blockNumber,
         extrinsic_index: ext.index,
         module: ext.method.section,
         call: ext.method.method,
         success: ext.success,
-        timestamp: BigInt(Date.now()), // Use current timestamp if not provided
+        timestamp: new Date(), // Use current timestamp if not provided
         signer: ext.signer || undefined,
-        fee: ext.fee ? BigInt(ext.fee) : undefined,
+        fee: ext.fee ? Number(ext.fee) : undefined,
       }));
 
       // Batch insert extrinsics
@@ -237,14 +237,14 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       });
 
       const dbEvents: Partial<Event>[] = events.map(event => ({
-        block_number: BigInt(blockNumber),
+        block_number: blockNumber,
         extrinsic_index: event.phase.applyExtrinsic || undefined,
         event_index: event.index,
         module: event.section,
         event_name: event.method,
         data: event.data,
         topics: [], // Not directly available in basic EventData
-        timestamp: BigInt(Date.now()),
+        timestamp: new Date(),
       }));
 
       // Batch insert events
@@ -334,11 +334,11 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
   private async storeBlock(blockData: BlockData, client: any): Promise<void> {
     try {
       const blockRecord: Partial<Block> = {
-        number: BigInt(blockData.number),
+        number: blockData.number,
         hash: blockData.hash,
         parent_hash: blockData.parentHash,
         state_root: blockData.stateRoot,
-        timestamp: BigInt(blockData.timestamp),
+        timestamp: new Date(blockData.timestamp),
         extrinsics_count: blockData.extrinsics.length,
       };
 

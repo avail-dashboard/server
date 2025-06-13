@@ -1,15 +1,15 @@
-import { Rollup, Prisma } from '@prisma/client';
+import { Rollup } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 
 export type RollupCreateInput = {
   appId: number;
   name: string;
   description?: string | null;
-  firstSeenBlock?: bigint | null;
-  lastActiveBlock?: bigint | null;
+  firstSeenBlock?: number | null;
+  lastActiveBlock?: number | null;
   totalSubmissions?: number;
-  totalDataSize?: bigint;
-  totalFeesPaid?: bigint;
+  totalDataSize?: number;
+  totalFeesPaid?: number;
   website?: string | null;
   logoUrl?: string | null;
 };
@@ -91,9 +91,9 @@ export class RollupRepository extends BaseRepository {
    */
   async updateStats(appId: number, stats: {
     totalSubmissions?: number;
-    totalDataSize?: bigint;
-    totalFeesPaid?: bigint;
-    lastActiveBlock?: bigint;
+    totalDataSize?: number;
+    totalFeesPaid?: number;
+    lastActiveBlock?: number;
   }): Promise<Rollup> {
     return this.prisma.rollup.update({
       where: { appId },
@@ -106,10 +106,10 @@ export class RollupRepository extends BaseRepository {
    */
   async incrementStats(appId: number, increments: {
     submissionsIncrement?: number;
-    dataSizeIncrement?: bigint;
-    feesIncrement?: bigint;
+    dataSizeIncrement?: number;
+    feesIncrement?: number;
   }): Promise<Rollup> {
-    const { submissionsIncrement = 0, dataSizeIncrement = 0n, feesIncrement = 0n } = increments;
+    const { submissionsIncrement = 0, dataSizeIncrement = 0, feesIncrement = 0 } = increments;
     
     return this.prisma.rollup.update({
       where: { appId },
@@ -134,7 +134,7 @@ export class RollupRepository extends BaseRepository {
    * Get active rollups (recently active)
    */
   async findActive(hoursBack: number = 24): Promise<Rollup[]> {
-    const cutoffTime = BigInt(Date.now() - (hoursBack * 60 * 60 * 1000));
+    const cutoffTime = Date.now() - (hoursBack * 60 * 60 * 1000);
     
     return this.prisma.rollup.findMany({
       where: {

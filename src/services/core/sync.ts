@@ -167,22 +167,22 @@ export class SyncService implements BaseService, ISyncService {
       const syncState = await this.getCurrentSyncState();
       const latestBlock = await this.blockchain.getLatestBlock();
       
-      const currentBlock = BigInt(syncState.last_synced_block);
-      const targetBlock = syncState.target_block ? BigInt(syncState.target_block) : BigInt(latestBlock.number);
+      const currentBlock = Number(syncState.last_synced_block);
+      const targetBlock = syncState.target_block ? Number(syncState.target_block) : latestBlock.number;
       const blocksRemaining = targetBlock - currentBlock;
-      const progressPercentage = targetBlock > 0n ? Number((currentBlock * 100n) / targetBlock) : 0;
+      const progressPercentage = targetBlock > 0 ? (currentBlock / targetBlock) * 100 : 0;
       
       // Calculate estimated time remaining based on current speed
       let estimatedTimeRemaining: number | undefined;
-      if (syncState.blocks_per_minute && syncState.blocks_per_minute > 0 && blocksRemaining > 0n) {
-        estimatedTimeRemaining = Math.ceil(Number(blocksRemaining) / syncState.blocks_per_minute * 60); // seconds
+      if (syncState.blocks_per_minute && syncState.blocks_per_minute > 0 && blocksRemaining > 0) {
+        estimatedTimeRemaining = Math.ceil(blocksRemaining / syncState.blocks_per_minute * 60); // seconds
       }
       
       return {
         current_block: currentBlock,
         target_block: targetBlock,
         progress_percentage: Math.min(progressPercentage, 100),
-        blocks_remaining: blocksRemaining > 0n ? blocksRemaining : 0n,
+        blocks_remaining: blocksRemaining > 0 ? blocksRemaining : 0,
         estimated_time_remaining: estimatedTimeRemaining,
         current_speed: syncState.blocks_per_minute || 0,
       };
@@ -216,11 +216,11 @@ export class SyncService implements BaseService, ISyncService {
       const errorRate = totalBlocks > 0 ? (syncState.error_count / totalBlocks) * 100 : 0;
       
       return {
-        total_blocks_synced: BigInt(syncState.last_synced_block),
+        total_blocks_synced: syncState.last_synced_block,
         total_errors: syncState.error_count,
         average_blocks_per_minute: averageBlocksPerMinute,
         sync_duration: syncDuration,
-        last_successful_block: BigInt(syncState.last_synced_block),
+        last_successful_block: syncState.last_synced_block,
         error_rate: errorRate,
       };
     } catch (error) {
@@ -261,7 +261,7 @@ export class SyncService implements BaseService, ISyncService {
       await this.updateSyncState({
         sync_status: 'syncing',
         sync_mode: mode,
-        target_block: BigInt(targetBlock),
+        target_block: targetBlock,
         started_at: new Date(),
         paused_at: undefined,
         completed_at: undefined,
@@ -355,7 +355,7 @@ export class SyncService implements BaseService, ISyncService {
       
       // Reset sync state
       await this.updateSyncState({
-        last_synced_block: 0n,
+        last_synced_block: 0,
         target_block: undefined,
         sync_status: 'idle',
         sync_mode: 'incremental',

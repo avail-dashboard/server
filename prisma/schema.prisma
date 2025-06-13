@@ -11,11 +11,12 @@ datasource db {
 }
 
 model Block {
-  number          BigInt           @id
+  number          Int              @id
   hash            String           @unique @db.VarChar(66)
   parentHash      String?          @map("parent_hash") @db.VarChar(66)
   stateRoot       String?          @map("state_root") @db.VarChar(66)
-  timestamp       BigInt
+  extrinsicsRoot  String?          @map("extrinsics_root") @db.VarChar(66)
+  timestamp       DateTime
   extrinsicsCount Int              @default(0) @map("extrinsics_count")
   createdAt       DateTime         @default(now()) @map("created_at")
   
@@ -32,14 +33,14 @@ model Block {
 model Extrinsic {
   id             Int      @id @default(autoincrement())
   hash           String   @unique @db.VarChar(66)
-  blockNumber    BigInt   @map("block_number")
+  blockNumber    Int      @map("block_number")
   extrinsicIndex Int?     @map("extrinsic_index")
   module         String?  @db.VarChar(50)
   call           String?  @db.VarChar(50)
   success        Boolean?
-  timestamp      BigInt?
-  signer         String?  @db.VarChar(48)
-  fee            BigInt?
+  timestamp      DateTime?
+  signer         String?  @db.VarChar(64)
+  fee            Int?
   createdAt      DateTime @default(now()) @map("created_at")
   
   // Relations
@@ -53,8 +54,8 @@ model Extrinsic {
 }
 
 model Account {
-  address     String   @id @db.VarChar(48)
-  balance     BigInt?
+  address     String   @id @db.VarChar(64)
+  balance     Int?
   nonce       Int?
   lastUpdated DateTime @default(now()) @map("last_updated")
   
@@ -64,13 +65,13 @@ model Account {
 
 model Event {
   id             Int      @id @default(autoincrement())
-  blockNumber    BigInt   @map("block_number")
+  blockNumber    Int      @map("block_number")
   extrinsicIndex Int?     @map("extrinsic_index")
   eventIndex     Int?     @map("event_index")
   module         String?  @db.VarChar(50)
   eventName      String?  @map("event_name") @db.VarChar(50)
   data           Json?
-  timestamp      BigInt?
+  timestamp      DateTime?
   createdAt      DateTime @default(now()) @map("created_at")
   
   // Relations
@@ -85,7 +86,7 @@ model Event {
 model Watchlist {
   id        Int      @id @default(autoincrement())
   userId    String?  @map("user_id") @db.VarChar(255)
-  address   String?  @db.VarChar(48)
+  address   String?  @db.VarChar(64)
   label     String?  @db.VarChar(100)
   createdAt DateTime @default(now()) @map("created_at")
   
@@ -95,15 +96,15 @@ model Watchlist {
 
 model SyncState {
   id                  Int       @id @default(autoincrement())
-  lastSyncedBlock     BigInt    @default(0) @map("last_synced_block")
-  targetBlock         BigInt?   @map("target_block")
+  lastSyncedBlock     Int       @default(0) @map("last_synced_block")
+  targetBlock         Int?      @map("target_block")
   syncStatus          SyncStatus @default(idle) @map("sync_status")
   syncMode            SyncMode   @default(incremental) @map("sync_mode")
   blocksPerMinute     Int?      @map("blocks_per_minute")
   estimatedCompletion DateTime? @map("estimated_completion")
   errorCount          Int       @default(0) @map("error_count")
   lastError           String?   @map("last_error")
-  lastErrorBlock      BigInt?   @map("last_error_block")
+  lastErrorBlock      Int?      @map("last_error_block")
   startedAt           DateTime? @map("started_at")
   pausedAt            DateTime? @map("paused_at")
   completedAt         DateTime? @map("completed_at")
@@ -118,17 +119,17 @@ model SyncState {
 model DataSubmission {
   id             Int      @id @default(autoincrement())
   extrinsicHash  String   @unique @map("extrinsic_hash") @db.VarChar(66)
-  blockNumber    BigInt   @map("block_number")
+  blockNumber    Int      @map("block_number")
   extrinsicIndex Int?     @map("extrinsic_index")
   appId          Int      @map("app_id")
   rollupName     String?  @map("rollup_name") @db.VarChar(255)
-  dataSize       BigInt   @map("data_size")
+  dataSize       Int      @map("data_size")
   dataHash       String   @map("data_hash") @db.VarChar(66)
-  submitter      String   @db.VarChar(48)
-  timestamp      BigInt
+  submitter      String   @db.VarChar(64)
+  timestamp      DateTime
   success        Boolean  @default(true)
   blobData       Bytes?   @map("blob_data")
-  kateCommitment String?  @map("kate_commitment") @db.VarChar(255)
+  kateCommitment String?  @map("kate_commitment") @db.Text
   proof          Json?
   createdAt      DateTime @default(now()) @map("created_at")
   
@@ -148,11 +149,11 @@ model Rollup {
   appId             Int      @id @map("app_id")
   name              String   @db.VarChar(255)
   description       String?
-  firstSeenBlock    BigInt?  @map("first_seen_block")
-  lastActiveBlock   BigInt?  @map("last_active_block")
+  firstSeenBlock    Int?     @map("first_seen_block")
+  lastActiveBlock   Int?     @map("last_active_block")
   totalSubmissions  Int      @default(0) @map("total_submissions")
-  totalDataSize     BigInt   @default(0) @map("total_data_size")
-  totalFeesPaid     BigInt   @default(0) @map("total_fees_paid")
+  totalDataSize     Int      @default(0) @map("total_data_size")
+  totalFeesPaid     Int      @default(0) @map("total_fees_paid")
   website           String?  @db.VarChar(255)
   logoUrl           String?  @map("logo_url") @db.VarChar(255)
   createdAt         DateTime @default(now()) @map("created_at")

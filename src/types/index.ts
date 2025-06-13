@@ -24,11 +24,11 @@ export type DataSource = 'rpc' | 'cache' | 'database';
 
 // Blockchain Data Types
 export interface Block {
-  number: bigint;
   hash: string;
+  number: number;
   parentHash: string;
   stateRoot: string;
-  timestamp: bigint;
+  timestamp: Date;
   extrinsicsCount: number;
   extrinsicsRoot?: string;
   authorId?: string;
@@ -39,22 +39,19 @@ export interface Block {
 }
 
 export interface Extrinsic {
-  id?: number;
   hash: string;
-  blockNumber: bigint;
-  extrinsicIndex: number;
+  index: number;
+  blockNumber: number;
   module: string;
-  call: string;
+  method: string;
+  args: any[];
+  timestamp: Date;
+  signer?: string;
+  fee: number;
   success: boolean;
-  timestamp: bigint;
-  signer: string;
-  fee: bigint;
-  args?: Record<string, unknown>;
+  tip?: number;
+  error?: string;
   events?: ExtrinsicEvent[];
-  tip?: bigint;
-  signature?: string;
-  isSigned?: boolean;
-  isUserTransaction?: boolean;
 }
 
 export interface ExtrinsicEvent {
@@ -68,14 +65,14 @@ export interface ExtrinsicEvent {
 
 export interface Account {
   address: string;
-  balance: bigint;
+  balance: number;
   nonce: number;
   lastUpdated?: Date;
   accountInfo?: {
-    free: bigint;
-    reserved: bigint;
-    frozen: bigint;
-    flags: bigint;
+    free: number;
+    reserved: number;
+    frozen: number;
+    flags: number;
   };
 }
 
@@ -88,12 +85,12 @@ export interface Validator {
     twitter?: string;
   };
   commission?: string;
-  selfStake?: bigint;
-  totalStake?: bigint;
+  selfStake?: number;
+  totalStake?: number;
   active?: boolean;
   nominators?: number;
-  ownStake?: bigint;
-  othersStake?: bigint;
+  ownStake?: number;
+  othersStake?: number;
   prefs?: ValidatorPrefs;
 }
 
@@ -103,16 +100,16 @@ export interface ValidatorPrefs {
 }
 
 export interface ChainStats {
-  blockHeight: bigint;
+  blockHeight: number;
   blockTime: number;
-  totalIssuance: bigint;
+  totalIssuance: number;
   activeValidators: number;
   nominators: number;
-  minimumStake: bigint;
-  averageStake: bigint;
+  minimumStake: number;
+  averageStake: number;
   inflation: number;
   stakingRatio: number;
-  lastUpdateTime: bigint;
+  lastUpdateTime: Date;
 }
 
 // Configuration Types
@@ -232,11 +229,11 @@ declare module 'express-serve-static-core' {
 
 // Database Models
 export interface BlockModel {
-  number: bigint;
+  number: number;
   hash: string;
   parent_hash: string;
   state_root: string;
-  timestamp: bigint;
+  timestamp: Date;
   extrinsics_count: number;
   created_at: Date;
 }
@@ -244,20 +241,20 @@ export interface BlockModel {
 export interface ExtrinsicModel {
   id: number;
   hash: string;
-  block_number: bigint;
+  block_number: number;
   extrinsic_index: number;
   module: string;
   call: string;
   success: boolean;
-  timestamp: bigint;
+  timestamp: Date;
   signer: string;
-  fee: bigint;
+  fee: number;
   created_at: Date;
 }
 
 export interface AccountModel {
   address: string;
-  balance: bigint;
+  balance: number;
   nonce: number;
   last_updated: Date;
 }
@@ -273,7 +270,7 @@ export interface WatchlistModel {
 // Analytics Types
 export interface TokenDistribution {
   address: string;
-  balance: bigint;
+  balance: number;
   percentage: number;
 }
 
@@ -286,7 +283,7 @@ export interface BlocksPerDay {
 export interface TransactionVolume {
   date: string;
   count: number;
-  volume: bigint;
+  volume: number;
   uniqueAccounts: number;
 }
 
@@ -298,16 +295,15 @@ export interface AnalyticsData {
 
 // Data Submission Types
 export interface DataSubmission {
-  extrinsicId: string;
-  blockNumber: bigint;
-  extrinsicIndex: number;
+  id: number;
+  extrinsicHash: string;
+  blockNumber: number;
   appId: number;
-  size: number; // in bytes
+  dataSize: number;
   dataHash: string;
   submitter: string;
-  timestamp: bigint;
+  timestamp: Date;
   success: boolean;
-  data?: string; // optional raw data
 }
 
 export interface DataSubmissionQuery extends PaginationParams {
@@ -323,10 +319,258 @@ export interface DataSubmissionQuery extends PaginationParams {
 
 export interface DataSubmissionStats {
   totalSubmissions: number;
-  totalDataSize: number; // in bytes
+  totalDataSize: number;
   uniqueApps: number;
   uniqueSubmitters: number;
   averageSize: number;
   submissionsToday: number;
   dataSizeToday: number;
+}
+
+// New blockchain types
+export interface AccountInfo {
+  address: string;
+  nonce: number;
+  consumers: number;
+  providers: number;
+  sufficients: number;
+  data: {
+    free: number;
+    reserved: number;
+    frozen: number;
+    flags: number;
+  };
+}
+
+export interface AccountBalance {
+  address: string;
+  balance: number;
+  nonce: number;
+  free: number;
+  reserved: number;
+  frozen: number;
+  flags: number;
+}
+
+export interface ValidatorInfo {
+  address: string;
+  commission: number;
+  blocked: boolean;
+  selfStake?: number;
+  totalStake?: number;
+  nominators: string[];
+  ownStake?: number;
+  othersStake?: number;
+}
+
+export interface StakingInfo {
+  era: number;
+  blockHeight: number;
+  sessionIndex: number;
+  totalIssuance: number;
+  activeStake: number;
+  minimumStake: number;
+  averageStake: number;
+  validatorCount: number;
+  nominatorCount: number;
+  lastUpdateTime: Date;
+}
+
+export interface Event {
+  index: number;
+  phase: string;
+  section: string;
+  method: string;
+  data: any[];
+  topics: string[];
+}
+
+export interface NetworkStats {
+  totalBlocks: number;
+  totalExtrinsics: number;
+  totalAccounts: number;
+  totalValidators: number;
+  totalNominators: number;
+  totalStaked: number;
+  averageBlockTime: number;
+  lastBlockTime: Date;
+}
+
+export interface Rollup {
+  appId: number;
+  name: string;
+  description?: string;
+  totalSubmissions: number;
+  totalDataSize: number;
+  lastActiveBlock?: number;
+  firstSeenBlock?: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+export interface SearchFilters {
+  query?: string;
+  type?: 'block' | 'extrinsic' | 'account' | 'validator';
+  page?: number;
+  limit?: number;
+}
+
+export interface BlockFilters {
+  fromBlock?: number;
+  toBlock?: number;
+  fromDate?: Date;
+  toDate?: Date;
+}
+
+export interface ExtrinsicFilters {
+  blockNumber?: number;
+  module?: string;
+  method?: string;
+  signer?: string;
+  success?: boolean;
+}
+
+export interface DbBlock {
+  number: number;
+  hash: string;
+  parentHash?: string;
+  stateRoot?: string;
+  timestamp: Date;
+  extrinsicsCount: number;
+  createdAt: Date;
+}
+
+export interface DbExtrinsic {
+  id: number;
+  hash: string;
+  block_number: number;
+  extrinsic_index?: number;
+  module?: string;
+  call?: string;
+  success?: boolean;
+  timestamp: Date;
+  signer?: string;
+  fee: number;
+  created_at: Date;
+}
+
+export interface DbAccount {
+  address: string;
+  balance: number;
+  nonce?: number;
+  last_updated: Date;
+}
+
+export interface BlockMetrics {
+  averageBlockTime: number;
+  blocksPerHour: number;
+  totalBlocks: number;
+  latestBlock: number;
+}
+
+export interface ExtrinsicMetrics {
+  totalExtrinsics: number;
+  successRate: number;
+  averageFee: number;
+  volume: number;
+  topModules: Array<{
+    module: string;
+    count: number;
+  }>;
+}
+
+export interface DataAvailabilityMetrics {
+  totalSubmissions: number;
+  totalDataSize: number;
+  averageSubmissionSize: number;
+  topRollups: Array<{
+    appId: number;
+    name: string;
+    submissions: number;
+    dataSize: number;
+  }>;
+}
+
+export interface WebSocketEvent {
+  type: string;
+  data: any;
+  timestamp: Date;
+}
+
+export interface NewBlockEvent extends WebSocketEvent {
+  type: 'new_block';
+  data: {
+    blockNumber: number;
+    blockHash: string;
+    timestamp: Date;
+    extrinsicsCount: number;
+  };
+}
+
+export interface NewExtrinsicEvent extends WebSocketEvent {
+  type: 'new_extrinsic';
+  data: {
+    hash: string;
+    blockNumber: number;
+    module: string;
+    method: string;
+    success: boolean;
+  };
+}
+
+export interface ApiError {
+  code: string;
+  message: string;
+  details?: any;
+}
+
+export interface ValidationError extends ApiError {
+  field: string;
+  value: any;
+}
+
+export interface DatabaseConfig {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  ssl?: boolean;
+}
+
+export interface BlockchainConfig {
+  wsEndpoint: string;
+  httpEndpoint?: string;
+  reconnectAttempts: number;
+  reconnectDelay: number;
+}
+
+export interface ServerConfig {
+  port: number;
+  host: string;
+  cors: {
+    origin: string[];
+    credentials: boolean;
+  };
+  rateLimit: {
+    windowMs: number;
+    max: number;
+  };
 } 

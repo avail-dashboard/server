@@ -231,14 +231,14 @@ export class DataAvailabilityService implements IDataAvailabilityService {
           // Create data submission with repository
           const submissionCreateData: DataSubmissionCreateInput = {
             extrinsicHash: extrinsicData.hash,
-            blockNumber: BigInt(blockData.number),
+            blockNumber: blockData.number,
             extrinsicIndex: extrinsicData.index,
             appId: submissionInfo.appId,
             rollupName: null, // TODO: Look up rollup name from app_id
-            dataSize: BigInt(submissionInfo.dataSize),
+            dataSize: submissionInfo.dataSize,
             dataHash: submissionInfo.dataHash,
             submitter: submissionInfo.submitter,
-            timestamp: BigInt(blockData.timestamp),
+            timestamp: new Date(blockData.timestamp),
             success: extrinsicData.success,
             blobData: submissionInfo.blobData || null,
             kateCommitment: submissionInfo.kateCommitment || null,
@@ -395,33 +395,19 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   private async updateRollupStats(appId: number, dataSize: number): Promise<void> {
     try {
       // Try to increment existing rollup stats
-      try {
-        await this.rollupRepository.incrementStats(appId, {
-          submissionsIncrement: 1,
-          dataSizeIncrement: BigInt(dataSize),
-        });
-      } catch (error) {
-        // If rollup doesn't exist, create it
-        await this.rollupRepository.create({
-          appId,
-          name: `App ${appId}`, // Default name, can be updated later
-          description: null,
-          firstSeenBlock: null, // TODO: Set current block number
-          lastActiveBlock: null, // TODO: Set current block number
-          totalSubmissions: 1,
-          totalDataSize: BigInt(dataSize),
-          totalFeesPaid: BigInt(0), // TODO: Calculate from extrinsic fees
-          website: null,
-          logoUrl: null,
-        });
-      }
-    } catch (error) {
-      logError(error as Error, {
-        component: 'data-availability-service',
-        action: 'updateRollupStats',
-        appId,
+      await this.rollupRepository.incrementStats(appId, {
+        submissionsIncrement: 1,
+        dataSizeIncrement: dataSize,
       });
-      // Don't throw error here to avoid failing the main data submission processing
+    } catch (error) {
+      // If rollup doesn't exist, create it
+      await this.rollupRepository.create({
+        appId,
+        name: `Rollup ${appId}`, // Default name
+        totalSubmissions: 1,
+        totalDataSize: dataSize,
+        totalFeesPaid: 0, // TODO: Calculate from extrinsic fees
+      });
     }
   }
 }
