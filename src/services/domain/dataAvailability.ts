@@ -24,6 +24,13 @@ export interface IDataAvailabilityService {
     sort?: SortParams, 
     filters?: DataSubmissionFilters
   ): Promise<PaginatedResponse<DataSubmission>>;
+  getDataSubmissionStats(): Promise<{
+    totalSubmissions: number;
+    totalDataSize: number;
+    uniqueApps: number;
+    avgDataSize: number;
+    submissionsLast24h: number;
+  }>;
   processDataSubmissionsFromBlock(blockData: BlockData): Promise<DataSubmission[]>;
   getRollupInfo(appId: number): Promise<Rollup | null>;
 }
@@ -53,32 +60,28 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   }
 
   /**
-   * Get data submission by extrinsic hash
-   * Pattern: Check database first, then fetch from blockchain if needed
+   * Get data submission by extrinsic hash (database-only)
    */
   async getDataSubmission(extrinsicHash: string): Promise<DataSubmission | null> {
     try {
-      // Step 1: Check database first
+      // Database-only approach - no blockchain fallback
       const existingSubmission = await this.getDataSubmissionFromDatabase(extrinsicHash);
+      
       if (existingSubmission) {
         logger.info('Data submission found in database', { 
           component: 'data-availability-service',
           extrinsicHash,
           source: 'database',
         });
-        return existingSubmission;
+      } else {
+        logger.info('Data submission not found in database', {
+          component: 'data-availability-service',
+          extrinsicHash,
+          source: 'database',
+        });
       }
-
-      // Step 2: If not in database, we need to process the block containing this extrinsic
-      logger.info('Data submission not found in database', {
-        component: 'data-availability-service',
-        extrinsicHash,
-        source: 'blockchain',
-      });
-
-      // For now, return null - in a real implementation, we'd need to find the block
-      // and process it to extract the data submission
-      return null;
+      
+      return existingSubmission;
 
     } catch (error) {
       logError(error as Error, {
@@ -91,39 +94,21 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   }
 
   /**
-   * Get all data submissions for a specific block
+   * Get all data submissions for a specific block (database-only)
    */
   async getDataSubmissionsForBlock(blockNumber: number): Promise<DataSubmission[]> {
     try {
-      // Step 1: Check database first
+      // Database-only approach - no blockchain fallback
       const existingSubmissions = await this.getDataSubmissionsFromDatabaseByBlock(blockNumber);
-      if (existingSubmissions.length > 0) {
-        logger.info('Data submissions found in database for block', { 
-          component: 'data-availability-service',
-          blockNumber,
-          count: existingSubmissions.length,
-          source: 'database',
-        });
-        return existingSubmissions;
-      }
-
-      // Step 2: Fetch block from blockchain and process data submissions
-      logger.info('Data submissions not found in database, fetching block from blockchain', {
-        component: 'data-availability-service',
-        blockNumber,
-        source: 'blockchain',
-      });
-
-      const blockData = await this.blockchain.getBlock(blockNumber);
-      const processedSubmissions = await this.processDataSubmissionsFromBlock(blockData);
       
-      logger.info('Data submissions processed and persisted for block', {
+      logger.info('Data submissions retrieved from database for block', { 
         component: 'data-availability-service',
         blockNumber,
-        count: processedSubmissions.length,
+        count: existingSubmissions.length,
+        source: 'database',
       });
-
-      return processedSubmissions;
+      
+      return existingSubmissions;
 
     } catch (error) {
       logError(error as Error, {
@@ -267,6 +252,46 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   }
 
   /**
+   * Get data submission statistics
+   */
+  async getDataSubmissionStats(): Promise<{
+    totalSubmissions: number;
+    totalDataSize: number;
+    uniqueApps: number;
+    avgDataSize: number;
+    submissionsLast24h: number;
+  }> {
+    try {
+      // Get overall stats from repository
+      const totalSubmissions = await this.dataSubmissionRepository.getTotalCount();
+      const totalDataSize = await this.dataSubmissionRepository.getTotalDataSize();
+      const uniqueApps = await this.dataSubmissionRepository.getUniqueAppCount();
+      
+      // Calculate average data size
+      const avgDataSize = totalSubmissions > 0 ? totalDataSize / totalSubmissions : 0;
+      
+      // Get submissions in last 24 hours
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const submissionsLast24h = await this.dataSubmissionRepository.getCountSince(yesterday);
+      
+      return {
+        totalSubmissions,
+        totalDataSize,
+        uniqueApps,
+        avgDataSize: Math.round(avgDataSize),
+        submissionsLast24h,
+      };
+    } catch (error) {
+      logError(error as Error, {
+        component: 'data-availability-service',
+        action: 'getDataSubmissionStats',
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Get rollup information by app ID
    */
   async getRollupInfo(appId: number): Promise<Rollup | null> {
@@ -375,7 +400,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   private async getDataSubmissionsFromDatabaseByBlock(blockNumber: number): Promise<DataSubmission[]> {
     try {
       const { submissions } = await this.dataSubmissionRepository.findMany(
-        {},
+        { blockNumber }, // Filter by block number
         { page: 1, limit: 1000 }
       );
       return submissions;

@@ -68,7 +68,18 @@ router.get(
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      throw new Error('Missing service');
+      const dataAvailabilityService = serviceFactory.get<DataAvailabilityService>('dataAvailabilityService');
+      const stats = await dataAvailabilityService.getDataSubmissionStats();
+
+      const response: APIResponse = {
+        success: true,
+        data: keysToCamelCase(stats),
+        meta: {
+          source: 'database',
+        },
+      };
+
+      res.json(response);
     } catch (error) {
       logError(error as Error, { component: 'data-submissions-route', action: 'getStats' });
       
