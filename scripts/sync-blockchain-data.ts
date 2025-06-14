@@ -21,6 +21,8 @@ import { createBlockIndexerService } from '../src/services/domain/indexer';
 import { createDataProcessorService } from '../src/services/domain/processor';
 import { createSyncService } from '../src/services/core/sync';
 import { QueueService } from '../src/services/core/queue';
+import { HybridProcessor } from '../src/services/domain/hybrid-processor';
+import { AvailDataSubmissionIndexer } from '../src/services/domain/availDataSubmissionIndexer';
 
 interface SyncOptions {
   mode: 'full' | 'incremental' | 'range' | 'live';
@@ -35,7 +37,10 @@ class StandaloneSyncScript {
   private blockchain: BlockchainService;
   private indexer: ReturnType<typeof createBlockIndexerService>;
   private processor: ReturnType<typeof createDataProcessorService>;
+  private queueService: QueueService;
   private syncService: ReturnType<typeof createSyncService>;
+  private hybridProcessor: HybridProcessor;
+  private availIndexer: AvailDataSubmissionIndexer;
   private shouldStop = false;
   private currentBlock = 0;
 
@@ -47,8 +52,12 @@ class StandaloneSyncScript {
     this.processor = createDataProcessorService(db, this.blockchain);
     
     // Create a minimal queue service for sync service dependency
-    const queueService = new QueueService();
-    this.syncService = createSyncService(db, this.blockchain, queueService);
+    this.queueService = new QueueService();
+    this.syncService = createSyncService(db, this.blockchain, this.queueService);
+    
+    // Initialize dual SDK services
+    this.hybridProcessor = new HybridProcessor();
+    this.availIndexer = new AvailDataSubmissionIndexer();
   }
 
   /**
@@ -66,11 +75,19 @@ class StandaloneSyncScript {
       await this.blockchain.start();
       logger.info('✅ Blockchain service started');
 
+      // Initialize queue service first (required by sync service)
+      await this.queueService.start();
+      logger.info('✅ Queue service started');
+
       // Initialize domain services
       await this.indexer.start();
       await this.processor.start();
       await this.syncService.start();
-      logger.info('✅ All services initialized');
+      
+      // Initialize dual SDK services
+      await this.hybridProcessor.initialize();
+      await this.availIndexer.initialize();
+      logger.info('✅ All services initialized (including dual SDK support)');
 
     } catch (error) {
       logger.error('❌ Failed to initialize services:', error);
@@ -88,7 +105,13 @@ class StandaloneSyncScript {
       await this.syncService.stop();
       await this.processor.stop();
       await this.indexer.stop();
+      await this.queueService.stop();
       await this.blockchain.stop();
+      
+      // Cleanup dual SDK services
+      await this.hybridProcessor.disconnect();
+      await this.availIndexer.disconnect();
+      
       await db.disconnect();
 
       logger.info('✅ All services shut down successfully');
@@ -248,12 +271,33 @@ class StandaloneSyncScript {
   }
 
   /**
-   * Process a batch of blocks
+   * Process a batch of blocks with hybrid SDK fallback
    */
   async processBatch(fromBlock: number, toBlock: number): Promise<void> {
     try {
-      // Index blocks from RPC
-      const blocks = await this.indexer.indexBlockRange(fromBlock, toBlock);
+      // Try regular polkadot.js indexing first
+      let blocks;
+      try {
+        blocks = await this.indexer.indexBlockRange(fromBlock, toBlock);
+        
+        // Check if we got the expected number of blocks
+        const expectedBlockCount = toBlock - fromBlock + 1;
+        if (blocks.length < expectedBlockCount) {
+          logger.warn(`⚠️ Polkadot.js indexing incomplete: got ${blocks.length}/${expectedBlockCount} blocks for range ${fromBlock}-${toBlock}, trying hybrid approach`);
+          
+          // Fallback to hybrid processing for individual blocks
+          blocks = await this.processBlocksWithHybridFallback(fromBlock, toBlock);
+        } else {
+          logger.debug(`✅ Regular indexing successful for range ${fromBlock}-${toBlock}`);
+        }
+      } catch (polkadotError) {
+        logger.warn(`⚠️ Polkadot.js indexing failed for range ${fromBlock}-${toBlock}, trying hybrid approach`, {
+          error: (polkadotError as Error).message,
+        });
+        
+        // Fallback to hybrid processing for individual blocks
+        blocks = await this.processBlocksWithHybridFallback(fromBlock, toBlock);
+      }
       
       if (blocks.length === 0) {
         logger.warn(`⚠️ No blocks returned for range ${fromBlock}-${toBlock}`);
@@ -275,6 +319,60 @@ class StandaloneSyncScript {
       logger.error(`❌ Failed to process batch ${fromBlock}-${toBlock}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Process blocks individually using hybrid approach when batch indexing fails
+   */
+  private async processBlocksWithHybridFallback(fromBlock: number, toBlock: number): Promise<any[]> {
+    const blocks: any[] = [];
+    
+    for (let blockNum = fromBlock; blockNum <= toBlock; blockNum++) {
+      try {
+        logger.debug(`🔄 Hybrid processing block ${blockNum}...`);
+        
+        // Use hybrid processor for problematic blocks
+        const hybridResult = await this.hybridProcessor.extractBlockData(blockNum);
+        
+        // Use the block data from hybrid result (already contains extrinsics and events)
+        const blockData = hybridResult.blockData;
+        
+        blocks.push(blockData);
+        
+        // Also process data submissions if found
+        if (hybridResult.dataSubmissions && hybridResult.dataSubmissions.length > 0) {
+          logger.info(`📊 Found ${hybridResult.dataSubmissions.length} data submissions in block ${blockNum} via hybrid processing`);
+          
+          try {
+            await this.availIndexer.indexBlock(blockNum);
+            logger.debug(`✅ Data submissions indexed for block ${blockNum}`);
+          } catch (indexError) {
+            logger.warn(`⚠️ Failed to index data submissions for block ${blockNum}`, {
+              error: (indexError as Error).message,
+            });
+          }
+        }
+        
+        logger.debug(`✅ Hybrid processing successful for block ${blockNum}`);
+        
+      } catch (error) {
+        logger.error(`❌ Hybrid processing failed for block ${blockNum}:`, error);
+        
+        // Try to get at least basic block data via avail-sdk directly
+        try {
+          const blockData = await this.availIndexer['availService'].getBlock(blockNum);
+          blocks.push(blockData);
+          logger.warn(`⚠️ Using basic block data for ${blockNum} after hybrid failure`);
+        } catch (basicError) {
+          logger.error(`❌ Failed to get basic block data for ${blockNum}:`, basicError);
+          // Skip this block rather than create invalid placeholder
+          logger.error(`❌ Skipping block ${blockNum} - could not retrieve any data`);
+        }
+      }
+    }
+    
+    logger.info(`✅ Hybrid processing completed for range ${fromBlock}-${toBlock}: ${blocks.length} blocks processed`);
+    return blocks;
   }
 
   /**

@@ -297,15 +297,25 @@ export class SyncService implements BaseService, ISyncService {
     try {
       logger.info('SyncService: Pausing sync', { component: 'sync' });
       
-      await this.updateSyncState({
-        sync_status: 'paused',
-        paused_at: new Date(),
-      });
+      const syncState = await this.getCurrentSyncState();
       
-      // Pause the queue to stop processing new jobs
-      await this.queue.pauseQueue();
-      
-      logger.info('SyncService: Sync paused', { component: 'sync' });
+      // Only pause if sync is actually running
+      if (syncState.sync_status === 'syncing') {
+        await this.updateSyncState({
+          sync_status: 'paused',
+          paused_at: new Date(),
+        });
+        
+        // Pause the queue to stop processing new jobs
+        await this.queue.pauseQueue();
+        
+        logger.info('SyncService: Sync paused', { component: 'sync' });
+      } else {
+        logger.info('SyncService: Sync is not running, no need to pause', { 
+          component: 'sync', 
+          currentStatus: syncState.sync_status,
+        });
+      }
     } catch (error) {
       logError(error as Error, { component: 'sync', action: 'pauseSync' });
       throw error;
