@@ -1,0 +1,916 @@
+{
+	"info": {
+		"_postman_id": "avail-explorer-api-collection",
+		"name": "Avail Explorer API - Working Endpoints",
+		"description": "Complete collection of all working database-only API endpoints for the Avail Explorer backend. All endpoints tested and functional as of Phase 1 completion.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "avail-explorer"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Server Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Check server health and status"
+					},
+					"response": [
+						{
+							"name": "Healthy Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/health",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"health"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"status\": \"healthy\",\n    \"timestamp\": \"2024-01-20T10:30:00.000Z\",\n    \"uptime\": 3661.25,\n    \"version\": \"1.0.0\",\n    \"environment\": \"development\",\n    \"services\": {\n      \"database\": {\n        \"connected\": true,\n        \"note\": \"Connected\"\n      },\n      \"caching\": {\n        \"connected\": true,\n        \"ping\": 2,\n        \"note\": \"Connected\"\n      },\n      \"websocket\": {\n        \"enabled\": true\n      }\n    }\n  },\n  \"timestamp\": \"2024-01-20T10:30:00.000Z\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Data Submissions",
+			"item": [
+				{
+					"name": "Get Data Submissions (Paginated)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/data-submissions?page=1&limit=10&sort_by=block_number&sort_order=desc",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"data-submissions"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (default: 1)"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Items per page (default: 20)"
+								},
+								{
+									"key": "sort_by",
+									"value": "block_number",
+									"description": "Sort field (default: block_number)"
+								},
+								{
+									"key": "sort_order",
+									"value": "desc",
+									"description": "Sort order: asc or desc (default: desc)"
+								}
+							]
+						},
+						"description": "Get paginated list of data submissions with optional sorting"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/data-submissions?page=1&limit=10&sort_by=block_number&sort_order=desc",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"data-submissions"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1"
+										},
+										{
+											"key": "limit",
+											"value": "10"
+										},
+										{
+											"key": "sort_by",
+											"value": "block_number"
+										},
+										{
+											"key": "sort_order",
+											"value": "desc"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"extrinsicId\": \"1492275-sample-0\",\n      \"blockNumber\": \"1492275\",\n      \"extrinsicIndex\": 0,\n      \"appId\": 0,\n      \"size\": 512,\n      \"dataHash\": \"0x0016c53300000000\",\n      \"submitter\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\n      \"timestamp\": \"1749935119190\",\n      \"success\": true,\n      \"data\": \"{\\\"type\\\":\\\"sample_data_submission\\\",\\\"message\\\":\\\"Sample DA submission 1\\\",\\\"size\\\":512}\"\n    },\n    {\n      \"extrinsicId\": \"1492274-sample-1\",\n      \"blockNumber\": \"1492274\",\n      \"extrinsicIndex\": 1,\n      \"appId\": 1,\n      \"size\": 768,\n      \"dataHash\": \"0x0016c53200000001\",\n      \"submitter\": \"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty\",\n      \"timestamp\": \"1749935099190\",\n      \"success\": true,\n      \"data\": \"{\\\"type\\\":\\\"sample_data_submission\\\",\\\"message\\\":\\\"Sample DA submission 2\\\",\\\"size\\\":768}\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 2,\n    \"total\": 2,\n    \"source\": \"rpc\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Data Submission Statistics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/data-submissions/stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"data-submissions",
+								"stats"
+							]
+						},
+						"description": "Get overall statistics for data submissions including total count, data size, unique apps, and recent activity"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/data-submissions/stats",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"data-submissions",
+										"stats"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"totalSubmissions\": 1250,\n    \"totalDataSize\": 52428800,\n    \"uniqueApps\": 15,\n    \"uniqueSubmitters\": 34,\n    \"averageSize\": 41943,\n    \"submissionsToday\": 45,\n    \"dataSizeToday\": 2097152\n  },\n  \"meta\": {\n    \"source\": \"database\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Data Submissions for Rollup",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/data-submissions/rollup/17",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"data-submissions",
+								"rollup",
+								"17"
+							]
+						},
+						"description": "Get all data submissions for a specific rollup/app ID (example: app ID 17)"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/data-submissions/rollup/17",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"data-submissions",
+										"rollup",
+										"17"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"dataSubmissions\": [\n      {\n        \"blockNumber\": 1478100,\n        \"extrinsicIndex\": 1,\n        \"extrinsicHash\": \"0x1f86cb8da29d9cc78b7cc26e929d48bf3e610e34ab8752e3417170e9a7223628\",\n        \"appId\": 17,\n        \"signer\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\n        \"dataSize\": 2048,\n        \"dataHash\": \"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\",\n        \"kateCommitment\": \"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\",\n        \"timestamp\": \"2024-01-20T10:25:30.000Z\",\n        \"success\": true\n      }\n    ],\n    \"totalCount\": 43,\n    \"appId\": 17\n  },\n  \"meta\": {\n    \"source\": \"database\",\n    \"total\": 43,\n    \"app_id\": \"17\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Specific Data Submission",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/data-submissions/1478096-1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"data-submissions",
+								"1478096-1"
+							]
+						},
+						"description": "Get detailed information for a specific data submission using format: blockNumber-extrinsicIndex"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/data-submissions/1478096-1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"data-submissions",
+										"1478096-1"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"blockNumber\": 1478096,\n    \"extrinsicIndex\": 1,\n    \"extrinsicHash\": \"0x1f86cb8da29d9cc78b7cc26e929d48bf3e610e34ab8752e3417170e9a7223628\",\n    \"appId\": 17,\n    \"signer\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\n    \"dataSize\": 2048,\n    \"dataHash\": \"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\",\n    \"kateCommitment\": \"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\",\n    \"timestamp\": \"2024-01-20T10:25:30.000Z\",\n    \"success\": true\n  },\n  \"meta\": {\n    \"source\": \"database\"\n  }\n}"
+						},
+						{
+							"name": "Not Found Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/data-submissions/9999999-1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"data-submissions",
+										"9999999-1"
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"error\": {\n    \"code\": \"NOT_FOUND\",\n    \"message\": \"Data submission not found\"\n  }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Blocks",
+			"item": [
+				{
+					"name": "Get Blocks (Paginated)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blocks?page=1&limit=10&sort_by=number&sort_order=desc",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blocks"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (default: 1)"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Items per page (default: 20)"
+								},
+								{
+									"key": "sort_by",
+									"value": "number",
+									"description": "Sort field (default: number)"
+								},
+								{
+									"key": "sort_order",
+									"value": "desc",
+									"description": "Sort order: asc or desc (default: desc)"
+								}
+							]
+						},
+						"description": "Get paginated list of blocks with optional sorting"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/blocks?page=1&limit=10&sort_by=number&sort_order=desc",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"blocks"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1"
+										},
+										{
+											"key": "limit",
+											"value": "10"
+										},
+										{
+											"key": "sort_by",
+											"value": "number"
+										},
+										{
+											"key": "sort_order",
+											"value": "desc"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"number\": 1492268,\n      \"parentHash\": \"0x188b69a0c8ec230356a9d66e8f14c44841af0f689b1c7ac706f4301fc8df4aa4\",\n      \"stateRoot\": \"0x3763c8f06f82e5801fe9b65012e28f272a8a6e0a9016d31e3a5fa1519f0a6b6f\",\n      \"timestamp\": 1749934972855,\n      \"extrinsicsCount\": 2,\n      \"extrinsicsRoot\": \"0x8799f8a521840c51696b604f79086bc05af6077a1770d99776d87c3acbc61de3\",\n      \"size\": 958,\n      \"weight\": \"0\",\n      \"spec\": 0,\n      \"finalized\": true,\n      \"authorId\": \"\",\n      \"extrinsics\": 2,\n      \"time\": \"2025-06-14T21:02:52.855Z\"\n    },\n    {\n      \"number\": 1492267,\n      \"parentHash\": \"0x483fa739fb92696f547d425ceeaa91b207d1ead065d2acb46069ad25e6d414c5\",\n      \"stateRoot\": \"0x5b77e91fa8b8f1d0c5b31dd3128c924e9c3075239dff92de4f2503faf0321a53\",\n      \"timestamp\": 1749934972855,\n      \"extrinsicsCount\": 2,\n      \"extrinsicsRoot\": \"0x0212e286541c6d7165e5da6adb1d7d67fa42d779090a3cc8036b767ce60880b4\",\n      \"size\": 958,\n      \"weight\": \"0\",\n      \"spec\": 0,\n      \"finalized\": true,\n      \"authorId\": \"\",\n      \"extrinsics\": 2,\n      \"time\": \"2025-06-14T21:02:52.855Z\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 1492268,\n    \"source\": \"rpc\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Latest Block",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blocks/latest",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blocks",
+								"latest"
+							]
+						},
+						"description": "Get the latest finalized block from the database"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/blocks/latest",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"blocks",
+										"latest"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"number\": 1478100,\n    \"hash\": \"0x81f480bafaf69c15d199102892019464e4337ea0cba1f0a7e64283c360022bc5\",\n    \"parentHash\": \"0x70e9a0b8f1e1e2f2e3e4e5e6e7e8e9e0e1e2e3e4e5e6e7e8e9e0e1e2e3e4e5e6\",\n    \"timestamp\": \"2024-01-20T10:25:30.000Z\",\n    \"extrinsicsCount\": 3,\n    \"eventsCount\": 12,\n    \"finalized\": true,\n    \"validator\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\"\n  },\n  \"timestamp\": \"2024-01-20T10:30:00.000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Block by Number",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blocks/1478100",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blocks",
+								"1478100"
+							]
+						},
+						"description": "Get block by number (example: block 1478100)"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/blocks/1478100",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"blocks",
+										"1478100"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"number\": 1478100,\n    \"hash\": \"0x81f480bafaf69c15d199102892019464e4337ea0cba1f0a7e64283c360022bc5\",\n    \"parentHash\": \"0x70e9a0b8f1e1e2f2e3e4e5e6e7e8e9e0e1e2e3e4e5e6e7e8e9e0e1e2e3e4e5e6\",\n    \"timestamp\": \"2024-01-20T10:25:30.000Z\",\n    \"extrinsicsCount\": 3,\n    \"eventsCount\": 12,\n    \"finalized\": true,\n    \"validator\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\"\n  },\n  \"timestamp\": \"2024-01-20T10:30:00.000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Block by Hash",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/blocks/0x81f480bafaf69c15d199102892019464e4337ea0cba1f0a7e64283c360022bc5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"blocks",
+								"0x81f480bafaf69c15d199102892019464e4337ea0cba1f0a7e64283c360022bc5"
+							]
+						},
+						"description": "Get block by hash (example hash from latest block)"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/blocks/0x81f480bafaf69c15d199102892019464e4337ea0cba1f0a7e64283c360022bc5",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"blocks",
+										"0x81f480bafaf69c15d199102892019464e4337ea0cba1f0a7e64283c360022bc5"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"number\": 1478100,\n    \"hash\": \"0x81f480bafaf69c15d199102892019464e4337ea0cba1f0a7e64283c360022bc5\",\n    \"parentHash\": \"0x70e9a0b8f1e1e2f2e3e4e5e6e7e8e9e0e1e2e3e4e5e6e7e8e9e0e1e2e3e4e5e6\",\n    \"timestamp\": \"2024-01-20T10:25:30.000Z\",\n    \"extrinsicsCount\": 3,\n    \"eventsCount\": 12,\n    \"finalized\": true,\n    \"validator\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\"\n  },\n  \"timestamp\": \"2024-01-20T10:30:00.000Z\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Extrinsics",
+			"item": [
+				{
+					"name": "Get Extrinsics (Paginated)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/extrinsics?page=1&limit=10&sort_by=id&sort_order=desc",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"extrinsics"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (default: 1)"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Items per page (default: 20)"
+								},
+								{
+									"key": "sort_by",
+									"value": "id",
+									"description": "Sort field (default: id)"
+								},
+								{
+									"key": "sort_order",
+									"value": "desc",
+									"description": "Sort order: asc or desc (default: desc)"
+								}
+							]
+						},
+						"description": "Get paginated list of extrinsics with optional sorting"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/extrinsics?page=1&limit=10&sort_by=id&sort_order=desc",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"extrinsics"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1"
+										},
+										{
+											"key": "limit",
+											"value": "10"
+										},
+										{
+											"key": "sort_by",
+											"value": "id"
+										},
+										{
+											"key": "sort_order",
+											"value": "desc"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"hash\": \"0xf08f8c42b3e57c5447d92baa91301800bf697f4218085cc06fe35d5e203630d5\",\n      \"blockNumber\": 1492277,\n      \"extrinsicIndex\": 0,\n      \"module\": \"timestamp\",\n      \"call\": \"set\",\n      \"success\": true,\n      \"timestamp\": 1749935140000,\n      \"signer\": \"\",\n      \"fee\": 100000000000000,\n      \"tip\": 0,\n      \"signature\": \"\",\n      \"args\": [\n        1749935140000\n      ],\n      \"events\": [],\n      \"isSigned\": true,\n      \"isUserTransaction\": false\n    },\n    {\n      \"hash\": \"0x92cdb77314063a01930b093516d19a453399710cc8ae635ff5ab6cf76b26f218\",\n      \"blockNumber\": 1492277,\n      \"extrinsicIndex\": 1,\n      \"module\": \"vector\",\n      \"call\": \"failedSendMessageTxs\",\n      \"success\": true,\n      \"timestamp\": 1749935140000,\n      \"signer\": \"\",\n      \"fee\": 100000000000000,\n      \"tip\": 0,\n      \"signature\": \"\",\n      \"args\": [\n        []\n      ],\n      \"events\": [],\n      \"isSigned\": true,\n      \"isUserTransaction\": false\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 2,\n    \"total\": 4,\n    \"source\": \"rpc\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Extrinsic by Hash",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/extrinsics/0x1f86cb8da29d9cc78b7cc26e929d48bf3e610e34ab8752e3417170e9a7223628",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"extrinsics",
+								"0x1f86cb8da29d9cc78b7cc26e929d48bf3e610e34ab8752e3417170e9a7223628"
+							]
+						},
+						"description": "Get extrinsic by hash (example hash from recent extrinsic)"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/extrinsics/0x1f86cb8da29d9cc78b7cc26e929d48bf3e610e34ab8752e3417170e9a7223628",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"extrinsics",
+										"0x1f86cb8da29d9cc78b7cc26e929d48bf3e610e34ab8752e3417170e9a7223628"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"1478100-1\",\n    \"blockNumber\": 1478100,\n    \"extrinsicIndex\": 1,\n    \"extrinsicHash\": \"0x1f86cb8da29d9cc78b7cc26e929d48bf3e610e34ab8752e3417170e9a7223628\",\n    \"method\": \"dataAvailability.submitData\",\n    \"section\": \"dataAvailability\",\n    \"call\": \"submitData\",\n    \"signer\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\n    \"nonce\": 42,\n    \"signature\": \"0xsignature123...\",\n    \"tip\": \"0\",\n    \"success\": true,\n    \"timestamp\": \"2024-01-20T10:25:30.000Z\",\n    \"args\": {\n      \"data\": \"0x1234567890abcdef...\"\n    },\n    \"events\": [\n      {\n        \"eventIndex\": \"1478100-1-1\",\n        \"method\": \"DataSubmitted\",\n        \"section\": \"dataAvailability\",\n        \"data\": {\n          \"who\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\n          \"dataHash\": \"0x1234567890abcdef...\"\n        }\n      }\n    ]\n  }\n}"
+						},
+						{
+							"name": "Not Found Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/extrinsics/0xinvalidhash",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"extrinsics",
+										"0xinvalidhash"
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"error\": {\n    \"code\": \"NOT_FOUND\",\n    \"message\": \"Extrinsic not found\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Extrinsics for Block",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/extrinsics/block/1478100",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"extrinsics",
+								"block",
+								"1478100"
+							]
+						},
+						"description": "Get all extrinsics for a specific block number (example: block 1478100)"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/extrinsics/block/1478100",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"extrinsics",
+										"block",
+										"1478100"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"1478100-0\",\n      \"blockNumber\": 1478100,\n      \"extrinsicIndex\": 0,\n      \"extrinsicHash\": \"0xtimestamp_extrinsic_hash\",\n      \"method\": \"timestamp.set\",\n      \"section\": \"timestamp\",\n      \"call\": \"set\",\n      \"signer\": null,\n      \"nonce\": null,\n      \"signature\": null,\n      \"tip\": null,\n      \"success\": true,\n      \"timestamp\": \"2024-01-20T10:25:30.000Z\"\n    },\n    {\n      \"id\": \"1478100-1\",\n      \"blockNumber\": 1478100,\n      \"extrinsicIndex\": 1,\n      \"extrinsicHash\": \"0x1f86cb8da29d9cc78b7cc26e929d48bf3e610e34ab8752e3417170e9a7223628\",\n      \"method\": \"dataAvailability.submitData\",\n      \"section\": \"dataAvailability\",\n      \"call\": \"submitData\",\n      \"signer\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\n      \"nonce\": 42,\n      \"signature\": \"0xsignature123...\",\n      \"tip\": \"0\",\n      \"success\": true,\n      \"timestamp\": \"2024-01-20T10:25:30.000Z\"\n    },\n    {\n      \"id\": \"1478100-2\",\n      \"blockNumber\": 1478100,\n      \"extrinsicIndex\": 2,\n      \"extrinsicHash\": \"0x2b97db9ea28e9dd79c8dd27f939e48cf4f710f35bc8864f4e528071a8b334740\",\n      \"method\": \"dataAvailability.submitData\",\n      \"section\": \"dataAvailability\",\n      \"call\": \"submitData\",\n      \"signer\": \"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty\",\n      \"nonce\": 29,\n      \"signature\": \"0xsignature456...\",\n      \"tip\": \"0\",\n      \"success\": true,\n      \"timestamp\": \"2024-01-20T10:25:30.000Z\"\n    }\n  ]\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Specific Extrinsic by Block and Index",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/extrinsics/block/1478100/0",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"extrinsics",
+								"block",
+								"1478100",
+								"0"
+							]
+						},
+						"description": "Get specific extrinsic by block number and extrinsic index (example: block 1478100, index 0)"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/extrinsics/block/1478100/0",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"extrinsics",
+										"block",
+										"1478100",
+										"0"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"1478100-0\",\n    \"blockNumber\": 1478100,\n    \"extrinsicIndex\": 0,\n    \"extrinsicHash\": \"0xtimestamp_extrinsic_hash\",\n    \"method\": \"timestamp.set\",\n    \"section\": \"timestamp\",\n    \"call\": \"set\",\n    \"signer\": null,\n    \"nonce\": null,\n    \"signature\": null,\n    \"tip\": null,\n    \"success\": true,\n    \"timestamp\": \"2024-01-20T10:25:30.000Z\",\n    \"args\": {\n      \"now\": \"1642680330000\"\n    },\n    \"events\": [\n      {\n        \"eventIndex\": \"1478100-0-0\",\n        \"method\": \"NewSession\",\n        \"section\": \"session\",\n        \"data\": {\n          \"sessionIndex\": 12345\n        }\n      }\n    ]\n  }\n}"
+						},
+						{
+							"name": "Not Found Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/extrinsics/block/1478100/999",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"extrinsics",
+										"block",
+										"1478100",
+										"999"
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"error\": {\n    \"code\": \"NOT_FOUND\",\n    \"message\": \"Extrinsic not found\"\n  }\n}"
+						}
+					]
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3001",
+			"type": "string",
+			"description": "Base URL for the Avail Explorer API server"
+		}
+	]
+}
