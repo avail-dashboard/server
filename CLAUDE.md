@@ -7,10 +7,12 @@
 6. Make every task and code change you do as simple as possible. We want to avoid making any massive or complex changes. Every change should impact as little code as possible. Everything is about simplicity.
 7. Finally, add a review section to the projectplan.md file with a summary of the changes you made and any other relevant information.
 8. Please suggest edits to this claude.md file whenever makes sense.
-9. Docs/Developer.md - contains analysis of common issues and solutions, suggest edits when needed. (always)
-10. Docs/avail_explorer_complete_analysis.md - contains the analysis of the Avail Explorer UI. (optional, as per need)
-11. Docs/Avail DA Explorer Scope.md - contains the scope of this Avail DA Explorer project. (optional, as per need)
+9. Docs/Developer.md - contains analysis of common issues and solutions. Please update this with solution to problems you encounter in this project. don't suggest edit too long for this file. just a single double liner for a issue and solution.
 
+10. Docs/avail_explorer_complete_analysis.md - contains the analysis of the Avail Explorer UI. (load optionally, as per need)
+11. Docs/Avail DA Explorer Scope.md - contains the scope of this project. (load optionally, as per need)
+
+12. When working on a task, there are tasks that you don't do immediately but need to be done at some point. Please maintain them in todo.md, tasks like you created a test script for testing, but you need to remove it once fixed.
 
 https://github.com/availproject/avail - for avail codebase 
 https://github.com/polkadot-js/api - for polkadot-js/api codebase

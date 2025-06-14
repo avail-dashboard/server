@@ -25,4 +25,12 @@ singleton database, blockchain, queue
 
 don't use bigint for anything, as this leads to JSON serialization issues
 
-ENV_FILE=.env.local etc whenever using env variables like `ENV_FILE=.env.local npx scripts/check-block-decode.ts
+
+Loading env variables:
+* ENV_FILE=.env.local dotenv -e .env.local etc whenever using env variables like `npm`, `npx`, `tsx`, `node` etc.
+
+## Avail Data Submission Indexing
+Foreign key constraint issue with data_submissions_app_id_fkey → Fixed by ensuring rollup records exist before inserting data submissions. Added ensureRollupsExist() method to AvailDataSubmissionIndexer to auto-create rollup records for new app_ids discovered during indexing.
+
+## Foreign Key Constraint Issues
+data_submissions_app_id_fkey violations: Ensure rollup records exist before inserting data submissions. Create rollups first in indexing flow.
