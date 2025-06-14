@@ -233,8 +233,8 @@ export class AvailBlockchainService implements BaseService {
       stateRoot: block.block.header.stateRoot.toString(),
       extrinsicsRoot: block.block.header.extrinsicsRoot.toString(),
       timestamp: Date.now(), // Should be extracted from timestamp extrinsic
-      extrinsics: [],
-      events: [],
+      extrinsics: this.extractExtrinsicsData(block.block.extrinsics),
+      events: this.extractEventsData(events),
     };
 
     // Enhanced processing for avail-specific features
@@ -246,6 +246,99 @@ export class AvailBlockchainService implements BaseService {
     });
 
     return blockData;
+  }
+
+  /**
+   * Extract extrinsics data from raw block extrinsics
+   */
+  private extractExtrinsicsData(rawExtrinsics: any[]): any[] {
+    return rawExtrinsics.map((extrinsic, index) => {
+      try {
+        // Try to extract extrinsic data safely
+        const hash = extrinsic.hash?.toString() || `0x${index.toString().padStart(64, '0')}`;
+        
+        // Extract method information if available
+        let method = { section: 'unknown', method: 'unknown' };
+        try {
+          if (extrinsic.method) {
+            method = {
+              section: extrinsic.method.section || 'unknown',
+              method: extrinsic.method.method || 'unknown',
+            };
+          }
+        } catch (methodError) {
+          logger.debug('Failed to extract method from extrinsic', {
+            component: 'avail-blockchain',
+            extrinsicIndex: index,
+            error: (methodError as Error).message,
+          });
+        }
+
+        // Extract signer information if available
+        let signer;
+        try {
+          signer = extrinsic.signer?.toString();
+        } catch (signerError) {
+          // Signer extraction failed - this is common for unsigned extrinsics
+        }
+
+        return {
+          hash,
+          index,
+          method,
+          signer,
+          success: true, // Will be determined by events in processor
+          fee: null, // Fee calculation requires more complex logic
+        };
+      } catch (error) {
+        logger.warn('Failed to extract extrinsic data', {
+          component: 'avail-blockchain',
+          extrinsicIndex: index,
+          error: (error as Error).message,
+        });
+        
+        // Return minimal extrinsic data to maintain count
+        return {
+          hash: `0x${index.toString().padStart(64, '0')}`,
+          index,
+          method: { section: 'unknown', method: 'unknown' },
+          signer: undefined,
+          success: false,
+          fee: null,
+        };
+      }
+    });
+  }
+
+  /**
+   * Extract events data from raw events
+   */
+  private extractEventsData(rawEvents: any[]): any[] {
+    return rawEvents.map((event, index) => {
+      try {
+        return {
+          index,
+          section: event.event?.section || 'unknown',
+          method: event.event?.method || 'unknown',
+          data: event.event?.data || [],
+          phase: event.phase || { finalization: 0 },
+        };
+      } catch (error) {
+        logger.warn('Failed to extract event data', {
+          component: 'avail-blockchain',
+          eventIndex: index,
+          error: (error as Error).message,
+        });
+        
+        return {
+          index,
+          section: 'unknown',
+          method: 'unknown',
+          data: [],
+          phase: { finalization: 0 },
+        };
+      }
+    });
   }
 
   /**
