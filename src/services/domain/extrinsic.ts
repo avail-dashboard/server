@@ -8,7 +8,9 @@ import {
   PaginatedResponse,
   PaginationParams,
   SortParams,
+  ExtrinsicApiResponse,
 } from '../../types/database';
+import { IExtrinsicMapper } from '../../mappers';
 
 export interface ExtrinsicFeeInfo {
   baseFee: number;
@@ -23,9 +25,9 @@ export interface ExtrinsicWithFeeInfo extends Extrinsic {
 
 export interface IExtrinsicService {
   processBlockExtrinsics(blockData: BlockData): Promise<Extrinsic[]>;
-  getExtrinsic(hash: string): Promise<Extrinsic | null>;
-  getExtrinsicsForBlock(blockNumber: number): Promise<Extrinsic[]>;
-  getExtrinsics(pagination?: PaginationParams, sort?: SortParams): Promise<PaginatedResponse<Extrinsic>>;
+  getExtrinsic(hash: string): Promise<ExtrinsicApiResponse | null>;
+  getExtrinsicsForBlock(blockNumber: number): Promise<ExtrinsicApiResponse[]>;
+  getExtrinsics(pagination?: PaginationParams, sort?: SortParams): Promise<PaginatedResponse<ExtrinsicApiResponse>>;
   calculateFeeInfo(extrinsicData: ExtrinsicData): Promise<ExtrinsicFeeInfo>;
 }
 
@@ -33,15 +35,18 @@ export class ExtrinsicService implements IExtrinsicService {
   private extrinsicRepository: ExtrinsicRepository;
   private blockRepository: BlockRepository;
   private blockchain: BlockchainService;
+  private extrinsicMapper: IExtrinsicMapper;
 
   constructor(
     extrinsicRepository: ExtrinsicRepository,
     blockRepository: BlockRepository,
     blockchain: BlockchainService,
+    extrinsicMapper: IExtrinsicMapper,
   ) {
     this.extrinsicRepository = extrinsicRepository;
     this.blockRepository = blockRepository;
     this.blockchain = blockchain;
+    this.extrinsicMapper = extrinsicMapper;
   }
 
   /**
@@ -97,9 +102,10 @@ export class ExtrinsicService implements IExtrinsicService {
   /**
    * Get extrinsic by hash
    */
-  async getExtrinsic(hash: string): Promise<Extrinsic | null> {
+  async getExtrinsic(hash: string): Promise<ExtrinsicApiResponse | null> {
     try {
-      return await this.extrinsicRepository.findByHash(hash);
+      const extrinsic = await this.extrinsicRepository.findByHash(hash);
+      return extrinsic ? this.extrinsicMapper.toApiResponse(extrinsic) : null;
     } catch (error) {
       logError(error as Error, {
         component: 'extrinsic-service',
@@ -113,9 +119,10 @@ export class ExtrinsicService implements IExtrinsicService {
   /**
    * Get all extrinsics for a specific block
    */
-  async getExtrinsicsForBlock(blockNumber: number): Promise<Extrinsic[]> {
+  async getExtrinsicsForBlock(blockNumber: number): Promise<ExtrinsicApiResponse[]> {
     try {
-      return await this.extrinsicRepository.findByBlock(blockNumber);
+      const extrinsics = await this.extrinsicRepository.findByBlock(blockNumber);
+      return this.extrinsicMapper.toApiResponseArray(extrinsics);
     } catch (error) {
       logError(error as Error, {
         component: 'extrinsic-service',
@@ -132,7 +139,7 @@ export class ExtrinsicService implements IExtrinsicService {
   async getExtrinsics(
     pagination: PaginationParams = { page: 1, limit: 20 },
     sort: SortParams = { sort_by: 'id', sort_order: 'desc' },
-  ): Promise<PaginatedResponse<Extrinsic>> {
+  ): Promise<PaginatedResponse<ExtrinsicApiResponse>> {
     try {
       const { page = 1, limit = 20 } = pagination;
       const { sort_order: sortOrder = 'desc' } = sort;
@@ -144,7 +151,7 @@ export class ExtrinsicService implements IExtrinsicService {
       });
 
       return {
-        data: extrinsics,
+        data: this.extrinsicMapper.toApiResponseArray(extrinsics),
         pagination: {
           page,
           limit,
@@ -207,6 +214,8 @@ export class ExtrinsicService implements IExtrinsicService {
     }
   }
 
+  // Conversion method removed - now handled by ExtrinsicMapper
+
   /**
    * Private: Process a single extrinsic
    */
@@ -258,6 +267,7 @@ export const createExtrinsicService = (
   extrinsicRepository: ExtrinsicRepository,
   blockRepository: BlockRepository,
   blockchain: BlockchainService,
+  extrinsicMapper: IExtrinsicMapper,
 ): ExtrinsicService => {
-  return new ExtrinsicService(extrinsicRepository, blockRepository, blockchain);
+  return new ExtrinsicService(extrinsicRepository, blockRepository, blockchain, extrinsicMapper);
 }; 

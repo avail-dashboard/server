@@ -17,6 +17,9 @@ export { DataAvailabilityService, createDataAvailabilityService } from './domain
 export { BlockIndexerService, createBlockIndexerService } from './domain/indexer';
 export { DataProcessorService, createDataProcessorService } from './domain/processor';
 
+// Mappers
+export * from '../mappers';
+
 // Service Types
 export * from './types/service';
 export * from './types/blockchain';
@@ -33,6 +36,14 @@ import { createDataAvailabilityService } from './domain/dataAvailability';
 import { createSyncService } from './core/sync';
 import { createBlockIndexerService } from './domain/indexer';
 import { createDataProcessorService } from './domain/processor';
+
+// Mapper imports
+import { 
+  DataSubmissionMapper, 
+  RollupMapper, 
+  ExtrinsicMapper, 
+  BlockMapper,
+} from '../mappers';
 
 // Database imports
 import db from '../utils/database';
@@ -119,13 +130,27 @@ export class ServiceFactory {
       const blockchainService = this.get<BlockchainService>('blockchain');
       const queueService = this.get<QueueService>('queue');
       
+      // Create mapper instances
+      const dataSubmissionMapper = new DataSubmissionMapper();
+      const rollupMapper = new RollupMapper();
+      const extrinsicMapper = new ExtrinsicMapper();
+      const blockMapper = new BlockMapper();
+      
+      // Register mappers
+      this.register('dataSubmissionMapper', dataSubmissionMapper);
+      this.register('rollupMapper', rollupMapper);
+      this.register('extrinsicMapper', extrinsicMapper);
+      this.register('blockMapper', blockMapper);
+      
       // Create domain services using factory functions with dependencies
-      const blockService = createBlockService(blockRepository, blockchainService);
-      const extrinsicService = createExtrinsicService(extrinsicRepository, blockRepository, blockchainService);
+      const blockService = createBlockService(blockRepository, blockchainService, blockMapper);
+      const extrinsicService = createExtrinsicService(extrinsicRepository, blockRepository, blockchainService, extrinsicMapper);
       const dataAvailabilityService = createDataAvailabilityService(
         dataSubmissionRepository,
         rollupRepository, 
         blockchainService,
+        dataSubmissionMapper,
+        rollupMapper,
       );
       
       // Create new sync services

@@ -3,32 +3,36 @@ import { BlockchainService } from '../core/blockchain';
 import { BlockRepository } from '../../database/repositories/BlockRepository';
 import { Block } from '../../database';
 import { 
-  BlockWithMetadata, 
+  BlockWithMetadataApiResponse,
+  BlockApiResponse,
   PaginatedResponse,
   PaginationParams,
   SortParams,
 } from '../../types/database';
-import { BlockData } from '../types/blockchain';
+
+import { IBlockMapper } from '../../mappers';
 
 export interface IBlockService {
-  getBlock(hashOrNumber: string | number): Promise<BlockWithMetadata>;
-  getLatestBlock(): Promise<BlockWithMetadata>;
-  getBlocks(pagination?: PaginationParams, sort?: SortParams): Promise<PaginatedResponse<Block>>;
+  getBlock(hashOrNumber: string | number): Promise<BlockWithMetadataApiResponse>;
+  getLatestBlock(): Promise<BlockWithMetadataApiResponse>;
+  getBlocks(pagination?: PaginationParams, sort?: SortParams): Promise<PaginatedResponse<BlockApiResponse>>;
 }
 
 export class BlockService implements IBlockService {
   private blockRepository: BlockRepository;
   private blockchain: BlockchainService;
+  private blockMapper: IBlockMapper;
 
-  constructor(blockRepository: BlockRepository, blockchain: BlockchainService) {
+  constructor(blockRepository: BlockRepository, blockchain: BlockchainService, blockMapper: IBlockMapper) {
     this.blockRepository = blockRepository;
     this.blockchain = blockchain;
+    this.blockMapper = blockMapper;
   }
 
   /**
    * Get block by hash or number (database-only)
    */
-  async getBlock(hashOrNumber: string | number): Promise<BlockWithMetadata> {
+  async getBlock(hashOrNumber: string | number): Promise<BlockWithMetadataApiResponse> {
     try {
       // Database-only approach - no blockchain fallback
       const existingBlock = await this.getBlockFromDatabase(hashOrNumber);
@@ -64,7 +68,7 @@ export class BlockService implements IBlockService {
   /**
    * Get the latest block (database-only)
    */
-  async getLatestBlock(): Promise<BlockWithMetadata> {
+  async getLatestBlock(): Promise<BlockWithMetadataApiResponse> {
     try {
       // Database-only approach - get latest block from database
       const latestBlock = await this.blockRepository.getLatest();
@@ -79,20 +83,8 @@ export class BlockService implements IBlockService {
         source: 'database',
       });
 
-      // Convert to BlockWithMetadata format
-      return {
-        number: latestBlock.number,
-        hash: latestBlock.hash,
-        parent_hash: latestBlock.parentHash,
-        state_root: latestBlock.stateRoot,
-        timestamp: latestBlock.timestamp,
-        extrinsics_count: latestBlock.extrinsicsCount,
-        created_at: latestBlock.createdAt,
-        events: [],
-        logs: [],
-        data_submissions: [],
-        transfers: [],
-      } as BlockWithMetadata;
+      // Convert to BlockWithMetadata format using mapper
+      return this.blockMapper.toWithMetadataApiResponse(latestBlock);
 
     } catch (error) {
       logError(error as Error, {
@@ -109,7 +101,7 @@ export class BlockService implements IBlockService {
   async getBlocks(
     pagination: PaginationParams = { page: 1, limit: 20 },
     sort: SortParams = { sort_by: 'number', sort_order: 'desc' },
-  ): Promise<PaginatedResponse<Block>> {
+  ): Promise<PaginatedResponse<BlockApiResponse>> {
     try {
       const { page = 1, limit = 20 } = pagination;
       const { sort_order: sortOrder = 'desc' } = sort;
@@ -121,15 +113,7 @@ export class BlockService implements IBlockService {
       });
 
       return {
-        data: blocks.map(block => ({
-          number: block.number,
-          hash: block.hash,
-          parentHash: block.parentHash,
-          stateRoot: block.stateRoot,
-          timestamp: block.timestamp,
-          extrinsicsCount: block.extrinsicsCount,
-          createdAt: block.createdAt,
-        })),
+        data: this.blockMapper.toApiResponseArray(blocks),
         pagination: {
           page,
           limit,
@@ -152,7 +136,7 @@ export class BlockService implements IBlockService {
   /**
    * Private: Get block from database using repository
    */
-  private async getBlockFromDatabase(hashOrNumber: string | number): Promise<BlockWithMetadata | null> {
+  private async getBlockFromDatabase(hashOrNumber: string | number): Promise<BlockWithMetadataApiResponse | null> {
     try {
       let block: Block | null;
       
@@ -166,21 +150,9 @@ export class BlockService implements IBlockService {
         return null;
       }
 
-      // Convert to BlockWithMetadata format
+      // Convert to BlockWithMetadata format using mapper
       // TODO: Add metadata (events, extrinsics, etc.) in future iterations
-      return {
-        number: block.number,
-        hash: block.hash,
-        parent_hash: block.parentHash,
-        state_root: block.stateRoot,
-        timestamp: block.timestamp,
-        extrinsics_count: block.extrinsicsCount,
-        created_at: block.createdAt,
-        events: [],
-        logs: [],
-        data_submissions: [],
-        transfers: [],
-      } as BlockWithMetadata;
+      return this.blockMapper.toWithMetadataApiResponse(block);
 
     } catch (error) {
       logError(error as Error, {
@@ -194,6 +166,6 @@ export class BlockService implements IBlockService {
 
 }
 
-export const createBlockService = (blockRepository: BlockRepository, blockchain: BlockchainService): BlockService => {
-  return new BlockService(blockRepository, blockchain);
+export const createBlockService = (blockRepository: BlockRepository, blockchain: BlockchainService, blockMapper: IBlockMapper): BlockService => {
+  return new BlockService(blockRepository, blockchain, blockMapper);
 }; 

@@ -80,6 +80,25 @@ export interface DataSubmission {
   created_at: Date;
 }
 
+// API Response DataSubmission type (with serialized timestamps)
+export interface DataSubmissionApiResponse {
+  id: number;
+  extrinsic_hash: string;
+  block_number: number;
+  extrinsic_index: number;
+  app_id: number;
+  rollup_name?: string;
+  data_size: number;
+  data_hash: string;
+  submitter: string;
+  timestamp: string; // ISO string instead of Date
+  success: boolean;
+  blob_data?: Buffer;
+  kate_commitment?: string;
+  proof?: object;
+  created_at: string; // ISO string instead of Date
+}
+
 export interface Rollup {
   app_id: number;
   name: string;
@@ -93,6 +112,22 @@ export interface Rollup {
   logo_url?: string;
   created_at: Date;
   updated_at: Date;
+}
+
+// API Response Rollup type (with serialized timestamps)
+export interface RollupApiResponse {
+  app_id: number;
+  name: string;
+  description?: string;
+  first_seen_block?: number;
+  last_active_block?: number;
+  total_submissions: number;
+  total_data_size: number;
+  total_fees_paid: number;
+  website?: string;
+  logo_url?: string;
+  created_at: string; // ISO string instead of Date
+  updated_at: string; // ISO string instead of Date
 }
 
 // ==========================================
@@ -253,6 +288,17 @@ export interface UserPreferences {
 // ENHANCED EXISTING TYPES
 // ==========================================
 
+// API Response Block type (with serialized timestamps)
+export interface BlockApiResponse {
+  number: number;
+  hash: string;
+  parent_hash?: string;
+  state_root?: string;
+  timestamp: string; // ISO string instead of Date
+  extrinsics_count: number;
+  created_at: string; // ISO string instead of Date
+}
+
 // Enhanced Block type (extending existing)
 export interface BlockWithMetadata extends Block {
   events?: Event[];
@@ -263,6 +309,40 @@ export interface BlockWithMetadata extends Block {
     validator_address?: string;
     validator_name?: string;
   };
+}
+
+// Enhanced Block API Response type (for API responses with metadata)
+export interface BlockWithMetadataApiResponse {
+  number: number;
+  hash: string;
+  parent_hash?: string;
+  state_root?: string;
+  timestamp: string; // ISO string instead of Date
+  extrinsics_count: number;
+  created_at: string; // ISO string instead of Date
+  events?: Event[];
+  logs?: Log[];
+  data_submissions?: DataSubmission[];
+  transfers?: Transfer[];
+  validator_info?: {
+    validator_address?: string;
+    validator_name?: string;
+  };
+}
+
+// API Response Extrinsic type (with serialized timestamps)
+export interface ExtrinsicApiResponse {
+  id: number;
+  hash: string;
+  block_number: number;
+  extrinsic_index?: number;
+  module?: string;
+  call?: string;
+  success?: boolean;
+  timestamp?: string; // ISO string instead of Date
+  signer?: string;
+  fee?: number;
+  created_at: string; // ISO string instead of Date
 }
 
 // Enhanced Extrinsic type (extending existing)

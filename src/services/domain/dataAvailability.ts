@@ -12,18 +12,21 @@ import {
   PaginationParams,
   SortParams,
   DataSubmissionFilters,
+  DataSubmissionApiResponse,
+  RollupApiResponse,
 } from '../../types/database';
 import { ExtrinsicData, BlockData } from '../types/blockchain';
+import { IDataSubmissionMapper, IRollupMapper } from '../../mappers';
 
 export interface IDataAvailabilityService {
-  getDataSubmission(extrinsicHash: string): Promise<DataSubmission | null>;
-  getDataSubmissionsForBlock(blockNumber: number): Promise<DataSubmission[]>;
-  getDataSubmissionsForRollup(appId: number): Promise<DataSubmission[]>;
+  getDataSubmission(extrinsicHash: string): Promise<DataSubmissionApiResponse | null>;
+  getDataSubmissionsForBlock(blockNumber: number): Promise<DataSubmissionApiResponse[]>;
+  getDataSubmissionsForRollup(appId: number): Promise<DataSubmissionApiResponse[]>;
   getDataSubmissions(
     pagination?: PaginationParams, 
     sort?: SortParams, 
     filters?: DataSubmissionFilters
-  ): Promise<PaginatedResponse<DataSubmission>>;
+  ): Promise<PaginatedResponse<DataSubmissionApiResponse>>;
   getDataSubmissionStats(): Promise<{
     totalSubmissions: number;
     totalDataSize: number;
@@ -32,7 +35,7 @@ export interface IDataAvailabilityService {
     submissionsLast24h: number;
   }>;
   processDataSubmissionsFromBlock(blockData: BlockData): Promise<DataSubmission[]>;
-  getRollupInfo(appId: number): Promise<Rollup | null>;
+  getRollupInfo(appId: number): Promise<RollupApiResponse | null>;
 }
 
 export interface DataSubmissionInfo {
@@ -48,21 +51,27 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   private dataSubmissionRepository: DataSubmissionRepository;
   private rollupRepository: RollupRepository;
   private blockchain: BlockchainService;
+  private dataSubmissionMapper: IDataSubmissionMapper;
+  private rollupMapper: IRollupMapper;
 
   constructor(
     dataSubmissionRepository: DataSubmissionRepository,
     rollupRepository: RollupRepository,
-    blockchain: BlockchainService
+    blockchain: BlockchainService,
+    dataSubmissionMapper: IDataSubmissionMapper,
+    rollupMapper: IRollupMapper
   ) {
     this.dataSubmissionRepository = dataSubmissionRepository;
     this.rollupRepository = rollupRepository;
     this.blockchain = blockchain;
+    this.dataSubmissionMapper = dataSubmissionMapper;
+    this.rollupMapper = rollupMapper;
   }
 
   /**
    * Get data submission by extrinsic hash (database-only)
    */
-  async getDataSubmission(extrinsicHash: string): Promise<DataSubmission | null> {
+  async getDataSubmission(extrinsicHash: string): Promise<DataSubmissionApiResponse | null> {
     try {
       // Database-only approach - no blockchain fallback
       const existingSubmission = await this.getDataSubmissionFromDatabase(extrinsicHash);
@@ -73,15 +82,15 @@ export class DataAvailabilityService implements IDataAvailabilityService {
           extrinsicHash,
           source: 'database',
         });
+        return this.dataSubmissionMapper.toApiResponse(existingSubmission);
       } else {
         logger.info('Data submission not found in database', {
           component: 'data-availability-service',
           extrinsicHash,
           source: 'database',
         });
+        return null;
       }
-      
-      return existingSubmission;
 
     } catch (error) {
       logError(error as Error, {
@@ -96,7 +105,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   /**
    * Get all data submissions for a specific block (database-only)
    */
-  async getDataSubmissionsForBlock(blockNumber: number): Promise<DataSubmission[]> {
+  async getDataSubmissionsForBlock(blockNumber: number): Promise<DataSubmissionApiResponse[]> {
     try {
       // Database-only approach - no blockchain fallback
       const existingSubmissions = await this.getDataSubmissionsFromDatabaseByBlock(blockNumber);
@@ -108,7 +117,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
         source: 'database',
       });
       
-      return existingSubmissions;
+      return this.dataSubmissionMapper.toApiResponseArray(existingSubmissions);
 
     } catch (error) {
       logError(error as Error, {
@@ -123,7 +132,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   /**
    * Get all data submissions for a specific rollup/app
    */
-  async getDataSubmissionsForRollup(appId: number): Promise<DataSubmission[]> {
+  async getDataSubmissionsForRollup(appId: number): Promise<DataSubmissionApiResponse[]> {
     try {
       const { submissions } = await this.dataSubmissionRepository.findByAppId(
         appId,
@@ -136,7 +145,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
         count: submissions.length,
       });
 
-      return submissions;
+      return this.dataSubmissionMapper.toApiResponseArray(submissions);
 
     } catch (error) {
       logError(error as Error, {
@@ -155,7 +164,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
     pagination: PaginationParams = { page: 1, limit: 20 },
     sort: SortParams = { sort_by: 'timestamp', sort_order: 'desc' },
     filters: DataSubmissionFilters = {},
-  ): Promise<PaginatedResponse<DataSubmission>> {
+  ): Promise<PaginatedResponse<DataSubmissionApiResponse>> {
     try {
       const { page = 1, limit = 20 } = pagination;
       const { sort_order: sortOrder = 'desc' } = sort;
@@ -179,7 +188,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
       );
 
       return {
-        data: submissions,
+        data: this.dataSubmissionMapper.toApiResponseArray(submissions),
         pagination: {
           page,
           limit,
@@ -294,10 +303,10 @@ export class DataAvailabilityService implements IDataAvailabilityService {
   /**
    * Get rollup information by app ID
    */
-  async getRollupInfo(appId: number): Promise<Rollup | null> {
+  async getRollupInfo(appId: number): Promise<RollupApiResponse | null> {
     try {
       const rollup = await this.rollupRepository.findByAppId(appId);
-      return rollup;
+      return rollup ? this.rollupMapper.toApiResponse(rollup) : null;
     } catch (error) {
       logError(error as Error, {
         component: 'data-availability-service',
@@ -366,6 +375,8 @@ export class DataAvailabilityService implements IDataAvailabilityService {
       };
     }
   }
+
+  // Conversion methods removed - now handled by dedicated mapper classes
 
   /**
    * Private: Calculate hash of data
@@ -441,7 +452,15 @@ export class DataAvailabilityService implements IDataAvailabilityService {
 export const createDataAvailabilityService = (
   dataSubmissionRepository: DataSubmissionRepository,
   rollupRepository: RollupRepository,
-  blockchain: BlockchainService
+  blockchain: BlockchainService,
+  dataSubmissionMapper: IDataSubmissionMapper,
+  rollupMapper: IRollupMapper,
 ): DataAvailabilityService => {
-  return new DataAvailabilityService(dataSubmissionRepository, rollupRepository, blockchain);
+  return new DataAvailabilityService(
+    dataSubmissionRepository,
+    rollupRepository,
+    blockchain,
+    dataSubmissionMapper,
+    rollupMapper,
+  );
 }; 
