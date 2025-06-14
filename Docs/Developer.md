@@ -34,3 +34,6 @@ Foreign key constraint issue with data_submissions_app_id_fkey → Fixed by ensu
 
 ## Foreign Key Constraint Issues
 data_submissions_app_id_fkey violations: Ensure rollup records exist before inserting data submissions. Create rollups first in indexing flow.
+
+
+It can take up to 30 seconds for the server to start, as it waits for all the services to start. So wait for making requests to server

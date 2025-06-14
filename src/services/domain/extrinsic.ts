@@ -4,6 +4,11 @@ import { ExtrinsicRepository } from '../../database/repositories/ExtrinsicReposi
 import { BlockRepository } from '../../database/repositories/BlockRepository';
 import { Extrinsic } from '../../database';
 import { BlockData, ExtrinsicData } from '../types/blockchain';
+import { 
+  PaginatedResponse,
+  PaginationParams,
+  SortParams,
+} from '../../types/database';
 
 export interface ExtrinsicFeeInfo {
   baseFee: number;
@@ -20,6 +25,7 @@ export interface IExtrinsicService {
   processBlockExtrinsics(blockData: BlockData): Promise<Extrinsic[]>;
   getExtrinsic(hash: string): Promise<Extrinsic | null>;
   getExtrinsicsForBlock(blockNumber: number): Promise<Extrinsic[]>;
+  getExtrinsics(pagination?: PaginationParams, sort?: SortParams): Promise<PaginatedResponse<Extrinsic>>;
   calculateFeeInfo(extrinsicData: ExtrinsicData): Promise<ExtrinsicFeeInfo>;
 }
 
@@ -115,6 +121,44 @@ export class ExtrinsicService implements IExtrinsicService {
         component: 'extrinsic-service',
         action: 'getExtrinsicsForBlock',
         blockNumber,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get paginated list of extrinsics
+   */
+  async getExtrinsics(
+    pagination: PaginationParams = { page: 1, limit: 20 },
+    sort: SortParams = { sort_by: 'id', sort_order: 'desc' },
+  ): Promise<PaginatedResponse<Extrinsic>> {
+    try {
+      const { page = 1, limit = 20 } = pagination;
+      const { sort_order: sortOrder = 'desc' } = sort;
+
+      const { extrinsics, total } = await this.extrinsicRepository.findMany({
+        page,
+        limit,
+        orderBy: sortOrder.toLowerCase() as 'asc' | 'desc',
+      });
+
+      return {
+        data: extrinsics,
+        pagination: {
+          page,
+          limit,
+          total_count: total,
+          total_pages: Math.ceil(total / limit),
+          has_next: page < Math.ceil(total / limit),
+          has_prev: page > 1,
+        },
+      };
+
+    } catch (error) {
+      logError(error as Error, {
+        component: 'extrinsic-service',
+        action: 'getExtrinsics',
       });
       throw error;
     }

@@ -220,4 +220,45 @@ export class DataSubmissionRepository extends BaseRepository {
     
     return this.prisma.dataSubmission.count({ where });
   }
+
+  /**
+   * Get total count of all data submissions
+   */
+  async getTotalCount(): Promise<number> {
+    return this.prisma.dataSubmission.count();
+  }
+
+  /**
+   * Get total data size of all submissions
+   */
+  async getTotalDataSize(): Promise<number> {
+    const result = await this.prisma.dataSubmission.aggregate({
+      _sum: { dataSize: true },
+    });
+    return result._sum.dataSize || 0;
+  }
+
+  /**
+   * Get count of unique app IDs
+   */
+  async getUniqueAppCount(): Promise<number> {
+    const result = await this.prisma.dataSubmission.groupBy({
+      by: ['appId'],
+      _count: { appId: true },
+    });
+    return result.length;
+  }
+
+  /**
+   * Get count of submissions since a specific date
+   */
+  async getCountSince(date: Date): Promise<number> {
+    return this.prisma.dataSubmission.count({
+      where: {
+        timestamp: {
+          gte: date,
+        },
+      },
+    });
+  }
 }

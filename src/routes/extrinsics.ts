@@ -11,27 +11,28 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const sortBy = (req.query.sort_by as string) || 'id';
+    const sortOrder = (req.query.sort_order as string) || 'desc';
 
-    // For now, return empty result since the service method signature changed
-    // This would need to be updated to use a proper pagination method
-    const result = {
-      data: [],
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total: 0,
-        totalPages: 0,
-        hasNext: false,
-        hasPrev: false,
-      },
-    };
+    const extrinsicService = serviceFactory.get<ExtrinsicService>('extrinsicService');
+    const result = await extrinsicService.getExtrinsics(
+      { page, limit },
+      { sort_by: sortBy, sort_order: sortOrder as 'asc' | 'desc' },
+    );
 
     res.json({
       success: true,
       data: {
-        extrinsics: result.data.map((extrinsic: any) => keysToCamelCase(extrinsic)),
-        pagination: result.pagination,
+        extrinsics: result.data.map(extrinsic => keysToCamelCase(extrinsic)),
+        totalCount: result.pagination.total_count,
+      },
+      meta: {
+        source: 'database',
+        page: page,
+        limit: limit,
+        total: result.pagination.total_count,
       },
     });
 

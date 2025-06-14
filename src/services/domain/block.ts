@@ -26,13 +26,13 @@ export class BlockService implements IBlockService {
   }
 
   /**
-   * Get block by hash or number
-   * Pattern: Check database first, then fetch from blockchain if needed
+   * Get block by hash or number (database-only)
    */
   async getBlock(hashOrNumber: string | number): Promise<BlockWithMetadata> {
     try {
-      // Step 1: Check database first
+      // Database-only approach - no blockchain fallback
       const existingBlock = await this.getBlockFromDatabase(hashOrNumber);
+      
       if (existingBlock) {
         logger.info('Block found in database', { 
           component: 'block-service',
@@ -42,25 +42,14 @@ export class BlockService implements IBlockService {
         return existingBlock;
       }
 
-      // Step 2: Fetch from blockchain if not in database
-      logger.info('Block not found in database, fetching from blockchain', {
+      // Block not found - return null or throw appropriate error
+      logger.info('Block not found in database', {
         component: 'block-service',
         identifier: hashOrNumber,
-        source: 'blockchain',
+        source: 'database',
       });
 
-      const blockData = await this.fetchBlockFromBlockchain(hashOrNumber);
-      
-      // Step 3: Persist to database for analytics
-      const persistedBlock = await this.persistBlockToDatabase(blockData);
-      
-      logger.info('Block fetched and persisted successfully', {
-        component: 'block-service',
-        identifier: hashOrNumber,
-        blockNumber: persistedBlock.number,
-      });
-
-      return persistedBlock;
+      throw new Error(`Block ${hashOrNumber} not found in database`);
 
     } catch (error) {
       logError(error as Error, {
@@ -73,28 +62,37 @@ export class BlockService implements IBlockService {
   }
 
   /**
-   * Get the latest block
+   * Get the latest block (database-only)
    */
   async getLatestBlock(): Promise<BlockWithMetadata> {
     try {
-      // Get latest block from blockchain first (since it's the most current)
-      const latestBlockData = await this.blockchain.getLatestBlock();
+      // Database-only approach - get latest block from database
+      const latestBlock = await this.blockRepository.getLatest();
       
-      // Check if we already have this block in database
-      const existingBlock = await this.getBlockFromDatabase(latestBlockData.number);
-      if (existingBlock) {
-        return existingBlock;
+      if (!latestBlock) {
+        throw new Error('No blocks found in database');
       }
 
-      // Persist the latest block for analytics
-      const persistedBlock = await this.persistBlockToDatabase(latestBlockData);
-      
-      logger.info('Latest block fetched and persisted', {
+      logger.info('Latest block retrieved from database', {
         component: 'block-service',
-        blockNumber: persistedBlock.number,
+        blockNumber: latestBlock.number,
+        source: 'database',
       });
 
-      return persistedBlock;
+      // Convert to BlockWithMetadata format
+      return {
+        number: latestBlock.number,
+        hash: latestBlock.hash,
+        parent_hash: latestBlock.parentHash,
+        state_root: latestBlock.stateRoot,
+        timestamp: latestBlock.timestamp,
+        extrinsics_count: latestBlock.extrinsicsCount,
+        created_at: latestBlock.createdAt,
+        events: [],
+        logs: [],
+        data_submissions: [],
+        transfers: [],
+      } as BlockWithMetadata;
 
     } catch (error) {
       logError(error as Error, {
@@ -194,60 +192,6 @@ export class BlockService implements IBlockService {
     }
   }
 
-  /**
-   * Private: Fetch block from blockchain
-   */
-  private async fetchBlockFromBlockchain(hashOrNumber: string | number): Promise<BlockData> {
-    try {
-      return await this.blockchain.getBlock(hashOrNumber);
-    } catch (error) {
-      logError(error as Error, {
-        component: 'block-service',
-        action: 'fetchBlockFromBlockchain',
-        identifier: hashOrNumber,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Private: Persist block to database using repository
-   */
-  private async persistBlockToDatabase(blockData: BlockData): Promise<BlockWithMetadata> {
-    try {
-      const insertedBlock = await this.blockRepository.create({
-        number: blockData.number,
-        hash: blockData.hash,
-        parentHash: blockData.parentHash,
-        stateRoot: blockData.stateRoot,
-        timestamp: new Date(blockData.timestamp),
-        extrinsicsCount: blockData.extrinsics?.length || 0,
-      });
-      
-      // Convert to BlockWithMetadata format
-      return {
-        number: insertedBlock.number,
-        hash: insertedBlock.hash,
-        parent_hash: insertedBlock.parentHash,
-        state_root: insertedBlock.stateRoot,
-        timestamp: insertedBlock.timestamp,
-        extrinsics_count: insertedBlock.extrinsicsCount,
-        created_at: insertedBlock.createdAt,
-        events: [],
-        logs: [],
-        data_submissions: [],
-        transfers: [],
-      } as BlockWithMetadata;
-
-    } catch (error) {
-      logError(error as Error, {
-        component: 'block-service',
-        action: 'persistBlockToDatabase',
-        blockNumber: blockData.number,
-      });
-      throw error;
-    }
-  }
 }
 
 export const createBlockService = (blockRepository: BlockRepository, blockchain: BlockchainService): BlockService => {
