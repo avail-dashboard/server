@@ -31,8 +31,10 @@ class DatabaseService {
     this.pgPool = new Pool({
       connectionString: this.dbConfig.url,
       max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 60000,
+      connectionTimeoutMillis: 20000,
+      query_timeout: 60000,
+      statement_timeout: 60000,
     });
 
     this.setupPgEventHandlers();

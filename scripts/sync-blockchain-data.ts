@@ -291,9 +291,18 @@ class StandaloneSyncScript {
           logger.debug(`✅ Regular indexing successful for range ${fromBlock}-${toBlock}`);
         }
       } catch (polkadotError) {
-        logger.warn(`⚠️ Polkadot.js indexing failed for range ${fromBlock}-${toBlock}, trying hybrid approach`, {
-          error: (polkadotError as Error).message,
-        });
+        const errorMessage = (polkadotError as Error).message;
+        
+        // Check if this is a metadata error - if so, go straight to hybrid
+        if (this.isMetadataError(errorMessage)) {
+          logger.warn(`⚠️ Metadata decoding errors detected for range ${fromBlock}-${toBlock}, using hybrid approach`, {
+            error: errorMessage,
+          });
+        } else {
+          logger.warn(`⚠️ Polkadot.js indexing failed for range ${fromBlock}-${toBlock}, trying hybrid approach`, {
+            error: errorMessage,
+          });
+        }
         
         // Fallback to hybrid processing for individual blocks
         blocks = await this.processBlocksWithHybridFallback(fromBlock, toBlock);
@@ -402,6 +411,25 @@ class StandaloneSyncScript {
         await new Promise(resolve => setTimeout(resolve, 10000));
       }
     }
+  }
+
+  /**
+   * Check if error is a metadata/decoding error that won't be fixed by retrying
+   */
+  private isMetadataError(errorMessage: string): boolean {
+    const metadataErrorPatterns = [
+      'findMetaCall: Unable to find Call with index',
+      'createType(Call):: findMetaCall',
+      'createType(ExtrinsicV4):: createType(Call)',
+      'Unable to decode on index',
+      'Struct: failed on extrinsics',
+      'PORTABLEREGISTRY: Unable to determine runtime Call type',
+      'METADATA_ERROR:',
+    ];
+    
+    return metadataErrorPatterns.some(pattern => 
+      errorMessage.includes(pattern)
+    );
   }
 
   /**

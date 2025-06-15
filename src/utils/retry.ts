@@ -45,6 +45,17 @@ export async function withRetry<T>(
     } catch (error) {
       lastError = error as Error;
       
+      // Check if this is a non-retryable error (like metadata errors)
+      if (isNonRetryableError(lastError)) {
+        logger.warn(`Non-retryable error detected: ${context}, skipping retries`, {
+          component: 'retry',
+          context,
+          error: lastError.message,
+          errorType: lastError.name,
+        });
+        throw lastError;
+      }
+      
       // If this is the last attempt, throw the retry error
       if (attempt === config.maxRetries + 1) {
         const retryError = new RetryError(
@@ -90,6 +101,28 @@ export async function withRetry<T>(
   
   // This should never be reached due to the loop logic, but TypeScript requires it
   throw new Error('Unexpected retry loop completion');
+}
+
+/**
+ * Check if an error should not be retried
+ */
+function isNonRetryableError(error: Error): boolean {
+  // Don't retry metadata/decoding errors
+  if (error.name === 'MetadataError' || error.message.includes('METADATA_ERROR:')) {
+    return true;
+  }
+  
+  // Add other non-retryable error patterns here
+  const nonRetryablePatterns = [
+    'findMetaCall: Unable to find Call with index',
+    'createType(Call):: findMetaCall',
+    'createType(ExtrinsicV4):: createType(Call)',
+    'PORTABLEREGISTRY: Unable to determine runtime Call type',
+  ];
+  
+  return nonRetryablePatterns.some(pattern => 
+    error.message.includes(pattern)
+  );
 }
 
 // Simplified retry function for backward compatibility (similar to existing database.ts withRetry)

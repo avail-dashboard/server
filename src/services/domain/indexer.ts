@@ -381,14 +381,47 @@ export class BlockIndexerService implements BaseService, IBlockIndexerService {
         
         return blockData;
       } catch (error) {
+        const errorMessage = (error as Error).message;
+        
+        // Check if this is a metadata/decoding error that won't be fixed by retrying
+        if (this.isMetadataError(errorMessage)) {
+          logger.warn('BlockIndexerService: Metadata decoding error detected, skipping retries', {
+            component: 'indexer',
+            blockNumber,
+            error: errorMessage,
+          });
+          // Create a special error type to indicate this should not be retried
+          const metadataError = new Error(`METADATA_ERROR: ${errorMessage}`);
+          metadataError.name = 'MetadataError';
+          throw metadataError;
+        }
+        
         logger.warn('BlockIndexerService: Failed to fetch block, retrying...', {
           component: 'indexer',
           blockNumber,
-          error: (error as Error).message,
+          error: errorMessage,
         });
         throw error;
       }
     }, retryConfigs.blockchain, `fetch-block-${blockNumber}`);
+  }
+
+  /**
+   * Check if error is a metadata/decoding error that won't be fixed by retrying
+   */
+  private isMetadataError(errorMessage: string): boolean {
+    const metadataErrorPatterns = [
+      'findMetaCall: Unable to find Call with index',
+      'createType(Call):: findMetaCall',
+      'createType(ExtrinsicV4):: createType(Call)',
+      'Unable to decode on index',
+      'Struct: failed on extrinsics',
+      'PORTABLEREGISTRY: Unable to determine runtime Call type',
+    ];
+    
+    return metadataErrorPatterns.some(pattern => 
+      errorMessage.includes(pattern)
+    );
   }
 
   /**
