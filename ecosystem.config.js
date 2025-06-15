@@ -2,8 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'avail-explorer-backend',
-      script: 'dist/index.js',
-      env_file: '.env.production',
+      script: 'npm start',
       env_production: {
         NODE_ENV: 'production',
         PORT: 3001
