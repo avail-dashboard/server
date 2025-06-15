@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
+import { formatSingleResponse } from '../utils/responseFormatter';
 
 const router = Router();
 

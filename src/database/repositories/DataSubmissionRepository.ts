@@ -29,6 +29,7 @@ export interface DataSubmissionFilters {
   toTimestamp?: Date;
   fromBlock?: number;
   toBlock?: number;
+  blockNumber?: number;
 }
 
 export class DataSubmissionRepository extends BaseRepository {

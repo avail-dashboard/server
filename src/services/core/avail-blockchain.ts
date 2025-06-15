@@ -234,7 +234,7 @@ export class AvailBlockchainService implements BaseService {
       extrinsicsRoot: block.block.header.extrinsicsRoot.toString(),
       timestamp: Date.now(), // Should be extracted from timestamp extrinsic
       extrinsics: this.extractExtrinsicsData(block.block.extrinsics),
-      events: this.extractEventsData(events),
+      events: this.extractEventsData(events as any),
     };
 
     // Enhanced processing for avail-specific features
@@ -242,7 +242,7 @@ export class AvailBlockchainService implements BaseService {
       component: 'avail-blockchain',
       blockNumber: blockData.number,
       extrinsicsCount: block.block.extrinsics.length,
-      eventsCount: events.length,
+      eventsCount: Array.isArray(events) ? events.length : 0,
     });
 
     return blockData;

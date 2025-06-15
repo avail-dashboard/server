@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import { logger } from '../utils/logger';
 
 // Global for Next.js hot reload (avoid multiple instances)
 const globalForPrisma = globalThis as unknown as {

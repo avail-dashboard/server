@@ -267,7 +267,7 @@ export class AvailConnectionManager {
     const api = await initialize(provider.url);
     
     const connection: AvailConnection = {
-      api,
+      api: api as any, // Type assertion to handle API version conflicts
       url: provider.url,
       isConnected: true,
       lastActivity: new Date(),

@@ -13,5 +13,5 @@ export type {
   Watchlist, 
   SyncState,
   SyncStatus,
-  SyncMode 
+  SyncMode, 
 } from '@prisma/client';

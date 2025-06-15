@@ -10,7 +10,6 @@ import {
   dataSubmissionRepository, 
   rollupRepository,
   DataSubmissionCreateInput,
-  RollupCreateInput 
 } from '../database';
 
 export class DataSubmissionIndexingExample {
@@ -21,8 +20,9 @@ export class DataSubmissionIndexingExample {
   async indexDataSubmissionsForBlock(blockNumber: bigint): Promise<void> {
     console.log(`🔍 Indexing data submissions for block ${blockNumber}`);
 
-    // 1. Get block data
-    const block = await blockRepository.findByNumber(blockNumber);
+    // 1. Get block data - convert bigint to number for repository
+    const blockNumberInt = Number(blockNumber);
+    const block = await blockRepository.findByNumber(blockNumberInt);
     if (!block) {
       throw new Error(`Block ${blockNumber} not found`);
     }
@@ -31,18 +31,18 @@ export class DataSubmissionIndexingExample {
     const mockDataSubmissions: DataSubmissionCreateInput[] = [
       {
         extrinsicHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-        blockNumber: blockNumber,
+        blockNumber: blockNumberInt,
         extrinsicIndex: 1,
         appId: 1,
         rollupName: 'Example Rollup',
-        dataSize: 1024n,
+        dataSize: Number(1024n),
         dataHash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         submitter: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-        timestamp: BigInt(Date.now()),
+        timestamp: new Date(),
         success: true,
         kateCommitment: '0x987654321098765432109876543210987654321098765432109876543210',
-        proof: { merkle_path: ['0x1', '0x2'] }
-      }
+        proof: { merkle_path: ['0x1', '0x2'] },
+      },
     ];
 
     // 3. Store data submissions efficiently with batch insert
@@ -55,7 +55,7 @@ export class DataSubmissionIndexingExample {
       
       for (const appId of uniqueAppIds) {
         const appSubmissions = mockDataSubmissions.filter(ds => ds.appId === appId);
-        const totalDataSize = appSubmissions.reduce((sum, ds) => sum + ds.dataSize, 0n);
+        const totalDataSize = appSubmissions.reduce((sum, ds) => sum + ds.dataSize, 0);
 
         // Upsert rollup (create if doesn't exist, update stats if it does)
         await rollupRepository.upsert(
@@ -63,15 +63,15 @@ export class DataSubmissionIndexingExample {
           {
             appId,
             name: appSubmissions[0].rollupName || `Rollup ${appId}`,
-            firstSeenBlock: blockNumber,
-            lastActiveBlock: blockNumber,
+            firstSeenBlock: blockNumberInt,
+            lastActiveBlock: blockNumberInt,
             totalSubmissions: appSubmissions.length,
             totalDataSize: totalDataSize,
-            totalFeesPaid: 0n,
+            totalFeesPaid: 0,
           },
           {
-            lastActiveBlock: blockNumber,
-          }
+            lastActiveBlock: blockNumberInt,
+          },
         );
 
         // Increment statistics
@@ -91,13 +91,13 @@ export class DataSubmissionIndexingExample {
 
     // Get basic stats
     const stats = await dataSubmissionRepository.getStats(
-      appId ? { appId } : {}
+      appId ? { appId } : {},
     );
 
     // Get recent submissions with rollup data
     const { submissions } = await dataSubmissionRepository.findMany(
       appId ? { appId } : {},
-      { limit: 10, orderBy: 'desc' }
+      { limit: 10, orderBy: 'desc' },
     );
 
     // Get rollup leaderboard
@@ -138,14 +138,14 @@ export class DataSubmissionIndexingExample {
       {
         submitter: params.submitter,
         appId: params.appId,
-        fromBlock: params.fromBlock,
-        toBlock: params.toBlock,
+        fromBlock: params.fromBlock ? Number(params.fromBlock) : undefined,
+        toBlock: params.toBlock ? Number(params.toBlock) : undefined,
       },
       {
         page: params.page || 1,
         limit: params.limit || 20,
-        orderBy: 'desc'
-      }
+        orderBy: 'desc',
+      },
     );
 
     return {
@@ -163,7 +163,7 @@ export class DataSubmissionIndexingExample {
         limit: params.limit || 20,
         total,
         totalPages: Math.ceil(total / (params.limit || 20)),
-      }
+      },
     };
   }
 
@@ -174,7 +174,7 @@ export class DataSubmissionIndexingExample {
     console.log(`🔄 Bulk processing blocks ${blockRange.from} to ${blockRange.to}`);
 
     // Use transaction for consistency
-    return dataSubmissionRepository.transaction(async (tx) => {
+    return dataSubmissionRepository.transaction(async (_tx) => {
       const processedBlocks: bigint[] = [];
       
       for (let blockNum = blockRange.from; blockNum <= blockRange.to; blockNum++) {
@@ -207,7 +207,7 @@ export async function demonstrateDataSubmissionIndexing() {
     const searchResults = await indexer.searchDataSubmissions({
       appId: 1,
       page: 1,
-      limit: 5
+      limit: 5,
     });
     console.log('Search results:', searchResults);
     

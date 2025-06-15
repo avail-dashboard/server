@@ -121,7 +121,7 @@ function isNonRetryableError(error: Error): boolean {
   ];
   
   return nonRetryablePatterns.some(pattern => 
-    error.message.includes(pattern)
+    error.message.includes(pattern),
   );
 }
 

@@ -278,7 +278,7 @@ export class HybridProcessor {
         success: boolean;
       }> = [];
       
-      events.forEach((record, index) => {
+      (events as unknown as any[]).forEach((record: any, index: number) => {
         const { event, phase } = record;
         if (event.section === 'dataAvailability' && event.method === 'DataSubmitted') {
           if (phase.isApplyExtrinsic) {

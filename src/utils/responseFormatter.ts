@@ -1,4 +1,4 @@
-import { APIResponse } from '../types';
+// Response formatter utilities
 import { PaginatedResponse } from '../types/database';
 
 export interface StandardAPIResponse<T> {
@@ -24,7 +24,7 @@ export interface StandardAPIResponse<T> {
  */
 export function formatPaginatedResponse<T>(
   result: PaginatedResponse<T>,
-  meta?: { source?: string; [key: string]: any }
+  meta?: { source?: string; [key: string]: any },
 ): StandardAPIResponse<T[]> {
   return {
     success: true,
@@ -46,7 +46,7 @@ export function formatPaginatedResponse<T>(
  */
 export function formatSingleResponse<T>(
   data: T,
-  meta?: { source?: string; [key: string]: any }
+  meta?: { source?: string; [key: string]: any },
 ): StandardAPIResponse<T> {
   return {
     success: true,
@@ -62,7 +62,7 @@ export function formatSingleResponse<T>(
 export function formatErrorResponse(
   message: string,
   code: string = 'INTERNAL_ERROR',
-  statusCode: number = 500
+  _statusCode: number = 500,
 ): { success: false; error: { code: string; message: string }; timestamp: string } {
   return {
     success: false,
