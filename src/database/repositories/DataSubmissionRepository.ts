@@ -43,6 +43,15 @@ export class DataSubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Find data submission by data hash
+   */
+  async findByHash(dataHash: string): Promise<DataSubmission | null> {
+    return this.prisma.dataSubmission.findFirst({
+      where: { dataHash },
+    });
+  }
+
+  /**
    * Get data submissions for a block
    */
   async findByBlock(blockNumber: number): Promise<DataSubmission[]> {

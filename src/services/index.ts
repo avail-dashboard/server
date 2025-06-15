@@ -16,6 +16,7 @@ export { ExtrinsicService, createExtrinsicService } from './domain/extrinsic';
 export { DataAvailabilityService, createDataAvailabilityService } from './domain/dataAvailability';
 export { BlockIndexerService, createBlockIndexerService } from './domain/indexer';
 export { DataProcessorService, createDataProcessorService } from './domain/processor';
+export { SearchService, createSearchService } from './domain/search';
 
 // Mappers
 export * from '../mappers';
@@ -36,6 +37,7 @@ import { createDataAvailabilityService } from './domain/dataAvailability';
 import { createSyncService } from './core/sync';
 import { createBlockIndexerService } from './domain/indexer';
 import { createDataProcessorService } from './domain/processor';
+import { createSearchService } from './domain/search';
 
 // Mapper imports
 import { 
@@ -158,10 +160,19 @@ export class ServiceFactory {
       const blockIndexerService = createBlockIndexerService(db, blockchainService);
       const dataProcessorService = createDataProcessorService(db, blockchainService);
       
+      // Create search service
+      const searchService = createSearchService(
+        blockRepository,
+        extrinsicRepository,
+        rollupRepository,
+        dataSubmissionRepository,
+      );
+      
       // Register domain services
       this.register('blockService', blockService);
       this.register('extrinsicService', extrinsicService);
       this.register('dataAvailabilityService', dataAvailabilityService);
+      this.register('searchService', searchService);
       
       // Register new sync services
       this.register('syncService', syncService);

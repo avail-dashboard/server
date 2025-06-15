@@ -2,65 +2,34 @@ import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
-
-interface SearchResult {
-  type: string;
-  id: string;
-  title: string;
-  description: string;
-  url: string;
-}
+import { serviceFactory } from '../services';
+import { SearchService } from '../services/domain/search';
 
 const router = Router();
 
 /**
  * @route GET /api/search
- * @description Universal search for blocks, extrinsics, accounts
+ * @description Universal search for blocks, extrinsics, accounts, rollups, data submissions
  * @access Public
  */
 router.get('/', 
   cacheMiddleware(60), // 1 minute cache
   async (req: Request, res: Response) => {
     try {
-      const query = req.query.q as string;
+      const query = req.query.query as string;
 
       if (!query) {
-        return res.status(400).json(formatErrorResponse('Search query is required', 'VALIDATION_ERROR', 400));
+        return res.status(400).json(formatErrorResponse('Search query parameter is required', 'VALIDATION_ERROR', 400));
       }
 
-      const searchResults: SearchResult[] = [];
+      // Get search service from factory
+      const searchService = serviceFactory.get<SearchService>('searchService');
+      
+      // Perform search
+      const searchResponse = await searchService.search(query);
 
-      // Search logic based on query type
-      if (/^\d+$/.test(query)) {
-        // Numeric query - search for block by number
-        try {
-          throw new Error('Missing service');
-        } catch {
-          // Block not found, continue search
-        }
-      } else if (/^0x[a-fA-F0-9]{64}$/.test(query)) {
-        // Hash query - could be block or extrinsic
-        try {
-          throw new Error('Missing service');
-        } catch {
-          // Block not found, try extrinsic
-          try {
-            throw new Error('Missing service');
-          } catch {
-            // Extrinsic not found
-          }
-        }
-      } else if (query.length >= 47) {
-        // Address query
-        try {
-          throw new Error('Missing service');
-        } catch {
-          // Account not found
-        }
-      }
-
-      res.json(formatSingleResponse(searchResults, {
-        total: searchResults.length,
+      res.json(formatSingleResponse(searchResponse, {
+        total: searchResponse.total_results,
         source: 'database',
       }));
     } catch (error) {

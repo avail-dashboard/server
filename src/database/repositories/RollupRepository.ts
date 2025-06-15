@@ -25,12 +25,13 @@ export class RollupRepository extends BaseRepository {
   }
 
   /**
-   * Find rollup by name
+   * Find rollup by name (exact match)
    */
-  async findByName(name: string): Promise<Rollup | null> {
-    return this.prisma.rollup.findFirst({
+  async findByName(name: string): Promise<Rollup[]> {
+    const rollup = await this.prisma.rollup.findFirst({
       where: { name },
     });
+    return rollup ? [rollup] : [];
   }
 
   /**
