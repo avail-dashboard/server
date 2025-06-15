@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { serviceFactory } from '../services';
 import { ExtrinsicService } from '../services/domain/extrinsic';
-import { keysToCamelCase } from '../utils/caseConverter';
+import { formatPaginatedResponse, formatErrorResponse, formatSingleResponse } from '../utils/responseFormatter';
 
 const router = Router();
 
@@ -22,26 +22,18 @@ router.get('/', async (req: Request, res: Response) => {
       { sort_by: sortBy, sort_order: sortOrder as 'asc' | 'desc' },
     );
 
-    res.json({
-      success: true,
-      data: {
-        extrinsics: result.data.map(extrinsic => keysToCamelCase(extrinsic)),
-        totalCount: result.pagination.total_count,
-      },
-      meta: {
-        source: 'database',
-        page: page,
-        limit: limit,
-        total: result.pagination.total_count,
-      },
+    const response = formatPaginatedResponse(result, {
+      source: 'database',
+      page: page,
+      limit: limit,
+      total: result.pagination.total_count,
     });
+
+    res.json(response);
 
   } catch (error) {
     console.error('Error fetching extrinsics:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch extrinsics',
-    });
+    res.status(500).json(formatErrorResponse('Failed to fetch extrinsics'));
   }
 });
 
@@ -57,23 +49,14 @@ router.get('/:hash', async (req: Request, res: Response) => {
     const extrinsic = await extrinsicService.getExtrinsic(hash);
 
     if (!extrinsic) {
-      return res.status(404).json({
-        success: false,
-        error: 'Extrinsic not found',
-      });
+      return res.status(404).json(formatErrorResponse('Extrinsic not found', 'NOT_FOUND', 404));
     }
 
-    res.json({
-      success: true,
-      data: keysToCamelCase(extrinsic),
-    });
+    res.json(formatSingleResponse(extrinsic));
 
   } catch (error) {
     console.error('Error fetching extrinsic:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch extrinsic',
-    });
+    res.status(500).json(formatErrorResponse('Failed to fetch extrinsic'));
   }
 });
 
@@ -86,26 +69,17 @@ router.get('/block/:blockNumber', async (req: Request, res: Response) => {
     const blockNumber = parseInt(req.params.blockNumber);
 
     if (isNaN(blockNumber)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid block number',
-      });
+      return res.status(400).json(formatErrorResponse('Invalid block number', 'INVALID_PARAMETERS', 400));
     }
 
     const extrinsicService = serviceFactory.get<ExtrinsicService>('extrinsicService');
     const extrinsics = await extrinsicService.getExtrinsicsForBlock(blockNumber);
 
-    res.json({
-      success: true,
-      data: extrinsics.map(extrinsic => keysToCamelCase(extrinsic)),
-    });
+    res.json(formatSingleResponse(extrinsics));
 
   } catch (error) {
     console.error('Error fetching block extrinsics:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch block extrinsics',
-    });
+    res.status(500).json(formatErrorResponse('Failed to fetch block extrinsics'));
   }
 });
 
@@ -119,36 +93,24 @@ router.get('/block/:blockNumber/:index', async (req: Request, res: Response) => 
     const index = parseInt(req.params.index);
 
     if (isNaN(blockNumber) || isNaN(index)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid block number or extrinsic index',
-      });
+      return res.status(400).json(formatErrorResponse('Invalid block number or extrinsic index', 'INVALID_PARAMETERS', 400));
     }
 
     const extrinsicService = serviceFactory.get<ExtrinsicService>('extrinsicService');
     const blockExtrinsics = await extrinsicService.getExtrinsicsForBlock(blockNumber);
     
     // Find the extrinsic with the specified index
-    const extrinsic = blockExtrinsics.find(ext => ext.extrinsicIndex === index);
+    const extrinsic = blockExtrinsics.find(ext => ext.extrinsic_index === index);
 
     if (!extrinsic) {
-      return res.status(404).json({
-        success: false,
-        error: 'Extrinsic not found',
-      });
+      return res.status(404).json(formatErrorResponse('Extrinsic not found', 'NOT_FOUND', 404));
     }
 
-    res.json({
-      success: true,
-      data: keysToCamelCase(extrinsic),
-    });
+    res.json(formatSingleResponse(extrinsic));
 
   } catch (error) {
     console.error('Error fetching extrinsic by index:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch extrinsic',
-    });
+    res.status(500).json(formatErrorResponse('Failed to fetch extrinsic'));
   }
 });
 

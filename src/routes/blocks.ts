@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { serviceFactory, BlockService } from '../services';
+import { formatPaginatedResponse, formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
 
 const router = Router();
 
@@ -12,18 +13,10 @@ router.get('/latest', async (req: Request, res: Response) => {
     const blockService = serviceFactory.get<BlockService>('blockService');
     const block = await blockService.getLatestBlock();
 
-    res.json({
-      success: true,
-      data: block,
-      timestamp: new Date().toISOString(),
-    });
+    res.json(formatSingleResponse(block));
   } catch (error) {
     console.error('Error fetching latest block:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch latest block',
-      timestamp: new Date().toISOString(),
-    });
+    res.status(500).json(formatErrorResponse('Failed to fetch latest block'));
   }
 });
 
@@ -44,19 +37,10 @@ router.get('/', async (req: Request, res: Response) => {
       { sort_by: sortBy, sort_order: sortOrder as 'asc' | 'desc' },
     );
 
-    res.json({
-      success: true,
-      data: result.data,
-      pagination: result.pagination,
-      timestamp: new Date().toISOString(),
-    });
+    res.json(formatPaginatedResponse(result));
   } catch (error) {
     console.error('Error fetching blocks:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch blocks',
-      timestamp: new Date().toISOString(),
-    });
+    res.status(500).json(formatErrorResponse('Failed to fetch blocks'));
   }
 });
 
@@ -74,18 +58,10 @@ router.get('/:identifier', async (req: Request, res: Response) => {
     const blockService = serviceFactory.get<BlockService>('blockService');
     const block = await blockService.getBlock(blockIdentifier);
 
-    res.json({
-      success: true,
-      data: block,
-      timestamp: new Date().toISOString(),
-    });
+    res.json(formatSingleResponse(block));
   } catch (error) {
     console.error('Error fetching block:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch block',
-      timestamp: new Date().toISOString(),
-    });
+    res.status(500).json(formatErrorResponse('Failed to fetch block'));
   }
 });
 

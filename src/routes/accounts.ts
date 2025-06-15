@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
-import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import { keysToCamelCase } from '../utils/caseConverter';
+import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
 
 const router = Router();
 
@@ -15,26 +14,14 @@ router.get('/discover',
       // Get sample validator addresses that should work with the accounts endpoint
       throw new Error('Missing service');
 
-      const response: APIResponse = {
-        success: true,
-        data: { },
-        meta: {
-          source: 'rpc',
-          note: 'Sample validator addresses for testing the accounts endpoint',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse({}, {
+        source: 'rpc',
+        note: 'Sample validator addresses for testing the accounts endpoint',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'accounts-route', action: 'discover' });
       
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to discover sample addresses',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to discover sample addresses', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
@@ -49,13 +36,7 @@ router.get('/:address',
     } catch (error) {
       logError(error as Error, { component: 'accounts-route', action: 'getAccount' });
       
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch account details',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch account details', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );

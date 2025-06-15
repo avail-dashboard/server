@@ -35,7 +35,7 @@
   - 24h/week/month analytics per rollup
   - DA usage, blob count, fee trends, submission history
 
-## =á **Medium Priority Missing - Account & Validation Features**
+## =ï¿½ **Medium Priority Missing - Account & Validation Features**
 
 ### Account System
 - [ ] **Account Profiles** (`/api/accounts/:address`)
@@ -74,7 +74,7 @@
   - Inflation rate, minimum stake requirements
   - Era and epoch tracking
 
-## =â **Lower Priority Missing - Advanced Features**
+## =ï¿½ **Lower Priority Missing - Advanced Features**
 
 ### Search & Navigation
 - [ ] **Universal Search** (`/api/search`)
@@ -145,7 +145,7 @@
   - Rollup analytics export (CSV, JSON, XLSX)
   - Validator performance export
 
-## =à **Infrastructure Missing**
+## =ï¿½ **Infrastructure Missing**
 
 ### Database Schema Extensions
 - [ ] **Transfers Table** - For AVAIL transfer indexing
@@ -171,10 +171,63 @@
 
 ---
 
-## =Ê **Current Implementation Status**
+## =ï¿½ **Current Implementation Status**
 -  **Phase 1 Complete**: Core database endpoints (11/11 working)
 - = **Phase 2 Ready**: Analytics endpoints (0/3 implemented)  
-- ó **Phase 3 Pending**: Rollup endpoints (0/4 implemented)
-- ó **Advanced Features**: 0% implemented
+- ï¿½ **Phase 3 Pending**: Rollup endpoints (0/4 implemented)
+- ï¿½ **Advanced Features**: 0% implemented
 
 **Total Scope Coverage**: ~15% of full Avail DA Explorer specification completed.
+
+# TODO - Blocking Issues Resolution
+
+## IMMEDIATE BLOCKING ISSUES (Phase 1 - 30 mins)
+
+### Route-Level Cleanup (Must Complete First)
+- [ ] **analytics.ts**: Fix 2 remaining keysToCamelCase instances (lines 197-199, 252-254)
+- [ ] **rollups.ts**: Fix 6 keysToCamelCase instances + APIResponse imports
+- [ ] **Test compilation**: Verify routes compile after changes
+
+### Error Response Standardization  
+- [ ] **analytics.ts**: Convert remaining error responses to formatErrorResponse()
+- [ ] **rollups.ts**: Convert all error responses to formatErrorResponse()
+
+## DEEPER ISSUES (Phase 2 - If needed after Phase 1)
+
+### Type/Mapper Misalignment
+- [ ] **Audit**: Check database schema vs type definitions field naming
+- [ ] **Fix**: Property name conflicts (blockNumber vs block_number, etc.)
+- [ ] **Update**: Mapper functions to handle correct field names
+
+### Service Layer Issues
+- [ ] **dataAvailability.ts**: Fix type mismatches in mapper calls
+- [ ] **extrinsic.ts**: Fix type mismatches in mapper calls  
+- [ ] **block.ts**: Fix type mismatches in mapper calls
+
+## DEPENDENCY ISSUES (Phase 3 - If still blocking)
+
+### Example Files
+- [ ] **DataSubmissionIndexingExample.ts**: Fix BigInt vs Number conflicts
+- [ ] **Consider**: Exclude examples from build if not needed
+
+### Polkadot API
+- [ ] **Investigate**: Version conflicts between avail-js-sdk and @polkadot/api
+- [ ] **Fix**: Type incompatibilities if needed
+
+## TESTING TASKS
+
+### Compilation Testing
+- [ ] **Route-only**: Test individual route file compilation
+- [ ] **Service-layer**: Test service compilation after fixes
+- [ ] **Full build**: Complete server compilation test
+
+### Runtime Testing  
+- [ ] **API endpoints**: Test actual endpoint responses
+- [ ] **Response format**: Verify consistent format across all endpoints
+- [ ] **Error handling**: Test error response consistency
+
+## CLEANUP TASKS (After resolution)
+
+- [ ] **Remove**: Any temporary test scripts created during debugging
+- [ ] **Update**: Documentation with any architectural changes made
+- [ ] **Review**: Code for any remaining inconsistencies

@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
-import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import { keysToCamelCase } from '../utils/caseConverter';
+import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
 
 const router = Router();
 
@@ -15,13 +14,7 @@ router.get('/',
       throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'validators-route', action: 'list' });
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch validators',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch validators', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
@@ -35,13 +28,7 @@ router.get('/:address',
 
       // Validate address format
       if (!address || address.length < 40) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_ADDRESS',
-            message: 'Invalid validator address format',
-          },
-        });
+        return res.status(400).json(formatErrorResponse('Invalid validator address format', 'INVALID_ADDRESS', 400));
       }
 
       // Get all validators and find the specific one
@@ -96,15 +83,9 @@ router.get('/nomination-pools',
         },
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(poolsData),
-        meta: {
-          source: 'rpc',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(poolsData, {
+        source: 'rpc',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'validators-route', action: 'getNominationPools' });
       res.status(500).json({

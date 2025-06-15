@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
-import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
-import { keysToCamelCase } from '../utils/caseConverter';
+import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
 
 interface SearchResult {
   type: string;
@@ -26,13 +25,7 @@ router.get('/',
       const query = req.query.q as string;
 
       if (!query) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Search query is required',
-          },
-        });
+        return res.status(400).json(formatErrorResponse('Search query is required', 'VALIDATION_ERROR', 400));
       }
 
       const searchResults: SearchResult[] = [];
@@ -66,29 +59,14 @@ router.get('/',
         }
       }
 
-      // Transform search results using the keysToCamelCase utility
-      const transformedResults = searchResults.map(result => keysToCamelCase(result));
-
-      const response: APIResponse = {
-        success: true,
-        data: transformedResults,
-        meta: {
-          total: transformedResults.length,
-          source: 'database',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(searchResults, {
+        total: searchResults.length,
+        source: 'database',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'search-route', action: 'search' });
       
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Search failed',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Search failed', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );

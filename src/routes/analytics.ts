@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
-import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import { keysToCamelCase } from '../utils/caseConverter';
+import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
 
 const router = Router();
 
@@ -93,27 +92,15 @@ router.get('/gas',
         },
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(gasAnalytics),
-        meta: {
-          source: 'rpc',
-          period,
-          granularity,
-          note: 'Gas tracking implementation in progress',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(gasAnalytics, {
+        source: 'rpc',
+        period,
+        granularity,
+        note: 'Gas tracking implementation in progress',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'analytics-route', action: 'getGasAnalytics' });
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch gas analytics',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch gas analytics', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
@@ -139,26 +126,14 @@ router.get('/rollups',
         new_rollups_24h: 0, // TODO: Track new rollups
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(rollupAnalytics),
-        meta: {
-          source: 'rpc',
-          period,
-          note: 'Detailed rollup analytics implementation in progress',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(rollupAnalytics, {
+        source: 'rpc',
+        period,
+        note: 'Detailed rollup analytics implementation in progress',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'analytics-route', action: 'getRollupAnalytics' });
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch rollup analytics',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch rollup analytics', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
@@ -172,13 +147,7 @@ router.get('/rollups/:appId',
       const period = req.query.period as string || '24h';
 
       if (isNaN(appId)) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_APP_ID',
-            message: 'Invalid app ID format',
-          },
-        });
+        return res.status(400).json(formatErrorResponse('Invalid app ID format', 'INVALID_APP_ID', 400));
       }
 
       // TODO: Implement specific rollup analytics
@@ -207,27 +176,15 @@ router.get('/rollups/:appId',
         },
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(rollupDetails),
-        meta: {
-          source: 'rpc',
-          period,
-          app_id: appId.toString(),
-          note: 'Specific rollup analytics implementation in progress',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(rollupDetails, {
+        source: 'rpc',
+        period,
+        app_id: appId.toString(),
+        note: 'Specific rollup analytics implementation in progress',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'analytics-route', action: 'getSpecificRollupAnalytics', appId: req.params.appId });
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch rollup details',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch rollup details', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
@@ -262,26 +219,14 @@ router.get('/data-throughput',
         },
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(throughputAnalytics),
-        meta: {
-          source: 'rpc',
-          period,
-          granularity,
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(throughputAnalytics, {
+        source: 'rpc',
+        period,
+        granularity,
+      }));
     } catch (error) {
       logError(error as Error, { component: 'analytics-route', action: 'getDataThroughput' });
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch data throughput analytics',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch data throughput analytics', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
@@ -294,13 +239,7 @@ router.get('/validators',
       throw new Error('Missing service');
     } catch (error) {
       logError(error as Error, { component: 'analytics-route', action: 'getValidatorAnalytics' });
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch validator analytics',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch validator analytics', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );

@@ -1,9 +1,9 @@
-import { Block, BlockApiResponse, BlockWithMetadataApiResponse } from '../types/database';
+import { BlockApiResponse, BlockWithMetadataApiResponse } from '../types/database';
 
 export interface IBlockMapper {
-  toApiResponse(block: Block): BlockApiResponse;
-  toApiResponseArray(blocks: Block[]): BlockApiResponse[];
-  toWithMetadataApiResponse(block: Block): BlockWithMetadataApiResponse;
+  toApiResponse(block: any): BlockApiResponse;
+  toApiResponseArray(blocks: any[]): BlockApiResponse[];
+  toWithMetadataApiResponse(block: any): BlockWithMetadataApiResponse;
 }
 
 /**
@@ -12,38 +12,40 @@ export interface IBlockMapper {
 export class BlockMapper implements IBlockMapper {
   /**
    * Convert a single Block to BlockApiResponse
+   * Handles Prisma object with camelCase fields
    */
-  toApiResponse(block: Block): BlockApiResponse {
+  toApiResponse(block: any): BlockApiResponse {
     return {
       number: block.number,
       hash: block.hash,
-      parent_hash: block.parent_hash || undefined,
-      state_root: block.state_root || undefined,
-      timestamp: block.timestamp.toISOString(),
-      extrinsics_count: block.extrinsics_count,
-      created_at: block.created_at.toISOString(),
+      parent_hash: block.parentHash || block.parent_hash || undefined,
+      state_root: block.stateRoot || block.state_root || undefined,
+      timestamp: block.timestamp ? new Date(block.timestamp).toISOString() : new Date().toISOString(),
+      extrinsics_count: block.extrinsicsCount || block.extrinsics_count || 0,
+      created_at: block.createdAt ? new Date(block.createdAt).toISOString() : new Date().toISOString(),
     };
   }
 
   /**
    * Convert an array of Blocks to BlockApiResponse array
    */
-  toApiResponseArray(blocks: Block[]): BlockApiResponse[] {
+  toApiResponseArray(blocks: any[]): BlockApiResponse[] {
     return blocks.map(block => this.toApiResponse(block));
   }
 
   /**
    * Convert a single Block to BlockWithMetadataApiResponse
+   * Handles Prisma object with camelCase fields
    */
-  toWithMetadataApiResponse(block: Block): BlockWithMetadataApiResponse {
+  toWithMetadataApiResponse(block: any): BlockWithMetadataApiResponse {
     return {
       number: block.number,
       hash: block.hash,
-      parent_hash: block.parent_hash || undefined,
-      state_root: block.state_root || undefined,
-      timestamp: block.timestamp.toISOString(),
-      extrinsics_count: block.extrinsics_count,
-      created_at: block.created_at.toISOString(),
+      parent_hash: block.parentHash || block.parent_hash || undefined,
+      state_root: block.stateRoot || block.state_root || undefined,
+      timestamp: block.timestamp ? new Date(block.timestamp).toISOString() : new Date().toISOString(),
+      extrinsics_count: block.extrinsicsCount || block.extrinsics_count || 0,
+      created_at: block.createdAt ? new Date(block.createdAt).toISOString() : new Date().toISOString(),
       events: [],
       logs: [],
       data_submissions: [],

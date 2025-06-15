@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
-import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import { keysToCamelCase } from '../utils/caseConverter';
+import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
 
 const router = Router();
 
@@ -41,16 +40,10 @@ router.get('/leaderboard',
         metric,
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(leaderboardData),
-        meta: {
-          source: 'rpc',
-          period,
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(leaderboardData, {
+        source: 'rpc',
+        period,
+      }));
     } catch (error) {
       logError(error as Error, { component: 'rollups-route', action: 'getLeaderboard' });
       res.status(500).json({
@@ -122,16 +115,10 @@ router.get('/',
         limit,
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(rollupsData),
-        meta: {
-          source: 'rpc',
-          note: 'Mock data - database integration pending',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(rollupsData, {
+        source: 'rpc',
+        note: 'Mock data - database integration pending',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'rollups-route', action: 'list' });
       res.status(500).json({
@@ -185,15 +172,9 @@ router.get('/:appId',
         recent_submissions: [], // TODO: Get recent submissions for this app
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(rollupDetails),
-        meta: {
-          source: 'rpc',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(rollupDetails, {
+        source: 'rpc',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'rollups-route', action: 'getDetails', appId: req.params.appId });
       res.status(500).json({
@@ -247,18 +228,12 @@ router.get('/:appId/submissions',
         total_count: submissions.length,
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(submissionsData),
-        meta: {
-          page,
-          limit,
-          total: submissions.length,
-          source: 'rpc',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(submissionsData, {
+        page,
+        limit,
+        total: submissions.length,
+        source: 'rpc',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'rollups-route', action: 'getSubmissions', appId: req.params.appId });
       res.status(500).json({
@@ -310,18 +285,12 @@ router.get('/:appId/blobs',
         total_count: blobs.length,
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(blobsData),
-        meta: {
-          page,
-          limit,
-          total: blobs.length,
-          source: 'rpc',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(blobsData, {
+        page,
+        limit,
+        total: blobs.length,
+        source: 'rpc',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'rollups-route', action: 'getBlobs', appId: req.params.appId });
       res.status(500).json({
@@ -376,15 +345,9 @@ router.get('/:appId/analytics',
         cost_efficiency_trend: [], // TODO: Cost per MB over time
       };
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(analytics),
-        meta: {
-          source: 'rpc',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(analytics, {
+        source: 'rpc',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'rollups-route', action: 'getAnalytics', appId: req.params.appId });
       res.status(500).json({

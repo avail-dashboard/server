@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
-import { APIResponse } from '../types';
 import { pagination, cacheMiddleware } from '../middleware';
 import config from '../config';
-import { keysToCamelCase } from '../utils/caseConverter';
+import { formatPaginatedResponse, formatErrorResponse, formatSingleResponse } from '../utils/responseFormatter';
 import { serviceFactory, DataAvailabilityService } from '../services';
 
 const router = Router();
@@ -29,31 +28,18 @@ router.get('/',
         { sort_by: sortBy, sort_order: sortOrder as 'asc' | 'desc' },
       );
 
-      const response: APIResponse = {
-        success: true,
-        data: {
-          dataSubmissions: result.data.map(submission => keysToCamelCase(submission)),
-          totalCount: result.pagination.total_count,
-        },
-        meta: {
-          source: 'database',
-          page: page,
-          limit: limit,
-          total: result.pagination.total_count,
-        },
-      };
+      const response = formatPaginatedResponse(result, {
+        source: 'database',
+        page: page,
+        limit: limit,
+        total: result.pagination.total_count,
+      });
 
       res.json(response);
     } catch (error) {
       logError(error as Error, { component: 'data-submissions-route', action: 'getDataSubmissions' });
       
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch data submissions',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch data submissions', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
@@ -71,25 +57,11 @@ router.get(
       const dataAvailabilityService = serviceFactory.get<DataAvailabilityService>('dataAvailabilityService');
       const stats = await dataAvailabilityService.getDataSubmissionStats();
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(stats),
-        meta: {
-          source: 'database',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(stats));
     } catch (error) {
       logError(error as Error, { component: 'data-submissions-route', action: 'getStats' });
       
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch data submission statistics',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch data submission statistics', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
@@ -110,31 +82,19 @@ router.get('/rollup/:appId',
       const dataAvailabilityService = serviceFactory.get<DataAvailabilityService>('dataAvailabilityService');
       const submissions = await dataAvailabilityService.getDataSubmissionsForRollup(parseInt(appId, 10));
 
-      const response: APIResponse = {
-        success: true,
-        data: {
-          dataSubmissions: submissions.map(submission => keysToCamelCase(submission)),
-          totalCount: submissions.length,
-          appId: parseInt(appId, 10),
-        },
-        meta: {
-          source: 'database',
-          total: submissions.length,
-          app_id: appId,
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse({
+        dataSubmissions: submissions,
+        totalCount: submissions.length,
+        appId: parseInt(appId, 10),
+      }, {
+        source: 'database',
+        total: submissions.length,
+        app_id: appId,
+      }));
     } catch (error) {
       logError(error as Error, { component: 'data-submissions-route', action: 'getDataSubmissionsForRollup' });
       
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch data submissions for rollup',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch data submissions for rollup', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
@@ -153,61 +113,29 @@ router.get('/:submissionId',
       // Parse submission ID (format: blockNumber-extrinsicIndex)
       const parts = submissionId.split('-');
       if (parts.length !== 2) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_PARAMETERS',
-            message: 'Invalid submission ID format. Expected: blockNumber-extrinsicIndex',
-          },
-        });
+        return res.status(400).json(formatErrorResponse('Invalid submission ID format. Expected: blockNumber-extrinsicIndex', 'INVALID_PARAMETERS', 400));
       }
 
       const blockNumber = parseInt(parts[0], 10);
       const extrinsicIndex = parseInt(parts[1], 10);
 
       if (isNaN(blockNumber) || isNaN(extrinsicIndex)) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_PARAMETERS',
-            message: 'Invalid submission ID format. Block number and extrinsic index must be numbers.',
-          },
-        });
+        return res.status(400).json(formatErrorResponse('Invalid submission ID format. Block number and extrinsic index must be numbers.', 'INVALID_PARAMETERS', 400));
       }
 
       const dataAvailabilityService = serviceFactory.get<DataAvailabilityService>('dataAvailabilityService');
       const blockSubmissions = await dataAvailabilityService.getDataSubmissionsForBlock(blockNumber);
-      const submission = blockSubmissions.find(sub => sub.extrinsicIndex === extrinsicIndex);
+      const submission = blockSubmissions.find(sub => sub.extrinsic_index === extrinsicIndex);
 
       if (!submission) {
-        return res.status(404).json({
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Data submission not found',
-          },
-        });
+        return res.status(404).json(formatErrorResponse('Data submission not found', 'NOT_FOUND', 404));
       }
 
-      const response: APIResponse = {
-        success: true,
-        data: keysToCamelCase(submission),
-        meta: {
-          source: 'database',
-        },
-      };
-
-      res.json(response);
+      res.json(formatSingleResponse(submission));
     } catch (error) {
       logError(error as Error, { component: 'data-submissions-route', action: 'getDataSubmission' });
       
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch data submission',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch data submission', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );

@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
-import { APIResponse } from '../types';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
-import { keysToCamelCase } from '../utils/caseConverter';
+import { formatErrorResponse } from '../utils/responseFormatter';
 
 const router = Router();
 
@@ -17,13 +16,7 @@ router.get('/stats',
     } catch (error) {
       logError(error as Error, { component: 'chain-route', action: 'getStats' });
       
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch chain statistics',
-        },
-      });
+      res.status(500).json(formatErrorResponse('Failed to fetch chain statistics', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );
