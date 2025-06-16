@@ -294,6 +294,7 @@ export interface BlockApiResponse {
   hash: string;
   parent_hash?: string;
   state_root?: string;
+  extrinsics_root?: string; // Add missing extrinsics root
   timestamp: string; // ISO string instead of Date
   extrinsics_count: number;
   created_at: string; // ISO string instead of Date
@@ -317,6 +318,7 @@ export interface BlockWithMetadataApiResponse {
   hash: string;
   parent_hash?: string;
   state_root?: string;
+  extrinsics_root?: string; // Add missing extrinsics root
   timestamp: string; // ISO string instead of Date
   extrinsics_count: number;
   created_at: string; // ISO string instead of Date
