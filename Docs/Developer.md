@@ -45,3 +45,13 @@ It can take up to 30 seconds for the server to start, as it waits for all the se
 NEVER use `block.block.header.hash.toString()` for storing block hashes. This returns an internal header hash, not the canonical block hash.
 ✅ Correct: Use the hash parameter from `api.rpc.chain.getBlockHash(number)` 
 ❌ Wrong: `block.block.header.hash.toString()` - causes parent-child relationship failures
+
+## Missing Block Field Storage
+Ensure all block header fields are stored in database. Check processor includes all schema fields.
+✅ Include: hash, parent_hash, state_root, extrinsics_root, extrinsics_count
+❌ Missing: forgetting extrinsics_root in INSERT query
+
+## Blockchain Service Selection Critical
+Use AvailBlockchainService for proper extrinsics extraction, not BlockchainService.
+✅ Correct: AvailBlockchainService - extracts extrinsics properly with avail-sdk
+❌ Wrong: BlockchainService - returns empty extrinsics arrays, causes missing data

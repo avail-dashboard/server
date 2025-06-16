@@ -1,6 +1,6 @@
 import { logger, logError } from '../../utils/logger';
 import db from '../../utils/database';
-import { BlockchainService } from '../core/blockchain';
+import { AvailBlockchainService } from '../core/avail-blockchain';
 import { 
   BaseService,
   ServiceHealth, 
@@ -31,12 +31,12 @@ export interface IBlockIndexerService {
  */
 export class BlockIndexerService implements BaseService, IBlockIndexerService {
   private db: typeof db;
-  private blockchain: BlockchainService;
+  private blockchain: AvailBlockchainService;
   private isRunning = false;
   private readonly MAX_RETRIES = 5;
   private readonly BATCH_SIZE = 20; // blocks to fetch in parallel
 
-  constructor(database: typeof db, blockchain: BlockchainService) {
+  constructor(database: typeof db, blockchain: AvailBlockchainService) {
     this.db = database;
     this.blockchain = blockchain;
   }
@@ -504,7 +504,7 @@ export class BlockIndexerService implements BaseService, IBlockIndexerService {
  */
 export const createBlockIndexerService = (
   database: typeof db, 
-  blockchain: BlockchainService,
+  blockchain: AvailBlockchainService,
 ): BlockIndexerService => {
   return new BlockIndexerService(database, blockchain);
 };

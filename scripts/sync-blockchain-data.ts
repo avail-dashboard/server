@@ -16,7 +16,7 @@
 import { logger } from '../src/utils/logger';
 import db from '../src/utils/database';
 import { ConnectionManager } from '../src/services/core/connection-manager';
-import { BlockchainService } from '../src/services/core/blockchain';
+import { AvailBlockchainService } from '../src/services/core/avail-blockchain';
 import { createBlockIndexerService } from '../src/services/domain/indexer';
 import { createDataProcessorService } from '../src/services/domain/processor';
 import { createSyncService } from '../src/services/core/sync';
@@ -34,7 +34,7 @@ interface SyncOptions {
 
 class StandaloneSyncScript {
   private connectionManager: ConnectionManager;
-  private blockchain: BlockchainService;
+  private blockchain: AvailBlockchainService;
   private indexer: ReturnType<typeof createBlockIndexerService>;
   private processor: ReturnType<typeof createDataProcessorService>;
   private queueService: QueueService;
@@ -47,7 +47,7 @@ class StandaloneSyncScript {
   constructor() {
     // Initialize services
     this.connectionManager = new ConnectionManager();
-    this.blockchain = new BlockchainService();
+    this.blockchain = new AvailBlockchainService();
     this.indexer = createBlockIndexerService(db, this.blockchain);
     this.processor = createDataProcessorService(db, this.blockchain);
     
@@ -102,15 +102,36 @@ class StandaloneSyncScript {
     try {
       logger.info('🧹 Shutting down services...');
 
-      await this.syncService.stop();
-      await this.processor.stop();
-      await this.indexer.stop();
-      await this.queueService.stop();
-      await this.blockchain.stop();
+      // Stop services in dependency order (dependent services first)
+      if (this.syncService) {
+        await this.syncService.stop();
+      }
       
-      // Cleanup dual SDK services
-      await this.hybridProcessor.disconnect();
-      await this.availIndexer.disconnect();
+      if (this.processor) {
+        await this.processor.stop();
+      }
+      
+      if (this.indexer) {
+        await this.indexer.stop();
+      }
+      
+      // Cleanup dual SDK services before main blockchain service
+      if (this.hybridProcessor) {
+        await this.hybridProcessor.disconnect();
+      }
+      
+      if (this.availIndexer) {
+        await this.availIndexer.disconnect();
+      }
+      
+      if (this.queueService) {
+        await this.queueService.stop();
+      }
+      
+      // Stop blockchain service last (other services depend on it)
+      if (this.blockchain) {
+        await this.blockchain.stop();
+      }
       
       await db.disconnect();
 
@@ -442,7 +463,7 @@ class StandaloneSyncScript {
       process.on(signal, () => {
         logger.info(`🛑 Received ${signal}, gracefully shutting down...`);
         this.shouldStop = true;
-        process.exit(0);
+        // Don't call process.exit(0) immediately - let operations complete gracefully
       });
     });
 
@@ -485,6 +506,12 @@ class StandaloneSyncScript {
       throw error;
     } finally {
       await this.cleanup();
+      
+      // Small delay to ensure cleanup completes before script exit
+      if (this.shouldStop) {
+        logger.info('🔄 Waiting for graceful shutdown...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
   }
 }

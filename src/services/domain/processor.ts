@@ -1,6 +1,6 @@
 import { logger, logError } from '../../utils/logger';
 import db from '../../utils/database';
-import { BlockchainService } from '../core/blockchain';
+import { AvailBlockchainService } from '../core/avail-blockchain';
 import { 
   BaseService,
   ServiceHealth,
@@ -36,11 +36,11 @@ export interface IDataProcessorService {
  */
 export class DataProcessorService implements BaseService, IDataProcessorService {
   private db: typeof db;
-  private blockchain: BlockchainService;
+  private blockchain: AvailBlockchainService;
   private isRunning = false;
   private readonly BATCH_SIZE = 100; // records per batch
 
-  constructor(database: typeof db, blockchain: BlockchainService) {
+  constructor(database: typeof db, blockchain: AvailBlockchainService) {
     this.db = database;
     this.blockchain = blockchain;
   }
@@ -574,7 +574,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
  */
 export const createDataProcessorService = (
   database: typeof db, 
-  blockchain: BlockchainService,
+  blockchain: AvailBlockchainService,
 ): DataProcessorService => {
   return new DataProcessorService(database, blockchain);
 };

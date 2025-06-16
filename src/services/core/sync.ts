@@ -1,6 +1,6 @@
 import { logger, logError } from '../../utils/logger';
 import db from '../../utils/database';
-import { BlockchainService } from './blockchain';
+import { AvailBlockchainService } from './avail-blockchain';
 import { QueueService } from './queue';
 import { 
   BaseService,
@@ -35,14 +35,14 @@ export interface ISyncService {
  */
 export class SyncService implements BaseService, ISyncService {
   private db: typeof db;
-  private blockchain: BlockchainService;
+  private blockchain: AvailBlockchainService;
   private queue: QueueService;
   private syncIntervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private readonly SYNC_CHECK_INTERVAL = 10000; // 10 seconds
   private readonly BATCH_SIZE = 50; // blocks per batch
 
-  constructor(database: typeof db, blockchain: BlockchainService, queue: QueueService) {
+  constructor(database: typeof db, blockchain: AvailBlockchainService, queue: QueueService) {
     this.db = database;
     this.blockchain = blockchain;
     this.queue = queue;
@@ -552,7 +552,7 @@ export class SyncService implements BaseService, ISyncService {
  */
 export const createSyncService = (
   database: typeof db, 
-  blockchain: BlockchainService,
+  blockchain: AvailBlockchainService,
   queue: QueueService,
 ): SyncService => {
   return new SyncService(database, blockchain, queue);

@@ -3,6 +3,7 @@
 
 // Core Services
 export { BlockchainService, createBlockchainService } from './core/blockchain';
+export { AvailBlockchainService, createAvailBlockchainService } from './core/avail-blockchain';
 export { ConnectionManager, createConnectionManager } from './core/connection-manager';
 export { QueueService, createQueueService } from './core/queue';
 export { SyncService, createSyncService } from './core/sync';
@@ -28,6 +29,7 @@ export * from './types/blockchain';
 // Core services factory functions
 import { createConnectionManager, ConnectionManager } from './core/connection-manager';
 import { createBlockchainService, BlockchainService } from './core/blockchain';
+import { createAvailBlockchainService, AvailBlockchainService } from './core/avail-blockchain';
 import { createQueueService, QueueService } from './core/queue';
 
 // Domain services factory functions
@@ -104,16 +106,19 @@ export class ServiceFactory {
       
       // Create core service instances
       const connectionManager = createConnectionManager();
-      const blockchainService = createBlockchainService();
+      const blockchainService = createBlockchainService(); // For general blockchain operations
+      const availBlockchainService = createAvailBlockchainService(); // Use AvailBlockchainService for proper extrinsics extraction
       const queueService = createQueueService();
       
       // Register core services
       this.register('connectionManager', connectionManager);
       this.register('blockchain', blockchainService);
+      this.register('availBlockchain', availBlockchainService);
       this.register('queue', queueService);
 
       // Start core services
       await blockchainService.start();
+      await availBlockchainService.start();
       await queueService.start();
       
       console.log('✅ Core services initialized successfully');
@@ -130,6 +135,7 @@ export class ServiceFactory {
       
       // Get core services from registry with proper typing
       const blockchainService = this.get<BlockchainService>('blockchain');
+      const availBlockchainService = this.get<AvailBlockchainService>('availBlockchain');
       const queueService = this.get<QueueService>('queue');
       
       // Create mapper instances
@@ -156,9 +162,9 @@ export class ServiceFactory {
       );
       
       // Create new sync services
-      const syncService = createSyncService(db, blockchainService, queueService);
-      const blockIndexerService = createBlockIndexerService(db, blockchainService);
-      const dataProcessorService = createDataProcessorService(db, blockchainService);
+      const syncService = createSyncService(db, availBlockchainService, queueService);
+      const blockIndexerService = createBlockIndexerService(db, availBlockchainService);
+      const dataProcessorService = createDataProcessorService(db, availBlockchainService);
       
       // Create search service
       const searchService = createSearchService(
@@ -220,10 +226,15 @@ export class ServiceFactory {
       
       const shutdownPromises: Promise<void>[] = [];
 
-      // Stop blockchain service (will stop its internal managers)
+      // Stop blockchain services (will stop their internal managers)
       if (this.has('blockchain')) {
         const blockchain = this.get<BlockchainService>('blockchain');
         shutdownPromises.push(blockchain.stop());
+      }
+      
+      if (this.has('availBlockchain')) {
+        const availBlockchain = this.get<AvailBlockchainService>('availBlockchain');
+        shutdownPromises.push(availBlockchain.stop());
       }
 
       // Stop queue service
@@ -253,6 +264,11 @@ export class ServiceFactory {
     if (this.has('blockchain')) {
       const blockchain = this.get<BlockchainService>('blockchain');
       healthStatus.blockchain = await blockchain.getHealth();
+    }
+    
+    if (this.has('availBlockchain')) {
+      const availBlockchain = this.get<AvailBlockchainService>('availBlockchain');
+      healthStatus.availBlockchain = await availBlockchain.getHealth();
     }
 
     if (this.has('connectionManager')) {
@@ -286,6 +302,13 @@ export class ServiceFactory {
       const blockchain = this.get<BlockchainService>('blockchain');
       metrics.blockchain = {
         connection: blockchain.getConnectionMetrics(),
+      };
+    }
+    
+    if (this.has('availBlockchain')) {
+      const availBlockchain = this.get<AvailBlockchainService>('availBlockchain');
+      metrics.availBlockchain = {
+        connection: availBlockchain.getConnectionMetrics(),
       };
     }
 
