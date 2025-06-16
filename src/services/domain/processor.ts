@@ -338,6 +338,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         hash: blockData.hash,
         parent_hash: blockData.parentHash,
         state_root: blockData.stateRoot,
+        extrinsics_root: blockData.extrinsicsRoot,
         timestamp: new Date(blockData.timestamp),
         extrinsics_count: blockData.extrinsics.length,
       };
@@ -358,13 +359,14 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
 
       // Insert new block
       await client.query(
-        `INSERT INTO blocks (number, hash, parent_hash, state_root, timestamp, extrinsics_count)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO blocks (number, hash, parent_hash, state_root, extrinsics_root, timestamp, extrinsics_count)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           blockRecord.number,
           blockRecord.hash,
           blockRecord.parent_hash,
           blockRecord.state_root,
+          blockRecord.extrinsics_root,
           blockRecord.timestamp,
           blockRecord.extrinsics_count,
         ],

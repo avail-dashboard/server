@@ -227,7 +227,7 @@ export class AvailBlockchainService implements BaseService {
 
     // Extract more complete information using avail-sdk capabilities
     const blockData: BlockData = {
-      hash: block.block.header.hash.toString(),
+      hash: hash, // Use the actual block hash, not header.hash
       number: block.block.header.number.toNumber(),
       parentHash: block.block.header.parentHash.toString(),
       stateRoot: block.block.header.stateRoot.toString(),

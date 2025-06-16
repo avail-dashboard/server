@@ -40,3 +40,8 @@ Prisma returns camelCase fields but TypeScript interfaces expect snake_case, cau
 Solution: Update mappers to handle both naming conventions: `field: obj.camelCase || obj.snake_case || defaultValue` with null safety for timestamps.
 
 It can take up to 30 seconds for the server to start, as it waits for all the services to start. So wait for making requests to server
+
+## Block Hash Extraction Critical Issue
+NEVER use `block.block.header.hash.toString()` for storing block hashes. This returns an internal header hash, not the canonical block hash.
+✅ Correct: Use the hash parameter from `api.rpc.chain.getBlockHash(number)` 
+❌ Wrong: `block.block.header.hash.toString()` - causes parent-child relationship failures

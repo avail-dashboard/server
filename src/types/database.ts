@@ -488,6 +488,7 @@ export interface Block {
   hash: string;
   parent_hash?: string;
   state_root?: string;
+  extrinsics_root?: string;
   timestamp: Date;
   extrinsics_count: number;
   created_at: Date;

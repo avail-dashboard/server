@@ -214,7 +214,7 @@ export class BlockchainService implements BaseService {
 
     // Transform the data to our BlockData interface
     return {
-      hash: block.block.header.hash.toString(),
+      hash: hash, // Use the actual block hash, not header.hash
       number: block.block.header.number.toNumber(),
       parentHash: block.block.header.parentHash.toString(),
       stateRoot: block.block.header.stateRoot.toString(),
