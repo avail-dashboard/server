@@ -1,5 +1,5 @@
-import { BlockchainService, createBlockchainService } from '../core/blockchain';
-import { AvailBlockchainService, createAvailBlockchainService } from '../core/avail-blockchain';
+import { BlockchainService, createBlockchainService } from './blockchain';
+import { AvailBlockchainService, createAvailBlockchainService } from './avail-blockchain';
 import { logger, logError } from '../../utils/logger';
 import { BlockData } from '../types/blockchain';
 
@@ -403,3 +403,10 @@ export class HybridProcessor {
     }
   }
 }
+
+/**
+ * Factory function to create a HybridProcessor instance
+ */
+export const createHybridProcessor = (): HybridProcessor => {
+  return new HybridProcessor();
+};

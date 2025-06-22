@@ -7,6 +7,7 @@ export { AvailBlockchainService, createAvailBlockchainService } from './core/ava
 export { ConnectionManager, createConnectionManager } from './core/connection-manager';
 export { QueueService, createQueueService } from './core/queue';
 export { SyncService, createSyncService } from './core/sync';
+export { HybridProcessor, createHybridProcessor } from './core/hybrid-processor';
 
 // Integration Services
 // (No integration services currently)

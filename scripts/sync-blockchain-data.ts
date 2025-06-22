@@ -21,7 +21,7 @@ import { createBlockIndexerService } from '../src/services/domain/indexer';
 import { createDataProcessorService } from '../src/services/domain/processor';
 import { createSyncService } from '../src/services/core/sync';
 import { QueueService } from '../src/services/core/queue';
-import { HybridProcessor } from '../src/services/domain/hybrid-processor';
+import { HybridProcessor, createHybridProcessor } from '../src/services/core/hybrid-processor';
 import { AvailDataSubmissionIndexer } from '../src/services/domain/availDataSubmissionIndexer';
 
 interface SyncOptions {
@@ -56,7 +56,7 @@ class StandaloneSyncScript {
     this.syncService = createSyncService(db, this.blockchain, this.queueService);
     
     // Initialize dual SDK services
-    this.hybridProcessor = new HybridProcessor();
+    this.hybridProcessor = createHybridProcessor();
     this.availIndexer = new AvailDataSubmissionIndexer();
   }
 
