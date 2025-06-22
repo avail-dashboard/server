@@ -11,40 +11,60 @@ datasource db {
 }
 
 model Block {
-  number          Int              @id
-  hash            String           @unique @db.VarChar(66)
-  parentHash      String?          @map("parent_hash") @db.VarChar(66)
-  stateRoot       String?          @map("state_root") @db.VarChar(66)
-  extrinsicsRoot  String?          @map("extrinsics_root") @db.VarChar(66)
-  timestamp       DateTime
-  extrinsicsCount Int              @default(0) @map("extrinsics_count")
-  createdAt       DateTime         @default(now()) @map("created_at")
+  number               Int              @id
+  hash                 String           @unique @db.VarChar(66)
+  parentHash           String?          @map("parent_hash") @db.VarChar(66)
+  stateRoot            String?          @map("state_root") @db.VarChar(66)
+  extrinsicsRoot       String?          @map("extrinsics_root") @db.VarChar(66)
+  timestamp            DateTime
+  extrinsicsCount      Int              @default(0) @map("extrinsics_count")
+  // Phase 1 enhancements
+  validatorAddress     String?          @map("validator_address") @db.VarChar(64)
+  validatorName        String?          @map("validator_name") @db.VarChar(255)
+  specVersion          Int?             @map("spec_version")
+  totalFees            BigInt?          @map("total_fees")
+  transferCount        Int?             @map("transfer_count")
+  dataSubmissionsSize  BigInt?          @map("data_submissions_size")
+  createdAt            DateTime         @default(now()) @map("created_at")
   
   // Relations
-  extrinsics      Extrinsic[]
-  events          Event[]
-  dataSubmissions DataSubmission[]
+  extrinsics           Extrinsic[]
+  events               Event[]
+  dataSubmissions      DataSubmission[]
+  transfers            Transfer[]
+  rewards              Reward[]
+  validator            Validator?       @relation(fields: [validatorAddress], references: [stashAddress])
   
   @@index([timestamp], name: "idx_blocks_timestamp")
   @@index([hash], name: "idx_blocks_hash")
+  @@index([validatorAddress], name: "idx_blocks_validator")
   @@map("blocks")
 }
 
 model Extrinsic {
-  id             Int      @id @default(autoincrement())
-  hash           String   @unique @db.VarChar(66)
-  blockNumber    Int      @map("block_number")
-  extrinsicIndex Int?     @map("extrinsic_index")
-  module         String?  @db.VarChar(50)
-  call           String?  @db.VarChar(50)
-  success        Boolean?
-  timestamp      DateTime?
-  signer         String?  @db.VarChar(64)
-  fee            Int?
-  createdAt      DateTime @default(now()) @map("created_at")
+  id               Int      @id @default(autoincrement())
+  hash             String   @unique @db.VarChar(66)
+  blockNumber      Int      @map("block_number")
+  extrinsicIndex   Int?     @map("extrinsic_index")
+  module           String?  @db.VarChar(50)
+  call             String?  @db.VarChar(50)
+  success          Boolean?
+  timestamp        DateTime?
+  signer           String?  @db.VarChar(64)
+  fee              Int?
+  // Phase 1 enhancements
+  nonce            Int?
+  lifetime         Json?    // { birth: number, death: number, immortal: boolean }
+  parameters       Json?    // Complete extrinsic arguments
+  signatureInfo    Json?    @map("signature_info") // { signature, signedExtensions }
+  tip              BigInt?
+  actualFee        BigInt?  @map("actual_fee") // Calculated from events
+  transferCount    Int?     @map("transfer_count") // Number of transfers in this extrinsic
+  createdAt        DateTime @default(now()) @map("created_at")
   
   // Relations
-  block          Block    @relation(fields: [blockNumber], references: [number])
+  block            Block    @relation(fields: [blockNumber], references: [number])
+  transfers        Transfer[]
   
   @@index([blockNumber], name: "idx_extrinsics_block")
   @@index([hash], name: "idx_extrinsics_hash")
@@ -54,12 +74,35 @@ model Extrinsic {
 }
 
 model Account {
-  address     String   @id @db.VarChar(64)
-  balance     Int?
-  nonce       Int?
-  lastUpdated DateTime @default(now()) @map("last_updated")
+  address              String   @id @db.VarChar(64)
+  balance              Int?
+  nonce                Int?
+  // Phase 1 enhancements
+  currentBalance       BigInt?  @map("current_balance")
+  reservedBalance      BigInt?  @map("reserved_balance")
+  frozenBalance        BigInt?  @map("frozen_balance")
+  accountType          AccountType @default(regular) @map("account_type")
+  identityName         String?  @map("identity_name") @db.VarChar(255)
+  identityInfo         Json?    @map("identity_info")
+  firstSeenBlock       Int?     @map("first_seen_block")
+  lastActivityBlock    Int?     @map("last_activity_block")
+  transactionCount     Int?     @default(0) @map("transaction_count")
+  transferCount        Int?     @default(0) @map("transfer_count")
+  lastUpdated          DateTime @default(now()) @map("last_updated")
+  
+  // Relations
+  validatorStash       Validator? @relation("ValidatorStash")
+  validatorController  Validator? @relation("ValidatorController") 
+  validatorReward      Validator? @relation("ValidatorReward")
+  nominations          Nomination[]
+  transfersFrom        Transfer[] @relation("TransferFrom")
+  transfersTo          Transfer[] @relation("TransferTo")
+  rewards              Reward[]
   
   @@index([balance], name: "idx_accounts_balance")
+  @@index([currentBalance], name: "idx_accounts_current_balance")
+  @@index([accountType], name: "idx_accounts_type")
+  @@index([lastActivityBlock], name: "idx_accounts_last_activity")
   @@map("accounts")
 }
 
@@ -167,6 +210,134 @@ model Rollup {
   @@map("rollups")
 }
 
+// ===== PHASE 1 NEW ENTITIES =====
+
+model Validator {
+  stashAddress        String      @id @map("stash_address") @db.VarChar(64)
+  controllerAddress   String?     @unique @map("controller_address") @db.VarChar(64)
+  rewardAddress       String?     @unique @map("reward_address") @db.VarChar(64)
+  commission          Int         // Stored as Perbill (parts per billion)
+  selfBonded          BigInt      @map("self_bonded")
+  totalBonded         BigInt      @map("total_bonded")
+  nominatorCount      Int         @default(0) @map("nominator_count")
+  status              ValidatorStatus @default(inactive)
+  sessionKeys         Json?       @map("session_keys") // All session keys
+  identityName        String?     @map("identity_name") @db.VarChar(255)
+  identityInfo        Json?       @map("identity_info")
+  blocksProduced      Int         @default(0) @map("blocks_produced")
+  lastBlockProduced   Int?        @map("last_block_produced")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at")
+  
+  // Relations
+  stashAccount        Account     @relation("ValidatorStash", fields: [stashAddress], references: [address])
+  controllerAccount   Account?    @relation("ValidatorController", fields: [controllerAddress], references: [address])
+  rewardAccount       Account?    @relation("ValidatorReward", fields: [rewardAddress], references: [address])
+  nominations         Nomination[]
+  rewards             Reward[]
+  blocks              Block[]
+  
+  @@index([status], name: "idx_validators_status")
+  @@index([totalBonded], name: "idx_validators_total_bonded")
+  @@index([commission], name: "idx_validators_commission")
+  @@index([lastBlockProduced], name: "idx_validators_last_block")
+  @@map("validators")
+}
+
+model Transfer {
+  id              String      @id // format: "{extrinsic_hash}-{index}"
+  extrinsicHash   String      @map("extrinsic_hash") @db.VarChar(66)
+  blockNumber     Int         @map("block_number")
+  extrinsicIndex  Int         @map("extrinsic_index")
+  fromAddress     String      @map("from_address") @db.VarChar(64)
+  toAddress       String      @map("to_address") @db.VarChar(64)
+  amount          BigInt
+  tokenType       String      @default("AVAIL") @map("token_type") @db.VarChar(10)
+  fees            BigInt
+  status          TransferStatus @default(success)
+  timestamp       DateTime
+  createdAt       DateTime    @default(now()) @map("created_at")
+  
+  // Relations
+  block           Block       @relation(fields: [blockNumber], references: [number])
+  extrinsic       Extrinsic   @relation(fields: [extrinsicHash], references: [hash])
+  fromAccount     Account     @relation("TransferFrom", fields: [fromAddress], references: [address])
+  toAccount       Account     @relation("TransferTo", fields: [toAddress], references: [address])
+  
+  @@index([blockNumber], name: "idx_transfers_block")
+  @@index([extrinsicHash], name: "idx_transfers_extrinsic")
+  @@index([fromAddress], name: "idx_transfers_from")
+  @@index([toAddress], name: "idx_transfers_to")
+  @@index([timestamp], name: "idx_transfers_timestamp")
+  @@index([amount], name: "idx_transfers_amount")
+  @@map("transfers")
+}
+
+model Nomination {
+  id                String      @id // format: "{nominator}-{validator}"
+  nominatorAddress  String      @map("nominator_address") @db.VarChar(64)
+  validatorAddress  String      @map("validator_address") @db.VarChar(64)
+  amount            BigInt
+  era               Int?
+  active            Boolean     @default(true)
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @default(now()) @updatedAt @map("updated_at")
+  
+  // Relations
+  nominator         Account     @relation(fields: [nominatorAddress], references: [address])
+  validator         Validator   @relation(fields: [validatorAddress], references: [stashAddress])
+  
+  @@index([nominatorAddress], name: "idx_nominations_nominator")
+  @@index([validatorAddress], name: "idx_nominations_validator")
+  @@index([era], name: "idx_nominations_era")
+  @@index([active], name: "idx_nominations_active")
+  @@map("nominations")
+}
+
+model Era {
+  number          Int         @id
+  startBlock      Int         @map("start_block")
+  endBlock        Int?        @map("end_block")
+  totalStaked     BigInt      @map("total_staked")
+  validatorCount  Int         @map("validator_count")
+  active          Boolean     @default(true)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  
+  // Relations
+  rewards         Reward[]
+  
+  @@index([startBlock], name: "idx_eras_start_block")
+  @@index([active], name: "idx_eras_active")
+  @@map("eras")
+}
+
+model Reward {
+  id                String      @id // format: "{address}-{era}-{type}"
+  address           String      @db.VarChar(64)
+  validatorAddress  String?     @map("validator_address") @db.VarChar(64)
+  amount            BigInt
+  era               Int
+  rewardType        RewardType  @map("reward_type")
+  blockNumber       Int         @map("block_number")
+  timestamp         DateTime
+  createdAt         DateTime    @default(now()) @map("created_at")
+  
+  // Relations
+  account           Account     @relation(fields: [address], references: [address])
+  validator         Validator?  @relation(fields: [validatorAddress], references: [stashAddress])
+  eraInfo           Era         @relation(fields: [era], references: [number])
+  block             Block       @relation(fields: [blockNumber], references: [number])
+  
+  @@index([address], name: "idx_rewards_address")
+  @@index([validatorAddress], name: "idx_rewards_validator")
+  @@index([era], name: "idx_rewards_era")
+  @@index([rewardType], name: "idx_rewards_type")
+  @@index([blockNumber], name: "idx_rewards_block")
+  @@map("rewards")
+}
+
+// ===== ENUMS =====
+
 enum SyncStatus {
   idle
   syncing
@@ -179,4 +350,29 @@ enum SyncMode {
   full
   incremental
   live
+}
+
+enum AccountType {
+  regular
+  validator
+  nominator
+  pool_member
+}
+
+enum ValidatorStatus {
+  active
+  waiting
+  inactive
+  slashed
+}
+
+enum TransferStatus {
+  success
+  failed
+}
+
+enum RewardType {
+  validator
+  nominator
+  slash
 }

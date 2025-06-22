@@ -320,7 +320,7 @@ export class AvailDataSubmissionIndexer {
     appLookup: any,
   ): Promise<DataSubmissionCreateInput[]> {
     
-    return submissions.map((submission, index) => {
+    return submissions.map((submission) => {
       // Get app_id from header extension
       const appId = this.getAppIdForSubmission(appLookup, submission.extrinsicIndex);
       
@@ -440,7 +440,7 @@ export class AvailDataSubmissionIndexer {
           extrinsicsRoot: blockData.extrinsicsRoot || '0x0000000000000000000000000000000000000000000000000000000000000000',
           timestamp: new Date(),
           extrinsicsCount: 0,
-        });
+        } as any);
 
         logger.debug('Block record created successfully', {
           component: 'avail-data-submission-indexer',
