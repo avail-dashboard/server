@@ -295,10 +295,15 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
   }
 
   /**
-   * Ensure data submission dependencies exist (submitter account and rollup)
+   * Ensure data submission dependencies exist (block, submitter account and rollup)
    */
   async ensureDependencies(entity: ExtractedEntity): Promise<void> {
     try {
+      // Ensure block exists first (required foreign key)
+      if (entity.data.blockNumber !== undefined) {
+        await this.dependencyResolver.ensureBlock(entity.data.blockNumber);
+      }
+
       // Ensure submitter account exists
       if (entity.data.submitter) {
         await this.dependencyResolver.ensureAccount(entity.data.submitter);

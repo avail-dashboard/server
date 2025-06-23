@@ -45,6 +45,39 @@ export class SimpleDependencyResolver implements DependencyResolver {
   }
 
   /**
+   * Ensure a block exists by calling the registered block resolver
+   */
+  async ensureBlock(blockNumber: number): Promise<any> {
+    try {
+      logger.debug('DependencyResolver: Ensuring block exists', {
+        component: 'dependency-resolver',
+        blockNumber,
+      });
+
+      const resolver = this.resolvers.get('block');
+      if (!resolver) {
+        throw new Error('Block resolver not registered');
+      }
+
+      const result = await resolver(blockNumber.toString());
+      
+      logger.debug('DependencyResolver: Block ensured', {
+        component: 'dependency-resolver',
+        blockNumber,
+      });
+
+      return result;
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'dependency-resolver',
+        action: 'ensureBlock',
+        blockNumber,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Ensure a rollup exists by calling the registered rollup resolver
    */
   async ensureRollup(appId: number): Promise<any> {

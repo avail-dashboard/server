@@ -214,6 +214,23 @@ export class ServiceFactory {
         accountService.ensureAccountExists(address),
       );
 
+      // Register block resolver to ensure blocks exist before creating dependent entities
+      dependencyResolver.registerResolver('block', async (blockNumber: string) => {
+        const blockNum = parseInt(blockNumber);
+        const existing = await blockRepository.findByNumber(blockNum);
+        if (!existing) {
+          // Get block data and create it
+          const blockData = await availBlockchainService.getBlock(blockNum);
+          if (blockData) {
+            const blockMapper = this.get('blockMapper');
+            const mappedBlock = blockMapper.mapFromBlockchainData(blockData);
+            return await blockRepository.create(mappedBlock);
+          }
+          throw new Error(`Block ${blockNum} not found on blockchain`);
+        }
+        return existing;
+      });
+
       const validatorService = createValidatorService(
         availBlockchainService,
         validatorRepository,

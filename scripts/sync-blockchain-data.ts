@@ -61,7 +61,7 @@ class StandaloneSyncScript {
       logger.info('✅ ServiceFactory initialized with all self-healing services');
 
       // Get services from factory
-      this.blockchain = this.serviceFactory.get('availBlockchainService');
+      this.blockchain = this.serviceFactory.get('availBlockchain');
       this.processor = this.serviceFactory.get('selfHealingBlockProcessor');
       
       // Create independent indexer (not part of self-healing architecture)
