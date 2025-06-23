@@ -162,6 +162,69 @@ export class TransferRepository extends BaseRepository {
   }
 
   /**
+   * Get transfers for an account (both sent and received) - alias for findByAddress
+   */
+  async findByAccount(address: string, params: {
+    page?: number;
+    limit?: number;
+    type?: 'sent' | 'received' | 'all';
+  } = {}): Promise<{ transfers: TransferWithRelations[]; total: number }> {
+    const { page = 1, limit = 20, type = 'all' } = params;
+    const skip = (page - 1) * limit;
+
+    let whereClause: any = {};
+    
+    if (type === 'sent') {
+      whereClause.fromAddress = address;
+    } else if (type === 'received') {
+      whereClause.toAddress = address;
+    } else {
+      whereClause.OR = [
+        { fromAddress: address },
+        { toAddress: address },
+      ];
+    }
+
+    const [transfers, total] = await Promise.all([
+      this.prisma.transfer.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { timestamp: 'desc' },
+        include: {
+          fromAccount: {
+            select: {
+              address: true,
+              identityName: true,
+            },
+          },
+          toAccount: {
+            select: {
+              address: true,
+              identityName: true,
+            },
+          },
+          block: {
+            select: {
+              number: true,
+              timestamp: true,
+            },
+          },
+          extrinsic: {
+            select: {
+              hash: true,
+              success: true,
+            },
+          },
+        },
+      }),
+      this.prisma.transfer.count({ where: whereClause }),
+    ]);
+
+    return { transfers, total };
+  }
+
+  /**
    * Get transfers for an address (both sent and received)
    */
   async findByAddress(address: string, params: {
@@ -196,6 +259,20 @@ export class TransferRepository extends BaseRepository {
     ]);
 
     return { transfers, total };
+  }
+
+  /**
+   * Count transfers for an account (both sent and received)
+   */
+  async countByAccount(address: string): Promise<number> {
+    return this.prisma.transfer.count({
+      where: {
+        OR: [
+          { fromAddress: address },
+          { toAddress: address },
+        ],
+      },
+    });
   }
 
   /**

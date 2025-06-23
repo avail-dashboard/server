@@ -1,16 +1,15 @@
-import { ApiPromise } from '@polkadot/api';
-import { logger, logError } from '../../utils/logger';
-import {
-  BaseService,
-  ServiceHealth,
+import { logger } from '../../utils/logger';
+import { AvailConnectionManager, createAvailConnectionManager } from './avail-connection-manager';
+import { 
+  BaseService, 
+  ServiceHealth, 
   ConnectionProvider,
 } from '../types/service';
 import {
   SubscriptionManager,
-  BlockData,
   ChainInfo,
+  BlockData,
 } from '../types/blockchain';
-import { AvailConnectionManager, AvailConnection, createAvailConnectionManager } from './avail-connection-manager';
 
 // Avail RPC Providers for avail-sdk
 const AVAIL_SDK_PROVIDERS: ConnectionProvider[] = [
@@ -81,7 +80,7 @@ export class AvailBlockchainService implements BaseService {
       });
       
     } catch (error) {
-      logError(error as Error, { component: 'avail-blockchain', action: 'start' });
+      logger.error('AvailBlockchainService: Error starting service', { component: 'avail-blockchain', error: (error as Error).message });
       throw error;
     }
   }
@@ -99,7 +98,7 @@ export class AvailBlockchainService implements BaseService {
       logger.info('AvailBlockchainService: Service stopped', { component: 'avail-blockchain' });
       
     } catch (error) {
-      logError(error as Error, { component: 'avail-blockchain', action: 'stop' });
+      logger.error('AvailBlockchainService: Error stopping service', { component: 'avail-blockchain', error: (error as Error).message });
       throw error;
     }
   }
@@ -155,7 +154,7 @@ export class AvailBlockchainService implements BaseService {
   /**
    * Get API instance (avail-sdk version)
    */
-  async getApi(): Promise<ApiPromise> {
+  async getApi(): Promise<any> {
     const connection = await this.connectionManager.getHealthyConnection();
     return connection.api;
   }
@@ -278,7 +277,7 @@ export class AvailBlockchainService implements BaseService {
         let signer;
         try {
           signer = extrinsic.signer?.toString();
-        } catch (signerError) {
+        } catch {
           // Signer extraction failed - this is common for unsigned extrinsics
         }
 
@@ -367,9 +366,8 @@ export class AvailBlockchainService implements BaseService {
       hashOrNumber,
     });
     
-    const [block, events] = await Promise.all([
+    const [block] = await Promise.all([
       api.rpc.chain.getBlock(hash),
-      api.query.system.events.at(hash),
     ]);
 
     const blockData = await this.getBlock(hashOrNumber);
@@ -382,7 +380,7 @@ export class AvailBlockchainService implements BaseService {
     }> = [];
 
     // Analyze extrinsics for data submissions
-    block.block.extrinsics.forEach((ext, index) => {
+    block.block.extrinsics.forEach((ext: any, index: number) => {
       try {
         if (ext.method.section === 'dataAvailability' && ext.method.method === 'submitData') {
           const submission = {

@@ -3,6 +3,8 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
+import { ServiceFactory } from '../services';
+import { ValidatorService } from '../services/domain/validator';
 
 const router = Router();
 
@@ -11,7 +13,36 @@ router.get('/',
   cacheMiddleware(config.cache.ttl.validators),
   async (req: Request, res: Response) => {
     try {
-      throw new Error('Missing service');
+      const { page = '1', limit = '20', status, minStake, maxStake, hasIdentity } = req.query;
+
+      const serviceFactory = ServiceFactory.getInstance();
+      const validatorService = serviceFactory.get<ValidatorService>('validatorService');
+
+      // Parse pagination
+      const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 20));
+
+      // Build filters
+      const filters: any = {};
+      if (status) {
+        filters.status = status;
+      }
+      if (minStake) {
+        filters.minTotalBonded = BigInt(minStake as string);
+      }
+      if (maxStake) {
+        filters.maxTotalBonded = BigInt(maxStake as string);
+      }
+      if (hasIdentity !== undefined) {
+        filters.hasIdentity = hasIdentity === 'true';
+      }
+
+      const validatorList = await validatorService.getValidators(filters, { page: pageNum, limit: limitNum });
+
+      res.json(formatSingleResponse(validatorList, {
+        source: 'database',
+        pagination: validatorList.pagination,
+      }));
     } catch (error) {
       logError(error as Error, { component: 'validators-route', action: 'list' });
       res.status(500).json(formatErrorResponse('Failed to fetch validators', 'INTERNAL_SERVER_ERROR'));
@@ -31,8 +62,15 @@ router.get('/:address',
         return res.status(400).json(formatErrorResponse('Invalid validator address format', 'INVALID_ADDRESS', 400));
       }
 
-      // Get all validators and find the specific one
-      throw new Error('Missing service');
+      const serviceFactory = ServiceFactory.getInstance();
+      const validatorService = serviceFactory.get<ValidatorService>('validatorService');
+
+      const validatorDetails = await validatorService.getValidator(address);
+
+      res.json(formatSingleResponse(validatorDetails, {
+        source: 'database',
+        note: 'Validator details with enhanced metadata',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'validators-route', action: 'getDetails', address: req.params.address });
       res.status(500).json({
@@ -51,7 +89,15 @@ router.get('/staking/overview',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      throw new Error('Missing service');
+      const serviceFactory = ServiceFactory.getInstance();
+      const validatorService = serviceFactory.get<ValidatorService>('validatorService');
+
+      const stakingOverview = await validatorService.getStakingOverview();
+
+      res.json(formatSingleResponse(stakingOverview, {
+        source: 'blockchain+database',
+        note: 'Staking overview with real-time chain data',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'validators-route', action: 'getStakingOverview' });
       res.status(500).json({

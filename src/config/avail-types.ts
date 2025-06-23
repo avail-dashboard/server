@@ -1,10 +1,11 @@
-import { DefinitionRpc, DefinitionRpcSub } from '@polkadot/types/types';
+// Avail-specific type definitions
+// These types are specific to the Avail blockchain
 
-// Avail-specific RPC definitions
-export const availRpc: Record<string, Record<string, DefinitionRpc | DefinitionRpcSub>> = {
+// RPC method definitions for Avail
+export const availRpcMethods = {
   kate: {
     blockLength: {
-      description: 'Get block length',
+      description: 'Get the block length',
       params: [
         {
           name: 'at',
@@ -15,39 +16,11 @@ export const availRpc: Record<string, Record<string, DefinitionRpc | DefinitionR
       type: 'BlockLength',
     },
     queryProof: {
-      description: 'Generate proof for block data',
+      description: 'Generate a proof for the given cells',
       params: [
-        {
-          name: 'blockHash',
-          type: 'Hash',
-        },
         {
           name: 'cells',
           type: 'Vec<Cell>',
-        },
-      ],
-      type: 'Vec<GProof>',
-    },
-    queryDataProof: {
-      description: 'Generate proof for application data',
-      params: [
-        {
-          name: 'blockHash',
-          type: 'Hash',
-        },
-        {
-          name: 'appId',
-          type: 'u32',
-        },
-      ],
-      type: 'ProofResponse',
-    },
-    queryRows: {
-      description: 'Query rows for block',
-      params: [
-        {
-          name: 'rows',
-          type: 'Vec<u32>',
         },
         {
           name: 'at',
@@ -55,7 +28,22 @@ export const availRpc: Record<string, Record<string, DefinitionRpc | DefinitionR
           isOptional: true,
         },
       ],
-      type: 'Vec<GRow>',
+      type: 'Vec<u8>',
+    },
+    queryDataProof: {
+      description: 'Generate a proof for the given data',
+      params: [
+        {
+          name: 'data_index',
+          type: 'u32',
+        },
+        {
+          name: 'at',
+          type: 'Hash',
+          isOptional: true,
+        },
+      ],
+      type: 'ProofResponse',
     },
   },
 };
@@ -174,8 +162,51 @@ export const availConfig = {
   verboseLogging: process.env.NODE_ENV === 'development',
 };
 
+// Avail blockchain specific types
+export interface AvailBlock {
+  hash: string;
+  number: number;
+  parentHash: string;
+  stateRoot: string;
+  extrinsicsRoot: string;
+  timestamp: number;
+  extrinsics: AvailExtrinsic[];
+  events: AvailEvent[];
+}
+
+export interface AvailExtrinsic {
+  hash: string;
+  method: string;
+  section: string;
+  args: any[];
+  signer?: string;
+  nonce?: number;
+  signature?: string;
+  tip?: string;
+  success: boolean;
+}
+
+export interface AvailEvent {
+  method: string;
+  section: string;
+  data: any[];
+  phase: {
+    ApplyExtrinsic?: number;
+    Finalization?: boolean;
+    Initialization?: boolean;
+  };
+}
+
+export interface AvailDataSubmission {
+  submitter: string;
+  data: Uint8Array;
+  dataRoot: string;
+  blockNumber: number;
+  extrinsicIndex: number;
+}
+
 export default {
-  rpc: availRpc,
+  rpc: availRpcMethods,
   types: availTypes,
   runtime: availRuntimeApi,
   config: availConfig,

@@ -30,6 +30,13 @@ export class EraRepository extends BaseRepository {
   }
 
   /**
+   * Find current era (alias for getCurrentEra)
+   */
+  async findCurrent(): Promise<any | null> {
+    return this.getCurrentEra();
+  }
+
+  /**
    * Get eras with pagination
    */
   async findMany(params: {

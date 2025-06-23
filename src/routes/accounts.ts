@@ -3,6 +3,8 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
+import { ServiceFactory } from '../services';
+import { AccountService } from '../services/domain/account';
 
 const router = Router();
 
@@ -11,11 +13,13 @@ router.get('/discover',
   cacheMiddleware(config.cache.ttl.validators),
   async (req: Request, res: Response) => {
     try {
-      // Get sample validator addresses that should work with the accounts endpoint
-      throw new Error('Missing service');
+      const serviceFactory = ServiceFactory.getInstance();
+      const accountService = serviceFactory.get<AccountService>('accountService');
+      
+      const sampleAddresses = await accountService.discoverSampleAddresses();
 
-      res.json(formatSingleResponse({}, {
-        source: 'rpc',
+      res.json(formatSingleResponse({ addresses: sampleAddresses }, {
+        source: 'database',
         note: 'Sample validator addresses for testing the accounts endpoint',
       }));
     } catch (error) {
@@ -31,8 +35,31 @@ router.get('/:address',
   cacheMiddleware(config.cache.ttl.accountBalance),
   async (req: Request, res: Response) => {
     try {
-      // Fetch account details from RPC
-      throw new Error('Missing service');
+      const { address } = req.params;
+
+      // Validate address format
+      if (!address || address.length < 40) {
+        return res.status(400).json(formatErrorResponse('Invalid account address format', 'INVALID_ADDRESS', 400));
+      }
+
+      const serviceFactory = ServiceFactory.getInstance();
+      const accountService = serviceFactory.get<AccountService>('accountService');
+      
+      // Get account details and balance
+      const [accountDetails, accountBalance] = await Promise.all([
+        accountService.getAccount(address),
+        accountService.getAccountBalance(address),
+      ]);
+
+      const responseData = {
+        account: accountDetails,
+        balance: accountBalance,
+      };
+
+      res.json(formatSingleResponse(responseData, {
+        source: 'blockchain+database',
+        note: 'Account details from database, balance from blockchain RPC',
+      }));
     } catch (error) {
       logError(error as Error, { component: 'accounts-route', action: 'getAccount' });
       

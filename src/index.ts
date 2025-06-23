@@ -36,6 +36,7 @@ import dataSubmissionRoutes from './routes/data-submissions';
 import validatorRoutes from './routes/validators';
 import analyticsRoutes from './routes/analytics';
 import rollupRoutes from './routes/rollups';
+import transferRoutes from './routes/transfers';
 
 class AvailExplorerServer {
   private app: express.Application;
@@ -169,6 +170,7 @@ class AvailExplorerServer {
     this.app.use(`${config.api.prefix}/validators`, validatorRoutes);
     this.app.use(`${config.api.prefix}/analytics`, analyticsRoutes);
     this.app.use(`${config.api.prefix}/rollups`, rollupRoutes);
+    this.app.use(`${config.api.prefix}/transfers`, transferRoutes);
   }
 
   private setupErrorHandling(): void {

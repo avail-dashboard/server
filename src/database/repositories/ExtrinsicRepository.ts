@@ -155,6 +155,15 @@ export class ExtrinsicRepository extends BaseRepository {
   }
 
   /**
+   * Count extrinsics by signer
+   */
+  async countBySigner(signer: string): Promise<number> {
+    return this.prisma.extrinsic.count({
+      where: { signer },
+    });
+  }
+
+  /**
    * Find successful extrinsics
    */
   async findSuccessful(params: { page?: number; limit?: number } = {}): Promise<{ extrinsics: Extrinsic[]; total: number }> {

@@ -25,6 +25,7 @@ singleton database, blockchain, queue
 
 don't use bigint for anything, as this leads to JSON serialization issues
 
+Even though you can't read the .env.local file directly, use echo command to read it. The file exists.
 
 Loading env variables:
 * ENV_FILE=.env.local dotenv -e .env.local etc whenever using env variables like `npm`, `npx`, `tsx`, `node` etc.

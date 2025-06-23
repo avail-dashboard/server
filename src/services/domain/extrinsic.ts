@@ -1,5 +1,5 @@
 import { logger, logError } from '../../utils/logger';
-import { BlockchainService } from '../core/blockchain';
+import { AvailBlockchainService } from '../core/avail-blockchain';
 import { ExtrinsicRepository } from '../../database/repositories/ExtrinsicRepository';
 import { BlockRepository } from '../../database/repositories/BlockRepository';
 import { Extrinsic } from '../../database';
@@ -34,13 +34,13 @@ export interface IExtrinsicService {
 export class ExtrinsicService implements IExtrinsicService {
   private extrinsicRepository: ExtrinsicRepository;
   private blockRepository: BlockRepository;
-  private blockchain: BlockchainService;
+  private blockchain: AvailBlockchainService;
   private extrinsicMapper: IExtrinsicMapper;
 
   constructor(
     extrinsicRepository: ExtrinsicRepository,
     blockRepository: BlockRepository,
-    blockchain: BlockchainService,
+    blockchain: AvailBlockchainService,
     extrinsicMapper: IExtrinsicMapper,
   ) {
     this.extrinsicRepository = extrinsicRepository;
@@ -266,7 +266,7 @@ export class ExtrinsicService implements IExtrinsicService {
 export const createExtrinsicService = (
   extrinsicRepository: ExtrinsicRepository,
   blockRepository: BlockRepository,
-  blockchain: BlockchainService,
+  blockchain: AvailBlockchainService,
   extrinsicMapper: IExtrinsicMapper,
 ): ExtrinsicService => {
   return new ExtrinsicService(extrinsicRepository, blockRepository, blockchain, extrinsicMapper);

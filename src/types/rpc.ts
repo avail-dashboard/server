@@ -1,11 +1,10 @@
-import { ApiPromise } from '@polkadot/api';
-import { WsProvider } from '@polkadot/rpc-provider';
+// RPC types for Avail blockchain using avail-js-sdk
 
 // Connection Management Types
 export interface RPCConnection {
   id: string;
-  provider: WsProvider;
-  api: ApiPromise;
+  provider: any;
+  api: any;
   endpoint: string;
   isConnected: boolean;
   isHealthy: boolean;
@@ -393,4 +392,36 @@ export interface RPCServiceConfig {
     metricsInterval: number;
     healthCheckInterval: number;
   };
+}
+
+// RPC types for Avail blockchain
+
+export interface AvailRpcConfig {
+  endpoint: string;
+  timeout: number;
+  retries: number;
+}
+
+export interface RpcProvider {
+  url: string;
+  type: 'ws' | 'http';
+  isConnected: boolean;
+}
+
+export interface RpcResponse<T = any> {
+  result?: T;
+  error?: {
+    code: number;
+    message: string;
+    data?: any;
+  };
+  id: string | number;
+  jsonrpc: string;
+}
+
+export interface RpcRequest {
+  method: string;
+  params?: any[];
+  id: string | number;
+  jsonrpc: string;
 } 

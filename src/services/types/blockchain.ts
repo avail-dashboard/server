@@ -1,11 +1,8 @@
 // Blockchain-specific types and interfaces
 
-import { ApiPromise } from '@polkadot/api';
-import { WsProvider, HttpProvider } from '@polkadot/rpc-provider';
-
 export interface BlockchainConnection {
-  api: ApiPromise;
-  provider: WsProvider | HttpProvider;
+  api: any;
+  provider: any;
   url: string;
   isConnected: boolean;
   lastActivity: Date;

@@ -178,12 +178,21 @@ export class ValidatorRepository extends BaseRepository {
    * Update validator
    */
   async update(stashAddress: string, data: ValidatorUpdateInput): Promise<Validator> {
+    // Build update object with only defined fields
+    const updateObject: any = {
+      updatedAt: new Date(),
+    };
+
+    // Only include fields that are actually provided
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updateObject[key] = value;
+      }
+    });
+
     return this.prisma.validator.update({
       where: { stashAddress },
-      data: {
-        ...data,
-        updatedAt: new Date(),
-      },
+      data: updateObject,
     });
   }
 
@@ -193,21 +202,28 @@ export class ValidatorRepository extends BaseRepository {
   async upsert(stashAddress: string, data: ValidatorCreateInput): Promise<Validator> {
     const { stashAddress: _, ...updateData } = data;
     
-    // Clean update data for Prisma type compatibility
-    const cleanUpdateData: Partial<ValidatorCreateInput> = {};
-    Object.entries(updateData).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        (cleanUpdateData as any)[key] = value;
-      }
-    });
+    // Build update object with only defined fields
+    const updateObject: any = {
+      updatedAt: new Date(),
+    };
+
+    if (updateData.status !== undefined) updateObject.status = updateData.status;
+    if (updateData.controllerAddress !== undefined) updateObject.controllerAddress = updateData.controllerAddress;
+    if (updateData.rewardAddress !== undefined) updateObject.rewardAddress = updateData.rewardAddress;
+    if (updateData.commission !== undefined) updateObject.commission = updateData.commission;
+    if (updateData.selfBonded !== undefined) updateObject.selfBonded = updateData.selfBonded;
+    if (updateData.totalBonded !== undefined) updateObject.totalBonded = updateData.totalBonded;
+    if (updateData.nominatorCount !== undefined) updateObject.nominatorCount = updateData.nominatorCount;
+    if (updateData.sessionKeys !== undefined) updateObject.sessionKeys = updateData.sessionKeys;
+    if (updateData.identityName !== undefined) updateObject.identityName = updateData.identityName;
+    if (updateData.identityInfo !== undefined) updateObject.identityInfo = updateData.identityInfo;
+    if (updateData.blocksProduced !== undefined) updateObject.blocksProduced = updateData.blocksProduced;
+    if (updateData.lastBlockProduced !== undefined) updateObject.lastBlockProduced = updateData.lastBlockProduced;
     
     return this.prisma.validator.upsert({
       where: { stashAddress },
       create: data,
-      update: {
-        ...cleanUpdateData,
-        updatedAt: new Date(),
-      } as any, // Type assertion to bypass strict typing
+      update: updateObject,
     });
   }
 

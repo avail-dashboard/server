@@ -3,6 +3,8 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
+import { serviceFactory } from '../services';
+import { AnalyticsService } from '../services/analytics/analytics';
 
 const router = Router();
 
@@ -45,7 +47,13 @@ router.get('/network',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      throw new Error('Missing service');
+      const analyticsService = serviceFactory.get<AnalyticsService>('analyticsService');
+      const networkActivity = await analyticsService.getNetworkActivity();
+      
+      res.json(formatSingleResponse(networkActivity, {
+        source: 'database',
+        cached: true,
+      }));
     } catch (error) {
       logError(error as Error, { component: 'analytics-route', action: 'getNetworkAnalytics' });
       res.status(500).json({
@@ -240,6 +248,65 @@ router.get('/validators',
     } catch (error) {
       logError(error as Error, { component: 'analytics-route', action: 'getValidatorAnalytics' });
       res.status(500).json(formatErrorResponse('Failed to fetch validator analytics', 'INTERNAL_SERVER_ERROR'));
+    }
+  },
+);
+
+// GET /api/analytics/chain-stats - Get comprehensive chain statistics
+router.get('/chain-stats',
+  cacheMiddleware(config.cache.ttl.chainStats),
+  async (req: Request, res: Response) => {
+    try {
+      const analyticsService = serviceFactory.get<AnalyticsService>('analyticsService');
+      const chainStats = await analyticsService.getChainStats();
+      
+      res.json(formatSingleResponse(chainStats, {
+        source: 'database',
+        cached: true,
+      }));
+    } catch (error) {
+      logError(error as Error, { component: 'analytics-route', action: 'getChainStats' });
+      res.status(500).json(formatErrorResponse('Failed to fetch chain statistics', 'INTERNAL_SERVER_ERROR'));
+    }
+  },
+);
+
+// GET /api/analytics/historical - Get historical data
+router.get('/historical',
+  cacheMiddleware(config.cache.ttl.chainStats),
+  async (req: Request, res: Response) => {
+    try {
+      const analyticsService = serviceFactory.get<AnalyticsService>('analyticsService');
+      const days = parseInt(req.query.days as string) || 7;
+      const historicalData = await analyticsService.getHistoricalData(days);
+      
+      res.json(formatSingleResponse(historicalData, {
+        source: 'database',
+        period: `${days}d`,
+        cached: true,
+      }));
+    } catch (error) {
+      logError(error as Error, { component: 'analytics-route', action: 'getHistoricalData' });
+      res.status(500).json(formatErrorResponse('Failed to fetch historical data', 'INTERNAL_SERVER_ERROR'));
+    }
+  },
+);
+
+// GET /api/analytics/top-metrics - Get top performers and rankings
+router.get('/top-metrics',
+  cacheMiddleware(config.cache.ttl.chainStats),
+  async (req: Request, res: Response) => {
+    try {
+      const analyticsService = serviceFactory.get<AnalyticsService>('analyticsService');
+      const topMetrics = await analyticsService.getTopMetrics();
+      
+      res.json(formatSingleResponse(topMetrics, {
+        source: 'database',
+        cached: true,
+      }));
+    } catch (error) {
+      logError(error as Error, { component: 'analytics-route', action: 'getTopMetrics' });
+      res.status(500).json(formatErrorResponse('Failed to fetch top metrics', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );

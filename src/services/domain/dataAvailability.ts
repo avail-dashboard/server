@@ -1,5 +1,5 @@
 import { logger, logError } from '../../utils/logger';
-import { BlockchainService } from '../core/blockchain';
+import { AvailBlockchainService } from '../core/avail-blockchain';
 import { 
   DataSubmissionRepository, 
   RollupRepository,
@@ -50,16 +50,16 @@ export interface DataSubmissionInfo {
 export class DataAvailabilityService implements IDataAvailabilityService {
   private dataSubmissionRepository: DataSubmissionRepository;
   private rollupRepository: RollupRepository;
-  private blockchain: BlockchainService;
+  private blockchain: AvailBlockchainService;
   private dataSubmissionMapper: IDataSubmissionMapper;
   private rollupMapper: IRollupMapper;
 
   constructor(
     dataSubmissionRepository: DataSubmissionRepository,
     rollupRepository: RollupRepository,
-    blockchain: BlockchainService,
+    blockchain: AvailBlockchainService,
     dataSubmissionMapper: IDataSubmissionMapper,
-    rollupMapper: IRollupMapper
+    rollupMapper: IRollupMapper,
   ) {
     this.dataSubmissionRepository = dataSubmissionRepository;
     this.rollupRepository = rollupRepository;
@@ -452,7 +452,7 @@ export class DataAvailabilityService implements IDataAvailabilityService {
 export const createDataAvailabilityService = (
   dataSubmissionRepository: DataSubmissionRepository,
   rollupRepository: RollupRepository,
-  blockchain: BlockchainService,
+  blockchain: AvailBlockchainService,
   dataSubmissionMapper: IDataSubmissionMapper,
   rollupMapper: IRollupMapper,
 ): DataAvailabilityService => {

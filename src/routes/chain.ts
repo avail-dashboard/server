@@ -3,20 +3,47 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatErrorResponse } from '../utils/responseFormatter';
+import { serviceFactory } from '../services';
+import { ChainService } from '../services/domain/chain';
 
 const router = Router();
 
-// GET /api/chain/stats - Get chain statistics
-router.get('/stats', 
+// GET /api/chain/info - Get chain information
+router.get('/info', 
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      // Fetch real chain data from RPC
-      throw new Error('Missing service');
-    } catch (error) {
-      logError(error as Error, { component: 'chain-route', action: 'getStats' });
+      const chainService = serviceFactory.get<ChainService>('chainService');
+      const chainInfo = await chainService.getChainInfo();
       
-      res.status(500).json(formatErrorResponse('Failed to fetch chain statistics', 'INTERNAL_SERVER_ERROR'));
+      res.json({
+        success: true,
+        data: chainInfo,
+      });
+    } catch (error) {
+      logError(error as Error, { component: 'chain-route', action: 'getChainInfo' });
+      
+      res.status(500).json(formatErrorResponse('Failed to fetch chain information', 'INTERNAL_SERVER_ERROR'));
+    }
+  },
+);
+
+// GET /api/chain/constants - Get chain constants
+router.get('/constants', 
+  cacheMiddleware(config.cache.ttl.chainStats),
+  async (req: Request, res: Response) => {
+    try {
+      const chainService = serviceFactory.get<ChainService>('chainService');
+      const constants = await chainService.getConstants();
+      
+      res.json({
+        success: true,
+        data: constants,
+      });
+    } catch (error) {
+      logError(error as Error, { component: 'chain-route', action: 'getConstants' });
+      
+      res.status(500).json(formatErrorResponse('Failed to fetch chain constants', 'INTERNAL_SERVER_ERROR'));
     }
   },
 );

@@ -22,6 +22,18 @@ export class RewardRepository extends BaseRepository {
   }
 
   /**
+   * Find rewards by account (alias for findByAddress)
+   */
+  async findByAccount(address: string, params: {
+    page?: number;
+    limit?: number;
+    era?: number;
+    rewardType?: string;
+  } = {}): Promise<{ rewards: any[]; total: number }> {
+    return this.findByAddress(address, params);
+  }
+
+  /**
    * Find rewards by address
    */
   async findByAddress(address: string, params: {
@@ -69,6 +81,15 @@ export class RewardRepository extends BaseRepository {
     ]);
 
     return { rewards, total };
+  }
+
+  /**
+   * Count rewards by account
+   */
+  async countByAccount(address: string): Promise<number> {
+    return this.prisma.reward.count({
+      where: { address },
+    });
   }
 
   /**
@@ -128,6 +149,73 @@ export class RewardRepository extends BaseRepository {
       data: rewards,
       skipDuplicates: true,
     });
+  }
+
+  /**
+   * Get rewards with filters and pagination
+   */
+  async findMany(params: {
+    page?: number;
+    limit?: number;
+    filters?: any;
+    orderBy?: 'timestamp' | 'amount' | 'era';
+    orderDirection?: 'asc' | 'desc';
+  }): Promise<{ rewards: any[]; total: number }> {
+    const { 
+      page = 1, 
+      limit = 20, 
+      filters = {}, 
+      orderBy = 'timestamp',
+      orderDirection = 'desc' 
+    } = params;
+    
+    const skip = (page - 1) * limit;
+    
+    const whereClause: any = {};
+    
+    if (filters.address) {
+      whereClause.address = filters.address;
+    }
+    
+    if (filters.validatorAddress) {
+      whereClause.validatorAddress = filters.validatorAddress;
+    }
+    
+    if (filters.era !== undefined) {
+      whereClause.era = filters.era;
+    }
+    
+    if (filters.rewardType) {
+      whereClause.rewardType = filters.rewardType;
+    }
+
+    const [rewards, total] = await Promise.all([
+      this.prisma.reward.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { [orderBy]: orderDirection },
+        include: {
+          validator: {
+            select: {
+              stashAddress: true,
+              identityName: true,
+              commission: true,
+            },
+          },
+          eraInfo: {
+            select: {
+              number: true,
+              startBlock: true,
+              endBlock: true,
+            },
+          },
+        },
+      }),
+      this.prisma.reward.count({ where: whereClause }),
+    ]);
+
+    return { rewards, total };
   }
 
   /**

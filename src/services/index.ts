@@ -2,12 +2,10 @@
 // Simple service factory and dependency injection
 
 // Core Services
-export { BlockchainService, createBlockchainService } from './core/blockchain';
 export { AvailBlockchainService, createAvailBlockchainService } from './core/avail-blockchain';
-export { ConnectionManager, createConnectionManager } from './core/connection-manager';
+export { AvailConnectionManager, createAvailConnectionManager } from './core/avail-connection-manager';
 export { QueueService, createQueueService } from './core/queue';
 export { SyncService, createSyncService } from './core/sync';
-export { HybridProcessor, createHybridProcessor } from './core/hybrid-processor';
 
 // Integration Services
 // (No integration services currently)
@@ -19,6 +17,9 @@ export { DataAvailabilityService, createDataAvailabilityService } from './domain
 export { BlockIndexerService, createBlockIndexerService } from './domain/indexer';
 export { DataProcessorService, createDataProcessorService } from './domain/processor';
 export { SearchService, createSearchService } from './domain/search';
+// Phase 2 Services
+export { AccountService, createAccountService } from './domain/account';
+export { ValidatorService, createValidatorService } from './domain/validator';
 
 // Mappers
 export * from '../mappers';
@@ -28,10 +29,10 @@ export * from './types/service';
 export * from './types/blockchain';
 
 // Core services factory functions
-import { createConnectionManager, ConnectionManager } from './core/connection-manager';
-import { createBlockchainService, BlockchainService } from './core/blockchain';
+import { createAvailConnectionManager, AvailConnectionManager } from './core/avail-connection-manager';
 import { createAvailBlockchainService, AvailBlockchainService } from './core/avail-blockchain';
 import { createQueueService, QueueService } from './core/queue';
+import config from '../config';
 
 // Domain services factory functions
 import { createBlockService } from './domain/block';
@@ -41,6 +42,12 @@ import { createSyncService } from './core/sync';
 import { createBlockIndexerService } from './domain/indexer';
 import { createDataProcessorService } from './domain/processor';
 import { createSearchService } from './domain/search';
+// Phase 2 Services
+import { createAccountService } from './domain/account';
+import { createValidatorService } from './domain/validator';
+import { createChainService } from './domain/chain';
+import { createTransferService } from './domain/transfer';
+import { createAnalyticsService } from '../services/analytics/analytics';
 
 // Mapper imports
 import { 
@@ -50,13 +57,19 @@ import {
   BlockMapper,
 } from '../mappers';
 
-// Database imports
+  // Database imports
 import db from '../utils/database';
 import { 
   blockRepository, 
   dataSubmissionRepository, 
   rollupRepository,
   extrinsicRepository,
+  // Phase 2 repositories
+  validatorRepository,
+  transferRepository,
+  nominationRepository,
+  rewardRepository,
+  eraRepository,
 } from '../database/repositories';
 
 // Service Factory for dependency injection
@@ -106,19 +119,22 @@ export class ServiceFactory {
       console.log('🔧 Initializing core services...');
       
       // Create core service instances
-      const connectionManager = createConnectionManager();
-      const blockchainService = createBlockchainService(); // For general blockchain operations
+      const providers = config.avail.rpc.endpoints.map((endpoint, index) => ({
+        url: endpoint,
+        provider: `Provider-${index + 1}`,
+        type: 'ws' as const,
+        priority: index + 1,
+      }));
+      const connectionManager = createAvailConnectionManager(providers);
       const availBlockchainService = createAvailBlockchainService(); // Use AvailBlockchainService for proper extrinsics extraction
       const queueService = createQueueService();
       
       // Register core services
       this.register('connectionManager', connectionManager);
-      this.register('blockchain', blockchainService);
       this.register('availBlockchain', availBlockchainService);
       this.register('queue', queueService);
 
       // Start core services
-      await blockchainService.start();
       await availBlockchainService.start();
       await queueService.start();
       
@@ -135,7 +151,6 @@ export class ServiceFactory {
       console.log('🔧 Initializing domain services...');
       
       // Get core services from registry with proper typing
-      const blockchainService = this.get<BlockchainService>('blockchain');
       const availBlockchainService = this.get<AvailBlockchainService>('availBlockchain');
       const queueService = this.get<QueueService>('queue');
       
@@ -152,12 +167,12 @@ export class ServiceFactory {
       this.register('blockMapper', blockMapper);
       
       // Create domain services using factory functions with dependencies
-      const blockService = createBlockService(blockRepository, blockchainService, blockMapper);
-      const extrinsicService = createExtrinsicService(extrinsicRepository, blockRepository, blockchainService, extrinsicMapper);
+      const blockService = createBlockService(blockRepository, availBlockchainService, blockMapper);
+      const extrinsicService = createExtrinsicService(extrinsicRepository, blockRepository, availBlockchainService, extrinsicMapper);
       const dataAvailabilityService = createDataAvailabilityService(
         dataSubmissionRepository,
         rollupRepository, 
-        blockchainService,
+        availBlockchainService,
         dataSubmissionMapper,
         rollupMapper,
       );
@@ -174,12 +189,62 @@ export class ServiceFactory {
         rollupRepository,
         dataSubmissionRepository,
       );
+
+      // Create Phase 2 services
+      const accountService = createAccountService(
+        availBlockchainService,
+        transferRepository,
+        extrinsicRepository,
+        validatorRepository,
+        rewardRepository,
+      );
+
+      const validatorService = createValidatorService(
+        availBlockchainService,
+        validatorRepository,
+        nominationRepository,
+        rewardRepository,
+        blockRepository,
+        eraRepository,
+      );
+
+
+      const chainService = createChainService(availBlockchainService);
+
+      const transferService = createTransferService(
+        availBlockchainService,
+        transferRepository,
+        blockRepository,
+      );
+
+      const analyticsService = createAnalyticsService(
+        availBlockchainService,
+        blockRepository,
+        extrinsicRepository,
+        transferRepository,
+        validatorRepository,
+        dataSubmissionRepository,
+      );
       
       // Register domain services
       this.register('blockService', blockService);
       this.register('extrinsicService', extrinsicService);
       this.register('dataAvailabilityService', dataAvailabilityService);
       this.register('searchService', searchService);
+      
+      // Register Phase 2 services
+      this.register('accountService', accountService);
+      this.register('validatorService', validatorService);
+      this.register('chainService', chainService);
+      this.register('transferService', transferService);
+      this.register('analyticsService', analyticsService);
+
+      // Start Phase 2 services
+      await accountService.start();
+      await validatorService.start();
+      await chainService.start();
+      await transferService.start();
+      await analyticsService.start();
       
       // Register new sync services
       this.register('syncService', syncService);
@@ -228,11 +293,6 @@ export class ServiceFactory {
       const shutdownPromises: Promise<void>[] = [];
 
       // Stop blockchain services (will stop their internal managers)
-      if (this.has('blockchain')) {
-        const blockchain = this.get<BlockchainService>('blockchain');
-        shutdownPromises.push(blockchain.stop());
-      }
-      
       if (this.has('availBlockchain')) {
         const availBlockchain = this.get<AvailBlockchainService>('availBlockchain');
         shutdownPromises.push(availBlockchain.stop());
@@ -262,18 +322,13 @@ export class ServiceFactory {
     healthStatus.initialized = this.initialized;
     healthStatus.registeredServices = this.getRegisteredServices();
 
-    if (this.has('blockchain')) {
-      const blockchain = this.get<BlockchainService>('blockchain');
-      healthStatus.blockchain = await blockchain.getHealth();
-    }
-    
     if (this.has('availBlockchain')) {
       const availBlockchain = this.get<AvailBlockchainService>('availBlockchain');
       healthStatus.availBlockchain = await availBlockchain.getHealth();
     }
 
     if (this.has('connectionManager')) {
-      const connMgr = this.get<ConnectionManager>('connectionManager');
+      const connMgr = this.get<AvailConnectionManager>('connectionManager');
       healthStatus.connectionManager = await connMgr.getHealth();
     }
 
@@ -299,13 +354,6 @@ export class ServiceFactory {
     metrics.initialized = this.initialized;
     metrics.registeredServices = this.getRegisteredServices();
 
-    if (this.has('blockchain')) {
-      const blockchain = this.get<BlockchainService>('blockchain');
-      metrics.blockchain = {
-        connection: blockchain.getConnectionMetrics(),
-      };
-    }
-    
     if (this.has('availBlockchain')) {
       const availBlockchain = this.get<AvailBlockchainService>('availBlockchain');
       metrics.availBlockchain = {
@@ -314,7 +362,7 @@ export class ServiceFactory {
     }
 
     if (this.has('connectionManager')) {
-      const connMgr = this.get<ConnectionManager>('connectionManager');
+      const connMgr = this.get<AvailConnectionManager>('connectionManager');
       metrics.connectionManager = connMgr.getMetrics();
     }
 

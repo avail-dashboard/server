@@ -1,5 +1,5 @@
 import { logger, logError } from '../../utils/logger';
-import { BlockchainService } from '../core/blockchain';
+import { AvailBlockchainService } from '../core/avail-blockchain';
 import { BlockRepository } from '../../database/repositories/BlockRepository';
 import { Block } from '../../database';
 import { 
@@ -20,10 +20,10 @@ export interface IBlockService {
 
 export class BlockService implements IBlockService {
   private blockRepository: BlockRepository;
-  private blockchain: BlockchainService;
+  private blockchain: AvailBlockchainService;
   private blockMapper: IBlockMapper;
 
-  constructor(blockRepository: BlockRepository, blockchain: BlockchainService, blockMapper: IBlockMapper) {
+  constructor(blockRepository: BlockRepository, blockchain: AvailBlockchainService, blockMapper: IBlockMapper) {
     this.blockRepository = blockRepository;
     this.blockchain = blockchain;
     this.blockMapper = blockMapper;
@@ -166,6 +166,6 @@ export class BlockService implements IBlockService {
 
 }
 
-export const createBlockService = (blockRepository: BlockRepository, blockchain: BlockchainService, blockMapper: IBlockMapper): BlockService => {
+export const createBlockService = (blockRepository: BlockRepository, blockchain: AvailBlockchainService, blockMapper: IBlockMapper): BlockService => {
   return new BlockService(blockRepository, blockchain, blockMapper);
 }; 

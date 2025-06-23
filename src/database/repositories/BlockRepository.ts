@@ -115,6 +115,18 @@ export class BlockRepository extends BaseRepository {
   }
 
   /**
+   * Find blocks by validator address
+   * TODO: Fix after Prisma client regeneration
+   */
+  async findByValidator(_validatorAddress: string, _params: {
+    page?: number;
+    limit?: number;
+  } = {}): Promise<{ blocks: Block[]; total: number }> {
+    // Temporary implementation - return empty results until Prisma client is updated
+    return { blocks: [], total: 0 };
+  }
+
+  /**
    * Get block count
    */
   async count(): Promise<number> {

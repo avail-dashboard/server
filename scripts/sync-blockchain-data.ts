@@ -15,7 +15,6 @@
 
 import { logger } from '../src/utils/logger';
 import db from '../src/utils/database';
-import { ConnectionManager } from '../src/services/core/connection-manager';
 import { AvailBlockchainService } from '../src/services/core/avail-blockchain';
 import { createBlockIndexerService } from '../src/services/domain/indexer';
 
@@ -25,7 +24,6 @@ import { TransferRepository } from '../src/database/repositories/TransferReposit
 import { EraRepository } from '../src/database/repositories/EraRepository';
 import { createSyncService } from '../src/services/core/sync';
 import { QueueService } from '../src/services/core/queue';
-import { HybridProcessor, createHybridProcessor } from '../src/services/core/hybrid-processor';
 import { AvailDataSubmissionIndexer } from '../src/services/domain/availDataSubmissionIndexer';
 
 interface SyncOptions {
@@ -38,21 +36,18 @@ interface SyncOptions {
 }
 
 class StandaloneSyncScript {
-  private connectionManager: ConnectionManager;
   private blockchain: AvailBlockchainService;
   private indexer: ReturnType<typeof createBlockIndexerService>;
   private processor: EnhancedProcessorService;
   private queueService: QueueService;
   private syncService: ReturnType<typeof createSyncService>;
-  private hybridProcessor: HybridProcessor;
   private availIndexer: AvailDataSubmissionIndexer;
   private shouldStop = false;
   private currentBlock = 0;
   private phase1Enabled = true;
 
   constructor() {
-    // Initialize services
-    this.connectionManager = new ConnectionManager();
+    // Initialize services - using only Avail SDK
     this.blockchain = new AvailBlockchainService();
     this.indexer = createBlockIndexerService(db, this.blockchain);
     
@@ -74,8 +69,7 @@ class StandaloneSyncScript {
     this.queueService = new QueueService();
     this.syncService = createSyncService(db, this.blockchain, this.queueService);
     
-    // Initialize dual SDK services
-    this.hybridProcessor = createHybridProcessor();
+    // Initialize Avail-specific indexer
     this.availIndexer = new AvailDataSubmissionIndexer();
   }
 
@@ -84,7 +78,7 @@ class StandaloneSyncScript {
    */
   async initialize(options?: SyncOptions): Promise<void> {
     try {
-      logger.info('🚀 Initializing sync script services...', {
+      logger.info('🚀 Initializing sync script services (Avail SDK only)...', {
         phase1Enabled: options?.phase1Enabled ?? this.phase1Enabled,
       });
 
@@ -100,7 +94,7 @@ class StandaloneSyncScript {
 
       // Initialize blockchain services
       await this.blockchain.start();
-      logger.info('✅ Blockchain service started');
+      logger.info('✅ Avail blockchain service started');
 
       // Initialize queue service first (required by sync service)
       await this.queueService.start();
@@ -111,10 +105,9 @@ class StandaloneSyncScript {
       await this.processor.start();
       await this.syncService.start();
       
-      // Initialize dual SDK services
-      await this.hybridProcessor.initialize();
+      // Initialize Avail-specific indexer
       await this.availIndexer.initialize();
-      logger.info('✅ All services initialized (including dual SDK support)', {
+      logger.info('✅ All services initialized (Avail SDK only)', {
         phase1Enabled: this.phase1Enabled,
       });
 
@@ -144,11 +137,7 @@ class StandaloneSyncScript {
         await this.indexer.stop();
       }
       
-      // Cleanup dual SDK services before main blockchain service
-      if (this.hybridProcessor) {
-        await this.hybridProcessor.disconnect();
-      }
-      
+      // Cleanup Avail indexer
       if (this.availIndexer) {
         await this.availIndexer.disconnect();
       }
@@ -225,12 +214,13 @@ class StandaloneSyncScript {
       to = options.toBlock ?? latestBlock.number;
       break;
         
-    case 'incremental':
+    case 'incremental': {
       // Only use sync service for incremental mode
       const syncState = await this.syncService.getCurrentSyncState();
       from = Number(syncState.last_synced_block) + 1;
       to = options.toBlock ?? latestBlock.number;
       break;
+    }
         
     case 'range':
       if (options.fromBlock === undefined || options.toBlock === undefined) {
@@ -240,12 +230,13 @@ class StandaloneSyncScript {
       to = options.toBlock;
       break;
         
-    case 'live':
+    case 'live': {
       // Only use sync service for live mode
       const liveSyncState = await this.syncService.getCurrentSyncState();
       from = Number(liveSyncState.last_synced_block) + 1;
       to = latestBlock.number;
       break;
+    }
         
     default:
       throw new Error(`Unknown sync mode: ${options.mode}`);
@@ -329,117 +320,73 @@ class StandaloneSyncScript {
   }
 
   /**
-   * Process a batch of blocks with hybrid SDK fallback
+   * Process a batch of blocks
    */
   async processBatch(fromBlock: number, toBlock: number): Promise<void> {
     try {
-      // Try regular polkadot.js indexing first
-      let blocks;
-      try {
-        blocks = await this.indexer.indexBlockRange(fromBlock, toBlock);
+      logger.debug(`🔄 Processing batch: ${fromBlock} to ${toBlock} (${toBlock - fromBlock + 1} blocks)`);
+
+      // First try to index blocks normally
+      const indexedBlocks = await this.indexer.indexBlockRange(fromBlock, toBlock);
+      
+      if (indexedBlocks.length === 0) {
+        logger.warn(`⚠️ No blocks indexed for range ${fromBlock}-${toBlock}, trying direct processing`);
         
-        // Check if we got the expected number of blocks
-        const expectedBlockCount = toBlock - fromBlock + 1;
-        if (blocks.length < expectedBlockCount) {
-          logger.warn(`⚠️ Polkadot.js indexing incomplete: got ${blocks.length}/${expectedBlockCount} blocks for range ${fromBlock}-${toBlock}, trying hybrid approach`);
+        // Try direct processing with Avail SDK
+        const processedBlocks = await this.processBlocksWithAvailSDK(fromBlock, toBlock);
+        
+        if (processedBlocks.length > 0) {
+          logger.info(`✅ Direct processing completed for range ${fromBlock}-${toBlock}: ${processedBlocks.length} blocks processed`);
           
-          // Fallback to hybrid processing for individual blocks
-          blocks = await this.processBlocksWithHybridFallback(fromBlock, toBlock);
-        } else {
-          logger.debug(`✅ Regular indexing successful for range ${fromBlock}-${toBlock}`);
+          // Process each block through the enhanced processor
+          for (const blockData of processedBlocks) {
+            await this.processor.processBlock(blockData.block);
+            logger.debug(`✅ Processed block ${blockData.block.number}`);
+          }
         }
-      } catch (polkadotError) {
-        const errorMessage = (polkadotError as Error).message;
+      } else {
+        logger.info(`✅ Successfully indexed ${indexedBlocks.length} blocks from range ${fromBlock}-${toBlock}`);
         
-        // Check if this is a metadata error - if so, go straight to hybrid
-        if (this.isMetadataError(errorMessage)) {
-          logger.warn(`⚠️ Metadata decoding errors detected for range ${fromBlock}-${toBlock}, using hybrid approach`, {
-            error: errorMessage,
-          });
-        } else {
-          logger.warn(`⚠️ Polkadot.js indexing failed for range ${fromBlock}-${toBlock}, trying hybrid approach`, {
-            error: errorMessage,
-          });
-        }
-        
-        // Fallback to hybrid processing for individual blocks
-        blocks = await this.processBlocksWithHybridFallback(fromBlock, toBlock);
-      }
-      
-      if (blocks.length === 0) {
-        logger.warn(`⚠️ No blocks returned for range ${fromBlock}-${toBlock}`);
-        return;
-      }
-      
-      // Process each block
-      for (const blockData of blocks) {
-        try {
-          await this.processor.processBlock(blockData);
-          logger.debug(`✅ Processed block ${blockData.number}`);
-        } catch (error) {
-          logger.error(`❌ Failed to process block ${blockData.number}:`, error);
-          throw error;
+        // Process indexed blocks through enhanced processor
+        for (const block of indexedBlocks) {
+          await this.processor.processBlock(block);
+          logger.debug(`✅ Processed block ${block.number}`);
         }
       }
-      
+
     } catch (error) {
-      logger.error(`❌ Failed to process batch ${fromBlock}-${toBlock}:`, error);
+      logger.error(`❌ Error processing batch ${fromBlock}-${toBlock}:`, error);
       throw error;
     }
   }
 
   /**
-   * Process blocks individually using hybrid approach when batch indexing fails
+   * Process blocks with direct Avail SDK approach (no hybrid fallback)
    */
-  private async processBlocksWithHybridFallback(fromBlock: number, toBlock: number): Promise<any[]> {
-    const blocks: any[] = [];
+  private async processBlocksWithAvailSDK(fromBlock: number, toBlock: number): Promise<any[]> {
+    const processedBlocks: any[] = [];
+    
+    logger.info(`🔄 Processing blocks ${fromBlock}-${toBlock} with Avail SDK`);
     
     for (let blockNum = fromBlock; blockNum <= toBlock; blockNum++) {
       try {
-        logger.debug(`🔄 Hybrid processing block ${blockNum}...`);
+        // Get block data directly from Avail SDK
+        const blockData = await this.blockchain.getBlockWithDataSubmissions(blockNum);
         
-        // Use hybrid processor for problematic blocks
-        const hybridResult = await this.hybridProcessor.extractBlockData(blockNum);
-        
-        // Use the block data from hybrid result (already contains extrinsics and events)
-        const blockData = hybridResult.blockData;
-        
-        blocks.push(blockData);
-        
-        // Also process data submissions if found
-        if (hybridResult.dataSubmissions && hybridResult.dataSubmissions.length > 0) {
-          logger.info(`📊 Found ${hybridResult.dataSubmissions.length} data submissions in block ${blockNum} via hybrid processing`);
-          
-          try {
-            await this.availIndexer.indexBlock(blockNum);
-            logger.debug(`✅ Data submissions indexed for block ${blockNum}`);
-          } catch (indexError) {
-            logger.warn(`⚠️ Failed to index data submissions for block ${blockNum}`, {
-              error: (indexError as Error).message,
-            });
-          }
+        if (blockData) {
+          processedBlocks.push(blockData);
+          logger.debug(`✅ Processed block ${blockNum} with Avail SDK`);
+        } else {
+          logger.warn(`⚠️ No block data returned for block ${blockNum}`);
         }
-        
-        logger.debug(`✅ Hybrid processing successful for block ${blockNum}`);
-        
       } catch (error) {
-        logger.error(`❌ Hybrid processing failed for block ${blockNum}:`, error);
-        
-        // Try to get at least basic block data via avail-sdk directly
-        try {
-          const blockData = await this.availIndexer['availService'].getBlock(blockNum);
-          blocks.push(blockData);
-          logger.warn(`⚠️ Using basic block data for ${blockNum} after hybrid failure`);
-        } catch (basicError) {
-          logger.error(`❌ Failed to get basic block data for ${blockNum}:`, basicError);
-          // Skip this block rather than create invalid placeholder
-          logger.error(`❌ Skipping block ${blockNum} - could not retrieve any data`);
-        }
+        logger.error(`❌ Failed to process block ${blockNum} with Avail SDK:`, error);
+        // With Avail SDK as primary, we want to see errors clearly
+        throw error;
       }
     }
     
-    logger.info(`✅ Hybrid processing completed for range ${fromBlock}-${toBlock}: ${blocks.length} blocks processed`);
-    return blocks;
+    return processedBlocks;
   }
 
   /**
@@ -469,25 +416,6 @@ class StandaloneSyncScript {
         await new Promise(resolve => setTimeout(resolve, 10000));
       }
     }
-  }
-
-  /**
-   * Check if error is a metadata/decoding error that won't be fixed by retrying
-   */
-  private isMetadataError(errorMessage: string): boolean {
-    const metadataErrorPatterns = [
-      'findMetaCall: Unable to find Call with index',
-      'createType(Call):: findMetaCall',
-      'createType(ExtrinsicV4):: createType(Call)',
-      'Unable to decode on index',
-      'Struct: failed on extrinsics',
-      'PORTABLEREGISTRY: Unable to determine runtime Call type',
-      'METADATA_ERROR:',
-    ];
-    
-    return metadataErrorPatterns.some(pattern => 
-      errorMessage.includes(pattern)
-    );
   }
 
   /**

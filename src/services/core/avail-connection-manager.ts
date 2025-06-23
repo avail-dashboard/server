@@ -1,6 +1,5 @@
-import { initialize } from "avail-js-sdk/chain";
-import { ApiPromise } from "@polkadot/api";
-import { logger, logError } from '../../utils/logger';
+import { logger } from '../../utils/logger';
+import { initialize } from 'avail-js-sdk';
 import {
   ConnectionProvider,
   CircuitBreakerState,
@@ -9,7 +8,7 @@ import {
 } from '../types/service';
 
 export interface AvailConnection {
-  api: ApiPromise;
+  api: any;
   url: string;
   isConnected: boolean;
   lastActivity: Date;
@@ -64,7 +63,7 @@ export class AvailConnectionManager {
   async initialize(): Promise<void> {
     logger.info('AvailConnectionManager: Initializing connections', { 
       component: 'avail-connection-manager',
-      providers: this.providers.length 
+      providers: this.providers.length,
     });
     
     // Create connection promises with individual timeouts
@@ -89,7 +88,7 @@ export class AvailConnectionManager {
     // Process results
     for (const result of results) {
       if (result.status === 'fulfilled') {
-        const { provider, connection, success, error } = result.value;
+        const { provider, connection, success } = result.value;
         
         if (success && connection) {
           this.connections.set(provider.url, connection);
@@ -104,7 +103,7 @@ export class AvailConnectionManager {
           });
         } else {
           this.connectionMetrics.failedConnections++;
-          logError(error as Error, {
+          logger.error('AvailConnectionManager: Connection initialization failed', {
             component: 'avail-connection-manager',
             action: 'initializeConnection',
             provider: provider.provider,
@@ -229,7 +228,7 @@ export class AvailConnectionManager {
       try {
         await connection.api.disconnect();
       } catch (error) {
-        logError(error as Error, { 
+        logger.error('AvailConnectionManager: Connection disconnect failed', { 
           component: 'avail-connection-manager', 
           action: 'disconnect',
           url: connection.url, 
@@ -309,7 +308,7 @@ export class AvailConnectionManager {
         return;
         
       } catch (error) {
-        logError(error as Error, {
+        logger.error('AvailConnectionManager: Primary connection establishment failed', {
           component: 'avail-connection-manager',
           action: 'establishPrimaryConnection',
           url,

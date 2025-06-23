@@ -47,19 +47,44 @@ export class NominationRepository extends BaseRepository {
   }
 
   /**
-   * Find nominations by validator address
+   * Find nominations by validator address with pagination
    */
-  async findByValidator(validatorAddress: string): Promise<any[]> {
-    return this.prisma.nomination.findMany({
-      where: { validatorAddress },
-      include: {
-        nominator: {
-          select: {
-            address: true,
-            identityName: true,
+  async findByValidator(validatorAddress: string, params: {
+    page?: number;
+    limit?: number;
+  } = {}): Promise<{ nominations: any[]; total: number }> {
+    const { page = 1, limit = 20 } = params;
+    const skip = (page - 1) * limit;
+
+    const [nominations, total] = await Promise.all([
+      this.prisma.nomination.findMany({
+        where: { validatorAddress },
+        skip,
+        take: limit,
+        include: {
+          nominator: {
+            select: {
+              address: true,
+              identityName: true,
+            },
           },
         },
-      },
+        orderBy: { amount: 'desc' },
+      }),
+      this.prisma.nomination.count({
+        where: { validatorAddress },
+      }),
+    ]);
+
+    return { nominations, total };
+  }
+
+  /**
+   * Count nominations by validator
+   */
+  async countByValidator(validatorAddress: string): Promise<number> {
+    return this.prisma.nomination.count({
+      where: { validatorAddress },
     });
   }
 
@@ -173,6 +198,15 @@ export class NominationRepository extends BaseRepository {
         validator: true,
         nominator: true,
       },
+    });
+  }
+
+  /**
+   * Count nominations by era
+   */
+  async countByEra(era: number): Promise<number> {
+    return this.prisma.nomination.count({
+      where: { era },
     });
   }
 
