@@ -345,27 +345,88 @@ export class ServiceFactory {
     try {
       console.log('🔄 Shutting down services...');
       
-      const shutdownPromises: Promise<void>[] = [];
-
-      // Stop blockchain services (will stop their internal managers)
-      if (this.has('availBlockchain')) {
-        const availBlockchain = this.get<AvailBlockchainService>('availBlockchain');
-        shutdownPromises.push(availBlockchain.stop());
+      // Define the shutdown order (reverse of startup order for proper dependency cleanup)
+      const shutdownOrder = [
+        // Sync services (started last, should stop first)
+        'selfHealingBlockProcessor',
+        'blockIndexerService', 
+        'syncService',
+        
+        // Domain services (Phase 2 & 5 services)
+        'analyticsService',
+        'dataSubmissionService',
+        'transferService',
+        'chainService',
+        'validatorService',
+        'accountService',
+        
+        // Core blockchain and queue services (started first, should stop last)
+        'queue',
+        'availBlockchain',
+      ];
+      
+      const shutdownErrors: string[] = [];
+      
+      // Stop services in the defined order
+      for (const serviceName of shutdownOrder) {
+        if (this.has(serviceName)) {
+          try {
+            const service = this.get(serviceName);
+            if (service && typeof service.stop === 'function') {
+              console.log(`🔄 Stopping service: ${serviceName}`);
+              await service.stop();
+              console.log(`✅ Service stopped: ${serviceName}`);
+            } else {
+              console.log(`ℹ️  Service ${serviceName} has no stop() method, skipping`);
+            }
+          } catch (error) {
+            const errorMsg = `Failed to stop ${serviceName}: ${(error as Error).message}`;
+            console.error(`❌ ${errorMsg}`);
+            shutdownErrors.push(errorMsg);
+            // Continue with other services even if one fails
+          }
+        }
       }
-
-      // Stop queue service
-      if (this.has('queue')) {
-        const queue = this.get<QueueService>('queue');
-        shutdownPromises.push(queue.stop());
+      
+      // Stop any remaining services that weren't in the explicit order
+      const allServices = this.getRegisteredServices();
+      const remainingServices = allServices.filter(name => !shutdownOrder.includes(name));
+      
+      if (remainingServices.length > 0) {
+        console.log(`🔄 Stopping remaining services: ${remainingServices.join(', ')}`);
+        
+        for (const serviceName of remainingServices) {
+          try {
+            const service = this.get(serviceName);
+            if (service && typeof service.stop === 'function') {
+              console.log(`🔄 Stopping remaining service: ${serviceName}`);
+              await service.stop();
+              console.log(`✅ Remaining service stopped: ${serviceName}`);
+            }
+          } catch (error) {
+            const errorMsg = `Failed to stop remaining service ${serviceName}: ${(error as Error).message}`;
+            console.error(`❌ ${errorMsg}`);
+            shutdownErrors.push(errorMsg);
+          }
+        }
       }
-
-      await Promise.all(shutdownPromises);
+      
+      // Clear the service registry
       this.services.clear();
       this.initialized = false;
       
-      console.log('✅ All services shutdown completed');
+      if (shutdownErrors.length > 0) {
+        console.warn(`⚠️  Some services had shutdown errors: ${shutdownErrors.join('; ')}`);
+        console.log('✅ Service shutdown completed with warnings');
+      } else {
+        console.log('✅ All services shutdown completed successfully');
+      }
+      
     } catch (error) {
-      console.error('❌ Error during service shutdown:', error);
+      console.error('❌ Critical error during service shutdown:', error);
+      // Even on critical error, try to clear the registry
+      this.services.clear();
+      this.initialized = false;
       throw error;
     }
   }
