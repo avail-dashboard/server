@@ -13,6 +13,8 @@ type Reward = any;
 type Block = any;
 type Era = any;
 import { BaseService, ServiceHealth } from '../types/service';
+import { SelfHealingProcessor, ExtractedEntity, ENTITY_TYPES, DependencyResolver } from '../types/self-healing';
+import { BlockData, ExtrinsicData } from '../types/blockchain';
 
 // Service interfaces
 export interface ValidatorWithDetails extends Validator {
@@ -111,13 +113,14 @@ export interface IValidatorService {
  * - Provide staking overview and analytics
  * - Support validator discovery and filtering
  */
-export class ValidatorService implements BaseService, IValidatorService {
+export class ValidatorService implements BaseService, IValidatorService, SelfHealingProcessor {
   private blockchain: AvailBlockchainService;
   private validatorRepository: ValidatorRepository;
   private nominationRepository: NominationRepository;
   private rewardRepository: RewardRepository;
   private blockRepository: BlockRepository;
   private eraRepository: EraRepository;
+  private dependencyResolver: DependencyResolver;
   private isRunning = false;
 
   constructor(
@@ -127,6 +130,7 @@ export class ValidatorService implements BaseService, IValidatorService {
     rewardRepository: RewardRepository,
     blockRepository: BlockRepository,
     eraRepository: EraRepository,
+    dependencyResolver: DependencyResolver,
   ) {
     this.blockchain = blockchain;
     this.validatorRepository = validatorRepository;
@@ -134,6 +138,7 @@ export class ValidatorService implements BaseService, IValidatorService {
     this.rewardRepository = rewardRepository;
     this.blockRepository = blockRepository;
     this.eraRepository = eraRepository;
+    this.dependencyResolver = dependencyResolver;
   }
 
   async start(): Promise<void> {
@@ -754,6 +759,349 @@ export class ValidatorService implements BaseService, IValidatorService {
       };
     }
   }
+
+  // Self-Healing Helper Methods
+
+  /**
+   * Create or update validator in database
+   * Similar to AccountService.getOrCreateAccount pattern
+   */
+  private async getOrCreateValidator(stashAddress: string, blockNumber: number): Promise<Validator> {
+    try {
+      // Try to get existing validator
+      let validator = await this.validatorRepository.findByStashAddress(stashAddress);
+
+      if (validator) {
+        // Update existing validator with block production stats
+        validator = await this.validatorRepository.updateStats(stashAddress, {
+          blocksProduced: (validator.blocksProduced || 0) + 1,
+          lastBlockProduced: blockNumber,
+        });
+        
+        logger.debug('ValidatorService: Updated existing validator', {
+          component: 'validator-service',
+          stashAddress: stashAddress.substring(0, 20) + '...',
+          blockNumber,
+        });
+      } else {
+        // Create new validator with defaults
+        validator = await this.validatorRepository.create({
+          stashAddress,
+          commission: 0, // Default commission
+          selfBonded: BigInt(0),
+          totalBonded: BigInt(0),
+          nominatorCount: 0,
+          status: 'active',
+          blocksProduced: 1,
+          lastBlockProduced: blockNumber,
+        });
+        
+        logger.debug('ValidatorService: Created new validator', {
+          component: 'validator-service',
+          stashAddress: stashAddress.substring(0, 20) + '...',
+          blockNumber,
+        });
+      }
+
+      return validator;
+    } catch (error) {
+      logError(error as Error, {
+        component: 'validator-service',
+        action: 'getOrCreateValidator',
+        stashAddress: stashAddress.substring(0, 20) + '...',
+        blockNumber,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Check if an extrinsic is a staking operation
+   */
+  private isStakingExtrinsic(extrinsic: ExtrinsicData): boolean {
+    return extrinsic.method.section === 'staking' &&
+           ['bond', 'bondExtra', 'validate', 'nominate', 'setController', 'setSessionKey'].includes(extrinsic.method.method);
+  }
+
+  /**
+   * Extract validator address from staking extrinsic
+   */
+  private extractValidatorFromStakingExtrinsic(extrinsic: ExtrinsicData): string | null {
+    try {
+      const args = extrinsic.method.args;
+      
+      // Different staking methods have different patterns
+      switch (extrinsic.method.method) {
+        case 'validate':
+          // validate() call means the signer is becoming a validator
+          return extrinsic.signer || null;
+          
+        case 'bond':
+          // bond(controller, value, payee) - signer is the stash
+          return extrinsic.signer || null;
+          
+        case 'setSessionKey':
+          // setSessionKey(keys, proof) - signer is the validator
+          return extrinsic.signer || null;
+          
+        default:
+          return null;
+      }
+    } catch (error) {
+      logger.warn('ValidatorService: Failed to extract validator from staking extrinsic', {
+        component: 'validator-service',
+        extrinsicHash: extrinsic.hash,
+        method: extrinsic.method.method,
+        error: (error as Error).message,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Validate if address looks like a valid validator address
+   * Uses same validation as AccountService for consistency
+   */
+  private isValidValidatorAddress(address: string): boolean {
+    try {
+      if (!address || typeof address !== 'string') {
+        return false;
+      }
+      
+      // Avail addresses typically start with '5' and are 47-48 characters long
+      if (address.length < 40 || address.length > 50) {
+        return false;
+      }
+      
+      if (!address.startsWith('5')) {
+        return false;
+      }
+      
+      // Basic character validation (base58 characters)
+      const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz]+$/;
+      return base58Regex.test(address);
+      
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Public method for other services to ensure validator exists
+   * Part of the dependency resolver pattern
+   */
+  async ensureValidatorExists(stashAddress: string, blockNumber: number = 0): Promise<Validator> {
+    return this.getOrCreateValidator(stashAddress, blockNumber);
+  }
+
+  // Self-Healing Processor Methods
+  // Phase 3: Validator extraction and processing implementation
+
+  /**
+   * Extract validator information from block data
+   * 
+   * Extracts validators from:
+   * - Block author (validator who produced this block)
+   * - Staking extrinsics (validators mentioned in staking operations)
+   * - Session key updates and validator registrations
+   */
+  async extractFromBlock(blockData: BlockData): Promise<ExtractedEntity[]> {
+    const validators = new Set<string>();
+    
+    try {
+      logger.debug('ValidatorService: Extracting validators from block', {
+        component: 'validator-service',
+        blockNumber: blockData.number,
+        extrinsicCount: blockData.extrinsics.length,
+      });
+
+      // 1. Extract block author (validator who produced this block)
+      if (blockData.validator && this.isValidValidatorAddress(blockData.validator)) {
+        validators.add(blockData.validator);
+        logger.debug('ValidatorService: Added block author validator', {
+          component: 'validator-service',
+          blockNumber: blockData.number,
+          validator: blockData.validator.substring(0, 20) + '...',
+        });
+      }
+
+      // 2. Extract validators from staking extrinsics
+      blockData.extrinsics.forEach((extrinsic, index) => {
+        try {
+          if (this.isStakingExtrinsic(extrinsic)) {
+            const validatorAddress = this.extractValidatorFromStakingExtrinsic(extrinsic);
+            if (validatorAddress && this.isValidValidatorAddress(validatorAddress)) {
+              validators.add(validatorAddress);
+              
+              logger.debug('ValidatorService: Added validator from staking extrinsic', {
+                component: 'validator-service',
+                blockNumber: blockData.number,
+                extrinsicIndex: index,
+                method: extrinsic.method.method,
+                validator: validatorAddress.substring(0, 20) + '...',
+              });
+            }
+          }
+        } catch (error) {
+          logger.warn('ValidatorService: Failed to extract validator from extrinsic', {
+            component: 'validator-service',
+            blockNumber: blockData.number,
+            extrinsicIndex: index,
+            error: (error as Error).message,
+          });
+          // Continue processing other extrinsics
+        }
+      });
+
+      // Convert to ExtractedEntity array
+      const entities: ExtractedEntity[] = Array.from(validators).map(stashAddress => ({
+        type: ENTITY_TYPES.VALIDATOR,
+        id: stashAddress,
+        data: {
+          stashAddress,
+          blockNumber: blockData.number,
+          extractedFrom: 'block_processing',
+          action: blockData.validator === stashAddress ? 'block_production' : 'staking_operation',
+        },
+        dependencies: [
+          {
+            service: 'account',
+            entityType: 'account',
+            entityId: stashAddress,
+            required: true,
+          },
+        ],
+      }));
+
+      logger.debug('ValidatorService: Validator extraction complete', {
+        component: 'validator-service',
+        blockNumber: blockData.number,
+        validatorCount: entities.length,
+      });
+
+      return entities;
+
+    } catch (error) {
+      logger.error('ValidatorService: Failed to extract validators from block', {
+        component: 'validator-service',
+        blockNumber: blockData.number,
+        error: (error as Error).message,
+      });
+      
+      // Return empty array on error - don't fail the entire block processing
+      return [];
+    }
+  }
+
+  /**
+   * Process extracted validator entities
+   * 
+   * For each extracted validator, ensure dependencies exist and create/update validator records
+   */
+  async processExtractedEntities(entities: ExtractedEntity[]): Promise<Validator[]> {
+    const results: Validator[] = [];
+    
+    try {
+      logger.debug('ValidatorService: Processing extracted validator entities', {
+        component: 'validator-service',
+        entityCount: entities.length,
+      });
+
+      for (const entity of entities) {
+        try {
+          // Ensure dependencies are resolved first (accounts)
+          await this.ensureDependencies(entity);
+          
+          // Process the validator entity
+          const validator = await this.getOrCreateValidator(
+            entity.data.stashAddress,
+            entity.data.blockNumber
+          );
+          results.push(validator);
+          
+          logger.debug('ValidatorService: Validator processed successfully', {
+            component: 'validator-service',
+            stashAddress: entity.data.stashAddress.substring(0, 20) + '...',
+            entityType: entity.type,
+            blockNumber: entity.data.blockNumber,
+            action: entity.data.action,
+          });
+
+        } catch (error) {
+          logger.error('ValidatorService: Failed to process validator entity', {
+            component: 'validator-service',
+            entityId: entity.id,
+            entityType: entity.type,
+            error: (error as Error).message,
+          });
+          // Continue processing other entities - don't fail the entire batch
+        }
+      }
+
+      logger.debug('ValidatorService: Validator entity processing complete', {
+        component: 'validator-service',
+        totalEntities: entities.length,
+        successfullyProcessed: results.length,
+        failed: entities.length - results.length,
+      });
+
+      return results;
+
+    } catch (error) {
+      logger.error('ValidatorService: Failed to process extracted entities', {
+        component: 'validator-service',
+        entityCount: entities.length,
+        error: (error as Error).message,
+      });
+      
+      // Return partial results on error
+      return results;
+    }
+  }
+
+  /**
+   * Ensure validator dependencies exist
+   * 
+   * Validators depend on accounts - ensure the stash account exists before creating validator
+   */
+  async ensureDependencies(entity: ExtractedEntity): Promise<void> {
+    try {
+      logger.debug('ValidatorService: Ensuring validator dependencies', {
+        component: 'validator-service',
+        entityType: entity.type,
+        entityId: entity.id.substring(0, 20) + '...',
+        dependencyCount: entity.dependencies.length,
+      });
+
+      // Process each dependency
+      for (const dependency of entity.dependencies) {
+        if (dependency.service === 'account' && dependency.entityType === 'account') {
+          // Ensure the account exists using the dependency resolver
+          await this.dependencyResolver.ensureAccount(dependency.entityId);
+          
+          logger.debug('ValidatorService: Account dependency resolved', {
+            component: 'validator-service',
+            accountAddress: dependency.entityId.substring(0, 20) + '...',
+            required: dependency.required,
+          });
+        }
+      }
+
+      logger.debug('ValidatorService: All dependencies resolved', {
+        component: 'validator-service',
+        entityId: entity.id.substring(0, 20) + '...',
+      });
+
+    } catch (error) {
+      logger.error('ValidatorService: Failed to resolve dependencies', {
+        component: 'validator-service',
+        entityId: entity.id,
+        entityType: entity.type,
+        error: (error as Error).message,
+      });
+      throw error;
+    }
+  }
 }
 
 // Factory function
@@ -764,6 +1112,7 @@ export const createValidatorService = (
   rewardRepository: RewardRepository,
   blockRepository: BlockRepository,
   eraRepository: EraRepository,
+  dependencyResolver: DependencyResolver,
 ): ValidatorService => {
   return new ValidatorService(
     blockchain,
@@ -772,5 +1121,6 @@ export const createValidatorService = (
     rewardRepository,
     blockRepository,
     eraRepository,
+    dependencyResolver,
   );
 };

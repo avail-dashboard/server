@@ -17,14 +17,9 @@ import { logger } from '../src/utils/logger';
 import db from '../src/utils/database';
 import { AvailBlockchainService } from '../src/services/core/avail-blockchain';
 import { createBlockIndexerService } from '../src/services/domain/indexer';
-
-import { createEnhancedProcessorService, EnhancedProcessorService } from '../src/services/domain/EnhancedProcessor';
-import { ValidatorRepository } from '../src/database/repositories/ValidatorRepository';
-import { TransferRepository } from '../src/database/repositories/TransferRepository';
-import { EraRepository } from '../src/database/repositories/EraRepository';
-import { createSyncService } from '../src/services/core/sync';
-import { QueueService } from '../src/services/core/queue';
-import { AvailDataSubmissionIndexer } from '../src/services/domain/availDataSubmissionIndexer';
+// Phase 7: Use ServiceFactory instead of individual processors
+import { ServiceFactory } from '../src/services';
+import { SelfHealingBlockProcessor } from '../src/services/domain/selfHealingProcessor';
 
 interface SyncOptions {
   mode: 'full' | 'incremental' | 'range' | 'live';
@@ -32,84 +27,49 @@ interface SyncOptions {
   toBlock?: number;
   batchSize?: number;
   delayMs?: number;
-  phase1Enabled?: boolean;
 }
 
 class StandaloneSyncScript {
+  private serviceFactory: ServiceFactory;
   private blockchain: AvailBlockchainService;
   private indexer: ReturnType<typeof createBlockIndexerService>;
-  private processor: EnhancedProcessorService;
-  private queueService: QueueService;
-  private syncService: ReturnType<typeof createSyncService>;
-  private availIndexer: AvailDataSubmissionIndexer;
+  private processor: SelfHealingBlockProcessor;
   private shouldStop = false;
   private currentBlock = 0;
-  private phase1Enabled = true;
 
   constructor() {
-    // Initialize services - using only Avail SDK
-    this.blockchain = new AvailBlockchainService();
-    this.indexer = createBlockIndexerService(db, this.blockchain);
+    // Phase 7: Initialize with ServiceFactory for integrated self-healing services
+    this.serviceFactory = ServiceFactory.getInstance();
     
-    // Initialize Phase 1 repositories
-    const validatorRepository = new ValidatorRepository();
-    const transferRepository = new TransferRepository();
-    const eraRepository = new EraRepository();
-    
-    // Create enhanced processor with Phase 1 support
-    this.processor = createEnhancedProcessorService(
-      db, 
-      this.blockchain,
-      validatorRepository,
-      transferRepository,
-      eraRepository,
-    );
-    
-    // Create a minimal queue service for sync service dependency
-    this.queueService = new QueueService();
-    this.syncService = createSyncService(db, this.blockchain, this.queueService);
-    
-    // Initialize Avail-specific indexer
-    this.availIndexer = new AvailDataSubmissionIndexer();
+    // Note: Individual services will be initialized through ServiceFactory
+    // This provides the complete self-healing architecture (Phases 1-6)
   }
 
   /**
-   * Initialize all services
+   * Initialize all services using ServiceFactory (Phase 7)
    */
-  async initialize(options?: SyncOptions): Promise<void> {
+  async initialize(_options?: SyncOptions): Promise<void> {
     try {
-      logger.info('🚀 Initializing sync script services (Avail SDK only)...', {
-        phase1Enabled: options?.phase1Enabled ?? this.phase1Enabled,
-      });
-
-      // Configure Phase 1 based on options
-      if (options?.phase1Enabled !== undefined) {
-        this.phase1Enabled = options.phase1Enabled;
-        this.processor.setPhase1Enabled(this.phase1Enabled);
-      }
+      logger.info('🚀 Initializing sync script with SelfHealingBlockProcessor...');
 
       // Initialize database connection
       await db.connect();
       logger.info('✅ Database connected');
 
-      // Initialize blockchain services
-      await this.blockchain.start();
-      logger.info('✅ Avail blockchain service started');
+      // Initialize ServiceFactory with all self-healing services (Phases 1-6)
+      await this.serviceFactory.initializeAllServices();
+      logger.info('✅ ServiceFactory initialized with all self-healing services');
 
-      // Initialize queue service first (required by sync service)
-      await this.queueService.start();
-      logger.info('✅ Queue service started');
-
-      // Initialize domain services
-      await this.indexer.start();
-      await this.processor.start();
-      await this.syncService.start();
+      // Get services from factory
+      this.blockchain = this.serviceFactory.get('availBlockchainService');
+      this.processor = this.serviceFactory.get('selfHealingBlockProcessor');
       
-      // Initialize Avail-specific indexer
-      await this.availIndexer.initialize();
-      logger.info('✅ All services initialized (Avail SDK only)', {
-        phase1Enabled: this.phase1Enabled,
-      });
+      // Create independent indexer (not part of self-healing architecture)
+      this.indexer = createBlockIndexerService(db, this.blockchain);
+      await this.indexer.start();
+      
+      logger.info('✅ All services initialized (Self-Healing Architecture)');
+      logger.info(`📊 SelfHealingBlockProcessor services: ${this.processor.getRegisteredServices().join(', ')}`);
 
     } catch (error) {
       logger.error('❌ Failed to initialize services:', error);
@@ -118,37 +78,20 @@ class StandaloneSyncScript {
   }
 
   /**
-   * Cleanup and shutdown services
+   * Cleanup and shutdown services (Phase 7)
    */
   async cleanup(): Promise<void> {
     try {
       logger.info('🧹 Shutting down services...');
 
-      // Stop services in dependency order (dependent services first)
-      if (this.syncService) {
-        await this.syncService.stop();
-      }
-      
-      if (this.processor) {
-        await this.processor.stop();
-      }
-      
+      // Stop independent indexer
       if (this.indexer) {
         await this.indexer.stop();
       }
       
-      // Cleanup Avail indexer
-      if (this.availIndexer) {
-        await this.availIndexer.disconnect();
-      }
-      
-      if (this.queueService) {
-        await this.queueService.stop();
-      }
-      
-      // Stop blockchain service last (other services depend on it)
-      if (this.blockchain) {
-        await this.blockchain.stop();
+      // Shutdown ServiceFactory (handles all self-healing services)
+      if (this.serviceFactory && this.serviceFactory.isInitialized()) {
+        await this.serviceFactory.shutdown();
       }
       
       await db.disconnect();
@@ -162,13 +105,27 @@ class StandaloneSyncScript {
   /**
    * Parse command line arguments
    */
+  /**
+   * Get last synced block from database (replaces syncService dependency)
+   */
+  private async getLastSyncedBlock(): Promise<number> {
+    try {
+      // Query the database for the highest block number
+      const result = await db.query('SELECT MAX(number) as last_block FROM blocks');
+      const lastBlock = result.rows[0]?.last_block;
+      return lastBlock ? parseInt(lastBlock) : 0;
+    } catch (error) {
+      logger.warn('Failed to get last synced block from database, starting from 0:', error);
+      return 0;
+    }
+  }
+
   parseArguments(): SyncOptions {
     const args = process.argv.slice(2);
     const options: SyncOptions = {
       mode: 'incremental',
       batchSize: 50,
       delayMs: 100,
-      phase1Enabled: process.env.PHASE1_ENABLED !== 'false', // Default to true, disable with env var
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -189,10 +146,6 @@ class StandaloneSyncScript {
       } else if (arg === '--delay' && args[i + 1]) {
         options.delayMs = parseInt(args[i + 1]);
         i++;
-      } else if (arg === '--phase1-enabled') {
-        options.phase1Enabled = true;
-      } else if (arg === '--phase1-disabled') {
-        options.phase1Enabled = false;
       }
     }
 
@@ -215,9 +168,9 @@ class StandaloneSyncScript {
       break;
         
     case 'incremental': {
-      // Only use sync service for incremental mode
-      const syncState = await this.syncService.getCurrentSyncState();
-      from = Number(syncState.last_synced_block) + 1;
+      // Get last synced block from database
+      const lastSyncedBlock = await this.getLastSyncedBlock();
+      from = lastSyncedBlock + 1;
       to = options.toBlock ?? latestBlock.number;
       break;
     }
@@ -231,9 +184,9 @@ class StandaloneSyncScript {
       break;
         
     case 'live': {
-      // Only use sync service for live mode
-      const liveSyncState = await this.syncService.getCurrentSyncState();
-      from = Number(liveSyncState.last_synced_block) + 1;
+      // Get last synced block from database for live mode
+      const lastSyncedBlock = await this.getLastSyncedBlock();
+      from = lastSyncedBlock + 1;
       to = latestBlock.number;
       break;
     }

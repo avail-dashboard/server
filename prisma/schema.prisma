@@ -18,6 +18,7 @@ model Block {
   extrinsicsRoot       String?          @map("extrinsics_root") @db.VarChar(66)
   timestamp            DateTime
   extrinsicsCount      Int              @default(0) @map("extrinsics_count")
+  eventsCount          Int              @default(0) @map("events_count")
   // Phase 1 enhancements
   validatorAddress     String?          @map("validator_address") @db.VarChar(64)
   validatorName        String?          @map("validator_name") @db.VarChar(255)
@@ -60,6 +61,10 @@ model Extrinsic {
   tip              BigInt?
   actualFee        BigInt?  @map("actual_fee") // Calculated from events
   transferCount    Int?     @map("transfer_count") // Number of transfers in this extrinsic
+  // Phase 1 critical missing fields
+  methodObject     Json?    @map("method_object") // Complete method object
+  methodArgs       Json?    @map("method_args") // Method arguments separately
+  extrinsicOrder   Int?     @map("extrinsic_order") // Order within block
   createdAt        DateTime @default(now()) @map("created_at")
   
   // Relations
@@ -70,6 +75,7 @@ model Extrinsic {
   @@index([hash], name: "idx_extrinsics_hash")
   @@index([signer], name: "idx_extrinsics_signer")
   @@index([timestamp], name: "idx_extrinsics_timestamp")
+  @@index([blockNumber, extrinsicOrder], name: "idx_extrinsics_block_order")
   @@map("extrinsics")
 }
 
@@ -115,6 +121,11 @@ model Event {
   eventName      String?  @map("event_name") @db.VarChar(50)
   data           Json?
   timestamp      DateTime?
+  // Phase 1 enhancements
+  phase          Json?    // Event phase object
+  phaseType      String?  @map("phase_type") @db.VarChar(50) // ApplyExtrinsic, Finalization, Initialization
+  methodObject   Json?    @map("method_object") // Complete method object when available
+  eventOrder     Int?     @map("event_order") // Order within block
   createdAt      DateTime @default(now()) @map("created_at")
   
   // Relations
@@ -123,6 +134,8 @@ model Event {
   @@index([blockNumber], name: "idx_events_block")
   @@index([module], name: "idx_events_module")
   @@index([timestamp], name: "idx_events_timestamp")
+  @@index([phaseType], name: "idx_events_phase_type")
+  @@index([blockNumber, eventOrder], name: "idx_events_block_order")
   @@map("events")
 }
 

@@ -6,6 +6,7 @@ export { AvailBlockchainService, createAvailBlockchainService } from './core/ava
 export { AvailConnectionManager, createAvailConnectionManager } from './core/avail-connection-manager';
 export { QueueService, createQueueService } from './core/queue';
 export { SyncService, createSyncService } from './core/sync';
+export { SimpleDependencyResolver, createDependencyResolver } from './core/dependency-resolver';
 
 // Integration Services
 // (No integration services currently)
@@ -15,11 +16,14 @@ export { BlockService, createBlockService } from './domain/block';
 export { ExtrinsicService, createExtrinsicService } from './domain/extrinsic';
 export { DataAvailabilityService, createDataAvailabilityService } from './domain/dataAvailability';
 export { BlockIndexerService, createBlockIndexerService } from './domain/indexer';
-export { DataProcessorService, createDataProcessorService } from './domain/processor';
+// Phase 6 Services (replacing DataProcessorService with SelfHealingBlockProcessor) 
+export { SelfHealingBlockProcessor, createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
 export { SearchService, createSearchService } from './domain/search';
 // Phase 2 Services
 export { AccountService, createAccountService } from './domain/account';
 export { ValidatorService, createValidatorService } from './domain/validator';
+// Phase 5 Services
+export { DataSubmissionService, createDataSubmissionService } from './domain/dataSubmission';
 
 // Mappers
 export * from '../mappers';
@@ -32,6 +36,7 @@ export * from './types/blockchain';
 import { createAvailConnectionManager, AvailConnectionManager } from './core/avail-connection-manager';
 import { createAvailBlockchainService, AvailBlockchainService } from './core/avail-blockchain';
 import { createQueueService, QueueService } from './core/queue';
+import { createDependencyResolver } from './core/dependency-resolver';
 import config from '../config';
 
 // Domain services factory functions
@@ -40,7 +45,8 @@ import { createExtrinsicService } from './domain/extrinsic';
 import { createDataAvailabilityService } from './domain/dataAvailability';
 import { createSyncService } from './core/sync';
 import { createBlockIndexerService } from './domain/indexer';
-import { createDataProcessorService } from './domain/processor';
+// Phase 6 Services (replacing DataProcessorService)
+import { createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
 import { createSearchService } from './domain/search';
 // Phase 2 Services
 import { createAccountService } from './domain/account';
@@ -48,6 +54,8 @@ import { createValidatorService } from './domain/validator';
 import { createChainService } from './domain/chain';
 import { createTransferService } from './domain/transfer';
 import { createAnalyticsService } from '../services/analytics/analytics';
+// Phase 5 Services
+import { createDataSubmissionService } from './domain/dataSubmission';
 
 // Mapper imports
 import { 
@@ -180,7 +188,6 @@ export class ServiceFactory {
       // Create new sync services
       const syncService = createSyncService(db, availBlockchainService, queueService);
       const blockIndexerService = createBlockIndexerService(db, availBlockchainService);
-      const dataProcessorService = createDataProcessorService(db, availBlockchainService);
       
       // Create search service
       const searchService = createSearchService(
@@ -189,6 +196,9 @@ export class ServiceFactory {
         rollupRepository,
         dataSubmissionRepository,
       );
+
+      // Create dependency resolver
+      const dependencyResolver = createDependencyResolver();
 
       // Create Phase 2 services
       const accountService = createAccountService(
@@ -199,6 +209,11 @@ export class ServiceFactory {
         rewardRepository,
       );
 
+      // Register account resolver before creating dependent services
+      dependencyResolver.registerResolver('account', (address: string) => 
+        accountService.ensureAccountExists(address),
+      );
+
       const validatorService = createValidatorService(
         availBlockchainService,
         validatorRepository,
@@ -206,8 +221,8 @@ export class ServiceFactory {
         rewardRepository,
         blockRepository,
         eraRepository,
+        dependencyResolver,
       );
-
 
       const chainService = createChainService(availBlockchainService);
 
@@ -215,6 +230,15 @@ export class ServiceFactory {
         availBlockchainService,
         transferRepository,
         blockRepository,
+        dependencyResolver,
+      );
+
+      // Phase 5: DataSubmissionService
+      const dataSubmissionService = createDataSubmissionService(
+        availBlockchainService,
+        dataSubmissionRepository,
+        rollupRepository,
+        dependencyResolver,
       );
 
       const analyticsService = createAnalyticsService(
@@ -224,6 +248,14 @@ export class ServiceFactory {
         transferRepository,
         validatorRepository,
         dataSubmissionRepository,
+      );
+
+      // Phase 6: Create SelfHealingBlockProcessor (replaces DataProcessorService)
+      const selfHealingBlockProcessor = createSelfHealingBlockProcessor(
+        accountService,
+        validatorService,
+        transferService,
+        dataSubmissionService,
       );
       
       // Register domain services
@@ -237,6 +269,8 @@ export class ServiceFactory {
       this.register('validatorService', validatorService);
       this.register('chainService', chainService);
       this.register('transferService', transferService);
+      // Register Phase 5 services
+      this.register('dataSubmissionService', dataSubmissionService);
       this.register('analyticsService', analyticsService);
 
       // Start Phase 2 services
@@ -244,17 +278,21 @@ export class ServiceFactory {
       await validatorService.start();
       await chainService.start();
       await transferService.start();
+      // Start Phase 5 services
+      await dataSubmissionService.start();
       await analyticsService.start();
       
       // Register new sync services
       this.register('syncService', syncService);
       this.register('blockIndexerService', blockIndexerService);
-      this.register('dataProcessorService', dataProcessorService);
+      // Phase 6: Register SelfHealingBlockProcessor instead of DataProcessorService
+      this.register('selfHealingBlockProcessor', selfHealingBlockProcessor);
       
       // Start sync services
       await syncService.start();
       await blockIndexerService.start();
-      await dataProcessorService.start();
+      // Phase 6: Start SelfHealingBlockProcessor instead of DataProcessorService
+      await selfHealingBlockProcessor.start();
       
       console.log('✅ Domain services initialized successfully');
     } catch (error) {

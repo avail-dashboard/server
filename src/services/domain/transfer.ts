@@ -3,6 +3,8 @@ import { AvailBlockchainService } from '../core/avail-blockchain';
 import { TransferRepository } from '../../database/repositories/TransferRepository';
 import { BlockRepository } from '../../database/repositories/BlockRepository';
 import { BaseService, ServiceHealth } from '../types/service';
+import { SelfHealingProcessor, ExtractedEntity, DependencyResolver } from '../types/self-healing';
+import { BlockData, ExtrinsicData } from '../types/blockchain';
 
 // Service interfaces
 export interface TransferFilters {
@@ -106,21 +108,25 @@ export interface ITransferService {
  * - Provide transfer statistics and analytics
  * - Support pagination and sorting
  * - Enhance transfers with identity and block information
+ * - Extract and process transfers from blockchain data (Phase 4)
  */
-export class TransferService implements BaseService, ITransferService {
+export class TransferService implements BaseService, ITransferService, SelfHealingProcessor {
   private blockchain: AvailBlockchainService;
   private transferRepository: TransferRepository;
   private blockRepository: BlockRepository;
+  private dependencyResolver: DependencyResolver;
   private isRunning = false;
 
   constructor(
     blockchain: AvailBlockchainService,
     transferRepository: TransferRepository,
     blockRepository: BlockRepository,
+    dependencyResolver: DependencyResolver,
   ) {
     this.blockchain = blockchain;
     this.transferRepository = transferRepository;
     this.blockRepository = blockRepository;
+    this.dependencyResolver = dependencyResolver;
   }
 
   async start(): Promise<void> {
@@ -572,6 +578,288 @@ export class TransferService implements BaseService, ITransferService {
       return undefined;
     }
   }
+
+  // Self-Healing Processor Methods (Phase 4 Implementation)
+
+  /**
+   * Extract transfer information from block data
+   * Identifies balance.transfer, balance.transferKeepAlive, and balance.transferAll extrinsics
+   */
+  async extractFromBlock(blockData: BlockData): Promise<ExtractedEntity[]> {
+    try {
+      logger.debug('TransferService: Extracting transfers from block', { 
+        component: 'transfer-service',
+        blockNumber: blockData.number,
+        extrinsicCount: blockData.extrinsics.length,
+      });
+
+      const transfers: ExtractedEntity[] = [];
+
+      blockData.extrinsics.forEach((extrinsic, index) => {
+        if (this.isTransferExtrinsic(extrinsic)) {
+          const transferData = this.extractTransferData(extrinsic, blockData, index);
+          if (transferData) {
+            transfers.push({
+              type: 'transfer',
+              id: `${blockData.number}-${index}`,
+              data: transferData,
+              dependencies: [
+                {
+                  service: 'account',
+                  entityType: 'account',
+                  entityId: transferData.fromAddress,
+                  required: true,
+                },
+                {
+                  service: 'account',
+                  entityType: 'account',
+                  entityId: transferData.toAddress,
+                  required: true,
+                },
+              ],
+            });
+          }
+        }
+      });
+
+      logger.debug('TransferService: Extracted transfers from block', { 
+        component: 'transfer-service',
+        blockNumber: blockData.number,
+        transferCount: transfers.length,
+      });
+
+      return transfers;
+
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'transfer-service', 
+        action: 'extractFromBlock',
+        blockNumber: blockData.number,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Process extracted transfer entities
+   * Creates transfer records after ensuring dependencies exist
+   */
+  async processExtractedEntities(entities: ExtractedEntity[]): Promise<any[]> {
+    try {
+      logger.debug('TransferService: Processing extracted transfer entities', { 
+        component: 'transfer-service',
+        entityCount: entities.length,
+      });
+
+      const results: any[] = [];
+
+      for (const entity of entities) {
+        try {
+          // Ensure dependencies exist first
+          await this.ensureDependencies(entity);
+
+          // Process the transfer
+          const transfer = await this.processTransfer(entity);
+          if (transfer) {
+            results.push(transfer);
+          }
+
+        } catch (error) {
+          logError(error as Error, { 
+            component: 'transfer-service', 
+            action: 'processExtractedEntity',
+            entityId: entity.id,
+          });
+          // Continue processing other entities
+        }
+      }
+
+      logger.debug('TransferService: Processed transfer entities', { 
+        component: 'transfer-service',
+        processedCount: results.length,
+        totalEntities: entities.length,
+      });
+
+      return results;
+
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'transfer-service', 
+        action: 'processExtractedEntities',
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Ensure transfer dependencies exist (from and to accounts)
+   */
+  async ensureDependencies(entity: ExtractedEntity): Promise<void> {
+    try {
+      // Ensure from account exists
+      if (entity.data.fromAddress) {
+        await this.dependencyResolver.ensureAccount(entity.data.fromAddress);
+      }
+
+      // Ensure to account exists  
+      if (entity.data.toAddress) {
+        await this.dependencyResolver.ensureAccount(entity.data.toAddress);
+      }
+
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'transfer-service', 
+        action: 'ensureDependencies',
+        entityId: entity.id,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Helper method: Check if extrinsic is a transfer
+   */
+  private isTransferExtrinsic(extrinsic: ExtrinsicData): boolean {
+    return extrinsic.method.section === 'balances' && 
+           ['transfer', 'transferKeepAlive', 'transferAll'].includes(extrinsic.method.method);
+  }
+
+  /**
+   * Helper method: Extract transfer data from extrinsic
+   */
+  private extractTransferData(extrinsic: ExtrinsicData, blockData: BlockData, index: number) {
+    try {
+      if (!extrinsic.signer) {
+        return null; // No signer means no valid transfer
+      }
+
+      // Extract destination address
+      let toAddress: string | null = null;
+      if (extrinsic.method.args.dest) {
+        // Handle different destination formats
+        if (typeof extrinsic.method.args.dest === 'string') {
+          toAddress = extrinsic.method.args.dest;
+        } else if (extrinsic.method.args.dest.Id) {
+          toAddress = extrinsic.method.args.dest.Id;
+        } else if (extrinsic.method.args.dest.toString) {
+          toAddress = extrinsic.method.args.dest.toString();
+        }
+      }
+
+      if (!toAddress) {
+        logger.warn('TransferService: Could not extract destination address', {
+          component: 'transfer-service',
+          extrinsicHash: extrinsic.hash,
+          args: extrinsic.method.args,
+        });
+        return null;
+      }
+
+      // Extract amount
+      let amount = BigInt(0);
+      if (extrinsic.method.args.value) {
+        try {
+          amount = BigInt(extrinsic.method.args.value.toString());
+        } catch {
+          logger.warn('TransferService: Could not parse transfer amount', {
+            component: 'transfer-service',
+            extrinsicHash: extrinsic.hash,
+            value: extrinsic.method.args.value,
+          });
+        }
+      }
+
+      return {
+        extrinsicHash: extrinsic.hash,
+        blockNumber: blockData.number,
+        blockHash: blockData.hash,
+        extrinsicIndex: index,
+        fromAddress: extrinsic.signer,
+        toAddress,
+        amount: amount.toString(),
+        fee: extrinsic.fee || '0',
+        success: extrinsic.success,
+        timestamp: new Date(blockData.timestamp),
+      };
+
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'transfer-service', 
+        action: 'extractTransferData',
+        extrinsicHash: extrinsic.hash,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Helper method: Process a single transfer entity
+   */
+  private async processTransfer(entity: ExtractedEntity): Promise<any> {
+    try {
+      const transferData = entity.data;
+
+      // Check if transfer already exists
+      const existing = await this.transferRepository.findByExtrinsicHash(transferData.extrinsicHash);
+      if (existing) {
+        logger.debug('TransferService: Transfer already exists, skipping', {
+          component: 'transfer-service',
+          extrinsicHash: transferData.extrinsicHash,
+        });
+        return existing;
+      }
+
+      // Create new transfer record
+      const transfer = await this.transferRepository.create({
+        id: `${transferData.extrinsicHash}-${transferData.extrinsicIndex}`,
+        extrinsicHash: transferData.extrinsicHash,
+        fromAddress: transferData.fromAddress,
+        toAddress: transferData.toAddress,
+        amount: BigInt(transferData.amount),
+        tokenType: 'AVAIL',
+        fees: BigInt(transferData.fee),
+        status: transferData.success ? 'success' : 'failed',
+        blockNumber: transferData.blockNumber,
+        extrinsicIndex: transferData.extrinsicIndex,
+        timestamp: transferData.timestamp,
+      });
+
+      logger.debug('TransferService: Transfer created', {
+        component: 'transfer-service',
+        transferId: transfer.id,
+        fromAddress: transferData.fromAddress.substring(0, 10) + '...',
+        toAddress: transferData.toAddress.substring(0, 10) + '...',
+        amount: transferData.amount,
+      });
+
+      return transfer;
+
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'transfer-service', 
+        action: 'processTransfer',
+        entityId: entity.id,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Public method for dependency resolver integration
+   */
+  async ensureTransferExists(extrinsicHash: string): Promise<any> {
+    try {
+      const transfer = await this.transferRepository.findByExtrinsicHash(extrinsicHash);
+      return transfer;
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'transfer-service', 
+        action: 'ensureTransferExists',
+        extrinsicHash,
+      });
+      throw error;
+    }
+  }
 }
 
 // Factory function
@@ -579,6 +867,7 @@ export const createTransferService = (
   blockchain: AvailBlockchainService,
   transferRepository: TransferRepository,
   blockRepository: BlockRepository,
+  dependencyResolver: DependencyResolver,
 ): TransferService => {
-  return new TransferService(blockchain, transferRepository, blockRepository);
+  return new TransferService(blockchain, transferRepository, blockRepository, dependencyResolver);
 }; 

@@ -189,15 +189,15 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         const method = ext.method?.method || 'unknown';
         
         return {
-          hash: ext.hash,
-          block_number: blockNumber,
-          extrinsic_index: ext.index,
+        hash: ext.hash,
+        block_number: blockNumber,
+        extrinsic_index: ext.index,
           module: section,
           call: method,
-          success: ext.success,
-          timestamp: new Date(), // Use current timestamp if not provided
-          signer: ext.signer || undefined,
-          fee: ext.fee ? Number(ext.fee) : undefined,
+        success: ext.success,
+        timestamp: new Date(), // Use current timestamp if not provided
+        signer: ext.signer || undefined,
+        fee: ext.fee ? Number(ext.fee) : undefined,
         };
       });
 
@@ -242,20 +242,46 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         count: events.length,
       });
 
-      const dbEvents: Partial<Event>[] = events.map(event => {
-        // Extract section and method from Avail SDK objects using proper API
-        const section = event.section || 'unknown';
-        const method = event.method || 'unknown';
+      const dbEvents: Partial<Event>[] = events.map((event, index) => {
+        // PHASE 1 FIX: Enhanced event method extraction
+        const section = event.section || event.module || 'unknown';
+        const method = event.method || event.event || event.name || 'unknown';
+        
+        // PHASE 1 FIX: Extract phase information
+        let phaseType: string | undefined;
+        let phase: any = null;
+        
+        if (event.phase) {
+          phase = event.phase;
+          if (event.phase.applyExtrinsic !== undefined) {
+            phaseType = 'ApplyExtrinsic';
+          } else if (event.phase.finalization !== undefined) {
+            phaseType = 'Finalization';
+          } else if (event.phase.initialization !== undefined) {
+            phaseType = 'Initialization';
+          } else {
+            phaseType = 'Unknown';
+          }
+        }
+        
+        // PHASE 1 FIX: Store method object when available
+        const methodObject = event.method && typeof event.method === 'object' 
+          ? event.method 
+          : null;
         
         return {
-          block_number: blockNumber,
+        block_number: blockNumber,
           extrinsic_index: event.phase?.applyExtrinsic || undefined,
-          event_index: event.index,
+        event_index: event.index,
           module: section,
           event_name: method,
-          data: event.data,
-          topics: [], // Not directly available in basic EventData
-          timestamp: new Date(),
+        data: event.data,
+        timestamp: new Date(),
+          // Phase 1 enhancements
+          phase: phase,
+          phase_type: phaseType,
+          method_object: methodObject,
+          event_order: index, // Store order within block
         };
       });
 
@@ -272,6 +298,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         component: 'processor', 
         blockNumber,
         count: events.length,
+        phaseTypes: dbEvents.map(e => e.phase_type).filter(Boolean),
       });
       
     } catch (error) {
