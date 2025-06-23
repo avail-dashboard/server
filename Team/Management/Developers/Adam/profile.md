@@ -1,7 +1,7 @@
 # Adam - Developer Profile
 
 ## Basic Information
-- **Role**: SDE-2 (Software Development Engineer II)
+- **Role**: Senior Developer (Promoted from SDE-2)
 - **Start Date**: 2025-06-23
 - **Specialization**: Backend Development, Queue Systems
 

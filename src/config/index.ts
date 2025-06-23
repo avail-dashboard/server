@@ -1,14 +1,15 @@
-import dotenv from 'dotenv';
+import { config as dotenvConfig } from 'dotenv';
 import Joi from 'joi';
 import path from 'path';
+import { JobType } from '../services/types/service';
 
 // Load environment variables
 // Use ENV_FILE environment variable to specify which env file to load
 const envFile = process.env.ENV_FILE || '.env';
-dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+dotenvConfig({ path: path.resolve(process.cwd(), envFile) });
 // Always load .env as fallback without overriding existing vars
 if (envFile !== '.env') {
-  dotenv.config();
+  dotenvConfig();
 }
 
 // Configuration schema validation
@@ -96,6 +97,45 @@ export const config = {
         delay: 2000,
       },
     },
+    // Retry strategies for different job types
+    retryStrategies: {
+      [JobType.BLOCK_INDEXING]: {
+        baseDelay: 5000,
+        maxDelay: 60000,
+        exponentialFactor: 2,
+        jitterEnabled: true,
+      },
+      [JobType.EXTRINSIC_PROCESSING]: {
+        baseDelay: 2000,
+        maxDelay: 30000,
+        exponentialFactor: 1.5,
+        jitterEnabled: true,
+      },
+      [JobType.ANALYTICS_CALCULATION]: {
+        baseDelay: 3000,
+        maxDelay: 45000,
+        exponentialFactor: 2,
+        jitterEnabled: true,
+      },
+      [JobType.DATA_SYNC]: {
+        baseDelay: 1000,
+        maxDelay: 15000,
+        exponentialFactor: 1.8,
+        jitterEnabled: true,
+      },
+      [JobType.ROLLUP_STATISTICS]: {
+        baseDelay: 2500,
+        maxDelay: 40000,
+        exponentialFactor: 2,
+        jitterEnabled: true,
+      },
+      [JobType.HEALTH_CHECK]: {
+        baseDelay: 1000,
+        maxDelay: 10000,
+        exponentialFactor: 1.5,
+        jitterEnabled: false,
+      },
+    },
   },
 
   // Avail Blockchain Data Sources
@@ -179,6 +219,37 @@ export const config = {
     },
     pingTimeout: 60000,
     pingInterval: 25000,
+  },
+
+  // Phase 2: Dependency Management Configuration - John's Implementation
+  dependencyManagement: {
+    detection: {
+      enabled: true,
+      scanDepth: 3,
+      batchSize: 100,
+      priority: {
+        blocks: 10,
+        accounts: 7,
+        rollups: 5,
+      },
+    },
+    resolution: {
+      maxConcurrentResolutions: 5,
+      retryAttempts: 3,
+      backoffStrategy: {
+        baseDelay: 2000,
+        maxDelay: 30000,
+        exponentialFactor: 2,
+        jitterEnabled: true,
+      },
+      batchTimeout: 60000, // 1 minute
+    },
+    performance: {
+      cacheEnabled: true,
+      cacheTtl: 300000, // 5 minutes
+      maxMemoryUsage: '512MB',
+      metricsEnabled: true,
+    },
   },
 };
 

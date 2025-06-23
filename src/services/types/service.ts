@@ -97,6 +97,45 @@ export interface QueueServiceInterface {
   clearQueue(): Promise<void>;
 }
 
+// Enhanced Job Options with Retry Strategy Support
+export interface EnhancedJobOptions {
+  priority?: number;
+  delay?: number;
+  attempts?: number;
+  retryStrategy?: Partial<RetryConfig>;
+  skipDeadLetter?: boolean;
+  removeOnComplete?: number | boolean;
+  removeOnFail?: number | boolean;
+  backoff?: string | { type: string; delay?: number };
+  repeat?: any;
+  debounce?: any;
+  jobId?: string;
+  preventParsingData?: boolean;
+}
+
+// Dead Letter Queue Types
+export interface DeadLetterJob {
+  originalJobId: string;
+  jobType: string;
+  jobData: any;
+  failureReason: string;
+  attemptCount: number;
+  firstFailedAt: Date;
+  lastFailedAt: Date;
+  retryStrategy: RetryConfig;
+}
+
+// Retry Strategy Type Alias (for compatibility with utils/retry.ts)
+export type { RetryConfig as RetryStrategy };
+
+// Job Priority Levels
+export enum JobPriority {
+  CRITICAL = 1,    // Dependencies, core data
+  HIGH = 5,        // Block processing
+  MEDIUM = 10,     // Standard processing  
+  LOW = 15         // Analytics, cleanup
+}
+
 // Job Types
 export enum JobType {
   BLOCK_INDEXING = 'block_indexing',

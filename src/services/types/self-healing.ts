@@ -85,6 +85,13 @@ export interface DependencyResolver {
   ensureAccount(address: string): Promise<any>;
 
   /**
+   * Ensure a block exists, creating it if necessary
+   * @param blockNumber - The block number
+   * @returns The block entity
+   */
+  ensureBlock(blockNumber: number): Promise<any>;
+
+  /**
    * Ensure a rollup exists, creating it if necessary  
    * @param appId - The application ID
    * @returns The rollup entity
