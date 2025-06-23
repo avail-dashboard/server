@@ -108,9 +108,21 @@ The sync service is encountering "Cannot use a pool after calling end on the poo
 - [x] Analyze database pool errors in sync service
 - [x] Read sync.ts to understand the error flow  
 - [x] Check database connection management
-- [ ] Fix the sync monitor cleanup in service shutdown
-- [ ] Ensure proper service shutdown order
-- [ ] Test the fix with a complete sync cycle
+- [x] Fix the sync monitor cleanup in service shutdown
+- [x] Ensure proper service shutdown order
+- [x] Test the fix with a complete sync cycle
+
+## ✅ PROBLEM RESOLVED
+
+**Fix Implemented**: ServiceFactory.shutdown() method completely rewritten to properly stop ALL registered services.
+
+**Key Changes**:
+- Added comprehensive service shutdown iteration (all 11 services with stop() methods)
+- Implemented proper shutdown order (sync → domain → core services)
+- Added robust error handling to prevent cascade failures
+- **Critical fix**: `syncService.stop()` now properly called before database disconnect
+
+**Result**: The sync monitor interval is now properly cleared before the database pool is closed, eliminating the "Cannot use a pool after calling end on the pool" errors.
 
 ## Implementation Steps
 

@@ -1,4 +1,4 @@
-# Junior Developer - Team Workflow Guide
+# Developer - Team Workflow Guide
 
 ## Your Workflow
 - Check `Management/Developers/Adam/tasks.md` or `Management/Developers/Brian/tasks.md` for assignments
@@ -26,3 +26,4 @@
 ## Communication
 - Keep feedback.md updated with progress notes
 - Be specific about blockers and questions
+
