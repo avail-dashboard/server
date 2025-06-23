@@ -183,17 +183,23 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         count: extrinsics.length,
       });
 
-      const dbExtrinsics: Partial<Extrinsic>[] = extrinsics.map(ext => ({
-        hash: ext.hash,
-        block_number: blockNumber,
-        extrinsic_index: ext.index,
-        module: ext.method.section,
-        call: ext.method.method,
-        success: ext.success,
-        timestamp: new Date(), // Use current timestamp if not provided
-        signer: ext.signer || undefined,
-        fee: ext.fee ? Number(ext.fee) : undefined,
-      }));
+      const dbExtrinsics: Partial<Extrinsic>[] = extrinsics.map(ext => {
+        // Extract section and method from Avail SDK objects
+        const section = ext.method?.__internal__section || ext.method?.section;
+        const method = ext.method?.__internal__method || ext.method?.method;
+        
+        return {
+          hash: ext.hash,
+          block_number: blockNumber,
+          extrinsic_index: ext.index,
+          module: section,
+          call: method,
+          success: ext.success,
+          timestamp: new Date(), // Use current timestamp if not provided
+          signer: ext.signer || undefined,
+          fee: ext.fee ? Number(ext.fee) : undefined,
+        };
+      });
 
       // Batch insert extrinsics
       if (client) {
@@ -236,16 +242,22 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         count: events.length,
       });
 
-      const dbEvents: Partial<Event>[] = events.map(event => ({
-        block_number: blockNumber,
-        extrinsic_index: event.phase.applyExtrinsic || undefined,
-        event_index: event.index,
-        module: event.section,
-        event_name: event.method,
-        data: event.data,
-        topics: [], // Not directly available in basic EventData
-        timestamp: new Date(),
-      }));
+      const dbEvents: Partial<Event>[] = events.map(event => {
+        // Extract section and method from Avail SDK objects
+        const section = event.__internal__section || event.section;
+        const method = event.__internal__method || event.method;
+        
+        return {
+          block_number: blockNumber,
+          extrinsic_index: event.phase?.applyExtrinsic || undefined,
+          event_index: event.index,
+          module: section,
+          event_name: method,
+          data: event.data,
+          topics: [], // Not directly available in basic EventData
+          timestamp: new Date(),
+        };
+      });
 
       // Batch insert events
       if (client) {
