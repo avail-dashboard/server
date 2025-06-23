@@ -164,7 +164,10 @@ export class ValidatorProcessor implements IValidatorProcessor {
           lastBlockProduced: blockNumber,
         });
       } else {
-        // Create basic validator record if it doesn't exist
+        // First, ensure the account record exists (required by foreign key constraint)
+        await this.ensureAccountExists(validatorAddress);
+        
+        // Then create the validator record
         await this.validatorRepository.create({
           stashAddress: validatorAddress,
           commission: 0,
@@ -175,6 +178,12 @@ export class ValidatorProcessor implements IValidatorProcessor {
           blocksProduced: 1,
           lastBlockProduced: blockNumber,
         });
+        
+        logger.debug('ValidatorProcessor: New validator created', {
+          component: 'validator-processor',
+          validatorAddress: validatorAddress.substring(0, 20) + '...',
+          blockNumber,
+        });
       }
 
     } catch (error) {
@@ -184,6 +193,35 @@ export class ValidatorProcessor implements IValidatorProcessor {
         validatorAddress,
         blockNumber,
       });
+    }
+  }
+
+  /**
+   * Ensure account record exists for the given address
+   */
+  private async ensureAccountExists(address: string): Promise<void> {
+    try {
+      // Access the database through the ValidatorRepository's transaction method
+      await this.validatorRepository.transaction(async (tx) => {
+        await tx.$executeRaw`
+          INSERT INTO accounts (address, last_updated)
+          VALUES (${address}, CURRENT_TIMESTAMP)
+          ON CONFLICT (address) DO NOTHING
+        `;
+      });
+      
+      logger.debug('ValidatorProcessor: Account ensured', {
+        component: 'validator-processor',
+        address: address.substring(0, 20) + '...',
+      });
+      
+    } catch (error) {
+      logError(error as Error, {
+        component: 'validator-processor',
+        action: 'ensureAccountExists',
+        address,
+      });
+      throw error; // Re-throw since this is critical for validator creation
     }
   }
 
@@ -252,9 +290,17 @@ export class ValidatorProcessor implements IValidatorProcessor {
    */
   private extractBlockAuthor(blockData: BlockData): string | null {
     try {
-      // Try to extract from block data
-      // For now, return null since BlockData structure needs to be checked
-      // TODO: Implement proper block author extraction
+      // Extract block author from the validator field in BlockData
+      if (blockData.validator) {
+        logger.debug('ValidatorProcessor: Block author extracted', {
+          component: 'validator-processor',
+          blockNumber: blockData.number,
+          author: blockData.validator.substring(0, 20) + '...',
+        });
+        return blockData.validator;
+      }
+
+      // No block author found
       return null;
 
     } catch (error) {

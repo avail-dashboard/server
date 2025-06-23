@@ -353,6 +353,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         extrinsics_root: blockData.extrinsicsRoot,
         timestamp: new Date(blockData.timestamp),
         extrinsics_count: blockData.extrinsics.length,
+        validator_address: blockData.validator, // Add validator address
       };
 
       // Check if block already exists
@@ -371,8 +372,8 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
 
       // Insert new block
       await client.query(
-        `INSERT INTO blocks (number, hash, parent_hash, state_root, extrinsics_root, timestamp, extrinsics_count)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO blocks (number, hash, parent_hash, state_root, extrinsics_root, timestamp, extrinsics_count, validator_address)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           blockRecord.number,
           blockRecord.hash,
@@ -381,6 +382,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
           blockRecord.extrinsics_root,
           blockRecord.timestamp,
           blockRecord.extrinsics_count,
+          blockRecord.validator_address,
         ],
       );
 

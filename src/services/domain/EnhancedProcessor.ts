@@ -147,13 +147,13 @@ export class EnhancedProcessorService implements IEnhancedProcessorService {
         phase1Enabled: this.phase1Enabled,
       });
 
-      // 1. Process with base data processor (existing functionality)
-      await this.dataProcessor.processBlock(blockData);
-
-      // 2. Process Phase 1 data if enabled
+      // 1. Process Phase 1 data FIRST if enabled (to satisfy foreign key constraints)
       if (this.phase1Enabled) {
         await this.processPhase1Data(blockData);
       }
+
+      // 2. Process with base data processor (existing functionality)
+      await this.dataProcessor.processBlock(blockData);
 
       logger.debug('EnhancedProcessorService: Block processed successfully', { 
         component: 'enhanced-processor', 

@@ -57,7 +57,7 @@ import {
   BlockMapper,
 } from '../mappers';
 
-  // Database imports
+// Database imports
 import db from '../utils/database';
 import { 
   blockRepository, 

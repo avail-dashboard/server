@@ -219,10 +219,30 @@ export class AvailBlockchainService implements BaseService {
       hash: hash.substring(0, 20) + '...',
     });
     
-    const [block, events] = await Promise.all([
+    const [block, events, header] = await Promise.all([
       api.rpc.chain.getBlock(hash),
       api.query.system.events.at(hash),
+      api.derive.chain.getHeader(hash),
     ]);
+
+    // Extract block author from the extended header
+    let blockAuthor: string | undefined;
+    try {
+      if (header && header.author) {
+        blockAuthor = header.author.toString();
+        logger.debug('Block author extracted', {
+          component: 'avail-blockchain',
+          blockNumber: header.number.toNumber(),
+          author: blockAuthor ? blockAuthor.substring(0, 20) + '...' : 'unknown',
+        });
+      }
+    } catch (error) {
+      logger.debug('Could not extract block author', {
+        component: 'avail-blockchain',
+        blockNumber: block.block.header.number.toNumber(),
+        error: (error as Error).message,
+      });
+    }
 
     // Extract more complete information using avail-sdk capabilities
     const blockData: BlockData = {
@@ -232,6 +252,7 @@ export class AvailBlockchainService implements BaseService {
       stateRoot: block.block.header.stateRoot.toString(),
       extrinsicsRoot: block.block.header.extrinsicsRoot.toString(),
       timestamp: Date.now(), // Should be extracted from timestamp extrinsic
+      validator: blockAuthor, // Add the extracted block author
       extrinsics: this.extractExtrinsicsData(block.block.extrinsics),
       events: this.extractEventsData(events as any),
     };
@@ -242,6 +263,7 @@ export class AvailBlockchainService implements BaseService {
       blockNumber: blockData.number,
       extrinsicsCount: block.block.extrinsics.length,
       eventsCount: Array.isArray(events) ? events.length : 0,
+      hasAuthor: !!blockData.validator,
     });
 
     return blockData;

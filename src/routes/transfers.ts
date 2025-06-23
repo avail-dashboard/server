@@ -17,14 +17,14 @@ router.get('/',
       
       // Parse query parameters for filtering
       const filters: TransferFilters = {};
-      if (req.query.from) filters.fromAddress = req.query.from as string;
-      if (req.query.to) filters.toAddress = req.query.to as string;
-      if (req.query.minAmount) filters.minAmount = req.query.minAmount as string;
-      if (req.query.maxAmount) filters.maxAmount = req.query.maxAmount as string;
-      if (req.query.blockNumber) filters.blockNumber = parseInt(req.query.blockNumber as string);
-      if (req.query.blockHash) filters.blockHash = req.query.blockHash as string;
-      if (req.query.startDate) filters.startDate = new Date(req.query.startDate as string);
-      if (req.query.endDate) filters.endDate = new Date(req.query.endDate as string);
+      if (req.query.from) {filters.fromAddress = req.query.from as string;}
+      if (req.query.to) {filters.toAddress = req.query.to as string;}
+      if (req.query.minAmount) {filters.minAmount = req.query.minAmount as string;}
+      if (req.query.maxAmount) {filters.maxAmount = req.query.maxAmount as string;}
+      if (req.query.blockNumber) {filters.blockNumber = parseInt(req.query.blockNumber as string);}
+      if (req.query.blockHash) {filters.blockHash = req.query.blockHash as string;}
+      if (req.query.startDate) {filters.startDate = new Date(req.query.startDate as string);}
+      if (req.query.endDate) {filters.endDate = new Date(req.query.endDate as string);}
 
       // Parse pagination options
       const options: PaginationOptions = {

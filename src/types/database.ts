@@ -493,6 +493,7 @@ export interface Block {
   extrinsics_root?: string;
   timestamp: Date;
   extrinsics_count: number;
+  validator_address?: string; // Add validator address field
   created_at: Date;
 }
 
