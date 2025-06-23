@@ -420,24 +420,92 @@ export class BlockIndexerService implements BaseService, IBlockIndexerService {
     ];
     
     return metadataErrorPatterns.some(pattern => 
-      errorMessage.includes(pattern)
+      errorMessage.includes(pattern),
     );
   }
 
   /**
    * Validate individual extrinsic structure
+   * Enhanced for Avail SDK compatibility
    */
   private validateExtrinsic(extrinsic: ExtrinsicData): boolean {
     try {
-      if (!extrinsic) {return false;}
-      if (typeof extrinsic.index !== 'number' || extrinsic.index < 0) {return false;}
-      if (!extrinsic.hash || extrinsic.hash.length !== 66) {return false;}
-      if (typeof extrinsic.isSigned !== 'boolean') {return false;}
-      if (!extrinsic.method || !extrinsic.method.section || !extrinsic.method.method) {return false;}
-      if (typeof extrinsic.success !== 'boolean') {return false;}
+      if (!extrinsic) {
+        logger.debug('BlockIndexerService: Extrinsic is null/undefined', { 
+          component: 'indexer',
+        });
+        return false;
+      }
+      
+      // Validate index
+      if (typeof extrinsic.index !== 'number' || extrinsic.index < 0) {
+        logger.debug('BlockIndexerService: Invalid extrinsic index', { 
+          component: 'indexer', 
+          index: extrinsic.index, 
+        });
+        return false;
+      }
+      
+      // Validate hash - allow for different formats or missing hash for inherent extrinsics
+      if (extrinsic.hash && extrinsic.hash.length !== 66) {
+        logger.debug('BlockIndexerService: Invalid extrinsic hash format', { 
+          component: 'indexer', 
+          hash: extrinsic.hash,
+          length: extrinsic.hash.length, 
+        });
+        return false;
+      }
+      
+      // Handle isSigned field - infer from signer presence if not provided by SDK
+      if (typeof extrinsic.isSigned !== 'boolean') {
+        // Avail SDK doesn't always provide isSigned, infer from signer presence
+        (extrinsic as any).isSigned = !!extrinsic.signer;
+        logger.debug('BlockIndexerService: Inferred isSigned from signer presence', { 
+          component: 'indexer',
+          hasSigner: !!extrinsic.signer,
+          inferredIsSigned: (extrinsic as any).isSigned,
+        });
+      }
+      
+      // Validate method structure
+      if (!extrinsic.method) {
+        logger.debug('BlockIndexerService: Missing method field', { 
+          component: 'indexer', 
+        });
+        return false;
+      }
+      
+      if (!extrinsic.method.section || !extrinsic.method.method) {
+        logger.debug('BlockIndexerService: Invalid method structure', { 
+          component: 'indexer', 
+          method: extrinsic.method, 
+        });
+        return false;
+      }
+      
+      // Handle success field - some extrinsics might not have this initially
+      if (typeof extrinsic.success !== 'boolean') {
+        logger.debug('BlockIndexerService: Missing success field, defaulting to true', { 
+          component: 'indexer', 
+        });
+        (extrinsic as any).success = true; // Default assumption for validation
+      }
+      
+      logger.debug('BlockIndexerService: Extrinsic validation passed', {
+        component: 'indexer',
+        index: extrinsic.index,
+        method: `${extrinsic.method.section}.${extrinsic.method.method}`,
+        isSigned: (extrinsic as any).isSigned,
+        hasSigner: !!extrinsic.signer,
+      });
       
       return true;
+      
     } catch (error) {
+      logger.error('BlockIndexerService: Extrinsic validation error', { 
+        component: 'indexer', 
+        error: (error as Error).message, 
+      });
       return false;
     }
   }
