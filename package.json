@@ -34,6 +34,9 @@
     "sync:live": "ENV_FILE=.env.production tsx scripts/sync-blockchain-data.ts --mode live",
     "sync:range": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode range",
     "sync:test": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode range --from 1000000 --to 1000010 --batch-size 5",
+    "test:phase1": "ENV_FILE=.env.local tsx scripts/test-phase1-processors.ts",
+    "test:phase1:integration": "ENV_FILE=.env.test jest tests/integration/phase1-integration.test.ts",
+    "test:phase1:performance": "ENV_FILE=.env.local tsx scripts/test-phase1-performance.ts",
     "db:init": "npm run prisma:migrate:deploy && npm run prisma:generate",
     "db:reset": "npm run prisma:migrate:reset && npm run prisma:generate",
     "db:seed": "ENV_FILE=.env.local tsx scripts/seed-database.ts",
@@ -49,14 +52,6 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@polkadot/api": "^16.1.1",
-    "@polkadot/api-augment": "^16.1.1",
-    "@polkadot/keyring": "^13.5.1",
-    "@polkadot/rpc-core": "^16.1.1",
-    "@polkadot/rpc-provider": "^16.1.1",
-    "@polkadot/types": "^16.1.1",
-    "@polkadot/util": "^13.5.1",
-    "@polkadot/util-crypto": "^13.5.1",
     "@prisma/client": "^6.9.0",
     "@types/uuid": "^10.0.0",
     "avail-js-sdk": "^0.4.2",
@@ -113,20 +108,6 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "resolutions": {
-    "@polkadot/api": "16.1.1",
-    "@polkadot/api-augment": "16.1.1",
-    "@polkadot/keyring": "13.5.1",
-    "@polkadot/rpc-core": "16.1.1",
-    "@polkadot/rpc-provider": "16.1.1",
-    "@polkadot/types": "16.1.1",
-    "@polkadot/util": "13.5.1",
-    "@polkadot/util-crypto": "13.5.1",
-    "@polkadot/types-create": "16.1.1",
-    "@polkadot/types-codec": "16.1.1",
-    "@polkadot/types-known": "16.1.1",
-    "@polkadot/api-derive": "16.1.1"
   },
   "keywords": [
     "avail",
