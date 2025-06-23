@@ -30,6 +30,43 @@ interface ErrorClassification {
   alertLevel: 'low' | 'medium' | 'high' | 'critical';
 }
 
+// Phase 2: Dependency Job Data Interfaces - Adam's Implementation
+interface DependencyDetectionJobData {
+  entityType: 'block' | 'account' | 'rollup' | 'validator';
+  entityId: string;
+  priority?: number;
+}
+
+interface DependencyResolutionJobData {
+  dependencyType: string;
+  dependencyId: string;
+  entityType: string;
+  entityId: string;
+  priority: number;
+}
+
+interface DependencyBatchResolutionJobData {
+  dependencies: Array<{
+    dependencyType: string;
+    dependencyId: string;
+    entityType: string;
+    entityId: string;
+  }>;
+  batchSize?: number;
+}
+
+interface DependencyGapAnalysisJobData {
+  startBlock: number;
+  endBlock: number;
+  entityType?: string;
+}
+
+interface DependencyConsistencyCheckJobData {
+  entityType: string;
+  entityIds: string[];
+  checkLevel: 'basic' | 'deep';
+}
+
 /**
  * QueueService - Background job processing with Bull queue
  * 
@@ -994,6 +1031,447 @@ export class QueueService implements QueueServiceInterface {
       }
     });
 
+    // ==================== Adam's Phase 2 Queue Integration - New Job Types ====================
+    
+    // DEPENDENCY_DETECTION processor - Adam's Implementation
+    this.jobProcessors.set(JobType.DEPENDENCY_DETECTION, async (job: Job<DependencyDetectionJobData>) => {
+      const { entityType, entityId, priority = 1 } = job.data;
+      const startTime = Date.now();
+      
+      this.logger.debug('Processing dependency detection job', { 
+        component: 'queue-service',
+        jobId: job.id, 
+        entityType,
+        entityId,
+        priority,
+      });
+      
+      try {
+        // Get dependency detection engine service
+        const dependencyDetectionEngine = await this.getService<any>('dependencyDetectionEngine');
+        
+        // Create processed entity for dependency detection
+        const processedEntity = {
+          id: entityId,
+          type: entityType,
+          data: { entityType, entityId },
+          timestamp: new Date(),
+        };
+        
+        // Detect missing dependencies using Adam's service
+        const dependencyReport = await dependencyDetectionEngine.detectMissingDependencies(processedEntity);
+        
+        // Queue resolution jobs for each missing dependency
+        for (const dependency of dependencyReport.missingDependencies) {
+          await this.addJob(JobType.DEPENDENCY_RESOLUTION, {
+            dependencyType: dependency.entityType,
+            dependencyId: dependency.entityId,
+            entityType,
+            entityId,
+            priority: dependency.priority,
+          }, { priority: this.mapDependencyPriorityToJobPriority(dependency.priority) });
+        }
+        
+        const duration = Date.now() - startTime;
+        
+        this.logger.info('Dependency detection completed successfully', {
+          component: 'queue-service',
+          jobId: job.id,
+          entityType,
+          entityId,
+          totalMissing: dependencyReport.totalMissing,
+          criticalMissing: dependencyReport.criticalMissing,
+          duration,
+        });
+        
+        return {
+          success: true,
+          data: {
+            entityType,
+            entityId,
+            dependencyReport,
+            resolutionJobsQueued: dependencyReport.missingDependencies.length,
+          },
+          metrics: {
+            duration,
+            dependenciesDetected: dependencyReport.totalMissing,
+            criticalDependencies: dependencyReport.criticalMissing,
+          },
+        };
+        
+      } catch (error) {
+        const classification = this.classifyError(error as Error, JobType.DEPENDENCY_DETECTION);
+        const duration = Date.now() - startTime;
+        
+        this.logger.error('Dependency detection failed', {
+          component: 'queue-service',
+          jobId: job.id,
+          entityType,
+          entityId,
+          error: (error as Error).message,
+          classification,
+          duration,
+        });
+        
+        throw error;
+      }
+    });
+
+    // DEPENDENCY_RESOLUTION processor - Adam's Implementation
+    this.jobProcessors.set(JobType.DEPENDENCY_RESOLUTION, async (job: Job<DependencyResolutionJobData>) => {
+      const { dependencyType, dependencyId, entityType, entityId, priority } = job.data;
+      const startTime = Date.now();
+      
+      this.logger.debug('Processing dependency resolution job', { 
+        component: 'queue-service',
+        jobId: job.id, 
+        dependencyType,
+        dependencyId,
+        entityType,
+        entityId,
+        priority,
+      });
+      
+      try {
+        // Get missing data resolver service
+        const missingDataResolver = await this.getService<any>('missingDataResolver');
+        
+        // Resolve dependency using Adam's service
+        let result;
+        switch (dependencyType) {
+        case 'block':
+          result = await missingDataResolver.resolveBlock(parseInt(dependencyId, 10));
+          break;
+        case 'account':
+        case 'validator':
+          result = await missingDataResolver.resolveAccount(dependencyId);
+          break;
+        case 'rollup':
+          result = await missingDataResolver.resolveRollup(parseInt(dependencyId, 10));
+          break;
+        default:
+          throw new Error(`Unsupported dependency type: ${dependencyType}`);
+        }
+        
+        const duration = Date.now() - startTime;
+        
+        if (!result.resolved) {
+          throw new Error(`Failed to resolve dependency: ${result.error}`);
+        }
+        
+        this.logger.info('Dependency resolved successfully', {
+          component: 'queue-service',
+          jobId: job.id,
+          dependencyType,
+          dependencyId,
+          duration,
+          resolutionTime: result.resolutionTime,
+        });
+        
+        return {
+          success: true,
+          data: {
+            dependencyType,
+            dependencyId,
+            entityType,
+            entityId,
+            result,
+          },
+          metrics: {
+            duration,
+            resolutionTime: result.resolutionTime,
+            resolved: result.resolved,
+          },
+        };
+        
+      } catch (error) {
+        const classification = this.classifyError(error as Error, JobType.DEPENDENCY_RESOLUTION);
+        const duration = Date.now() - startTime;
+        
+        this.logger.error('Dependency resolution failed', {
+          component: 'queue-service',
+          jobId: job.id,
+          dependencyType,
+          dependencyId,
+          error: (error as Error).message,
+          classification,
+          duration,
+        });
+        
+        throw error;
+      }
+    });
+
+    // DEPENDENCY_BATCH_RESOLUTION processor - Adam's Implementation
+    this.jobProcessors.set(JobType.DEPENDENCY_BATCH_RESOLUTION, async (job: Job<DependencyBatchResolutionJobData>) => {
+      const { dependencies, batchSize = 10 } = job.data;
+      const startTime = Date.now();
+      
+      this.logger.debug('Processing dependency batch resolution job', { 
+        component: 'queue-service',
+        jobId: job.id, 
+        dependencyCount: dependencies.length,
+        batchSize,
+      });
+      
+      try {
+        // Get missing data resolver service
+        const missingDataResolver = await this.getService<any>('missingDataResolver');
+        
+        // Convert to MissingDependency format for batch processing
+        const missingDependencies = dependencies.map(dep => ({
+          entityType: dep.dependencyType,
+          entityId: dep.dependencyId,
+          requiredBy: dep.entityId,
+          priority: 2, // Default to HIGH priority
+          discoveredAt: new Date(),
+        }));
+        
+        // Resolve dependencies in batch using Adam's service
+        const batchResolution = await missingDataResolver.resolveBatch(missingDependencies);
+        
+        const duration = Date.now() - startTime;
+        
+        this.logger.info('Dependency batch resolution completed', {
+          component: 'queue-service',
+          jobId: job.id,
+          batchId: batchResolution.batchId,
+          totalDependencies: batchResolution.totalDependencies,
+          resolvedCount: batchResolution.resolvedCount,
+          failedCount: batchResolution.failedCount,
+          efficiency: `${batchResolution.efficiency.toFixed(2)}%`,
+          duration,
+          totalTime: batchResolution.totalTime,
+        });
+        
+        return {
+          success: batchResolution.resolvedCount > 0,
+          data: {
+            batchResolution,
+            processedCount: dependencies.length,
+          },
+          metrics: {
+            duration,
+            totalTime: batchResolution.totalTime,
+            resolvedCount: batchResolution.resolvedCount,
+            failedCount: batchResolution.failedCount,
+            efficiency: batchResolution.efficiency,
+          },
+        };
+        
+      } catch (error) {
+        const classification = this.classifyError(error as Error, JobType.DEPENDENCY_BATCH_RESOLUTION);
+        const duration = Date.now() - startTime;
+        
+        this.logger.error('Dependency batch resolution failed', {
+          component: 'queue-service',
+          jobId: job.id,
+          dependencyCount: dependencies.length,
+          error: (error as Error).message,
+          classification,
+          duration,
+        });
+        
+        throw error;
+      }
+    });
+
+    // DEPENDENCY_GAP_ANALYSIS processor - Adam's Implementation
+    this.jobProcessors.set(JobType.DEPENDENCY_GAP_ANALYSIS, async (job: Job<DependencyGapAnalysisJobData>) => {
+      const { startBlock, endBlock, entityType } = job.data;
+      const startTime = Date.now();
+      
+      this.logger.debug('Processing dependency gap analysis job', { 
+        component: 'queue-service',
+        jobId: job.id, 
+        startBlock,
+        endBlock,
+        entityType,
+        blockRange: endBlock - startBlock + 1,
+      });
+      
+      try {
+        // Get dependency detection engine service
+        const dependencyDetectionEngine = await this.getService<any>('dependencyDetectionEngine');
+        
+        const gapsFound = [];
+        const blockRange = endBlock - startBlock + 1;
+        
+        // Analyze each block in the range for dependency gaps
+        for (let blockNumber = startBlock; blockNumber <= endBlock; blockNumber++) {
+          const processedEntity = {
+            id: `block-${blockNumber}`,
+            type: 'block',
+            data: { blockNumber },
+            blockNumber,
+            timestamp: new Date(),
+          };
+          
+          // Detect missing dependencies for this block
+          const dependencyReport = await dependencyDetectionEngine.detectMissingDependencies(processedEntity);
+          
+          if (dependencyReport.resolutionRequired) {
+            gapsFound.push({
+              blockNumber,
+              missingDependencies: dependencyReport.missingDependencies,
+              criticalMissing: dependencyReport.criticalMissing,
+            });
+          }
+        }
+        
+        const duration = Date.now() - startTime;
+        
+        this.logger.info('Dependency gap analysis completed', {
+          component: 'queue-service',
+          jobId: job.id,
+          startBlock,
+          endBlock,
+          blocksAnalyzed: blockRange,
+          gapsFound: gapsFound.length,
+          duration,
+        });
+        
+        return {
+          success: true,
+          data: {
+            startBlock,
+            endBlock,
+            blocksAnalyzed: blockRange,
+            gapsFound,
+            totalGaps: gapsFound.length,
+            gapPercentage: (gapsFound.length / blockRange) * 100,
+          },
+          metrics: {
+            duration,
+            blocksAnalyzed: blockRange,
+            gapsFound: gapsFound.length,
+            analysisRate: blockRange / (duration / 1000),
+          },
+        };
+        
+      } catch (error) {
+        const classification = this.classifyError(error as Error, JobType.DEPENDENCY_GAP_ANALYSIS);
+        const duration = Date.now() - startTime;
+        
+        this.logger.error('Dependency gap analysis failed', {
+          component: 'queue-service',
+          jobId: job.id,
+          startBlock,
+          endBlock,
+          error: (error as Error).message,
+          classification,
+          duration,
+        });
+        
+        throw error;
+      }
+    });
+
+    // DEPENDENCY_CONSISTENCY_CHECK processor - Adam's Implementation
+    this.jobProcessors.set(JobType.DEPENDENCY_CONSISTENCY_CHECK, async (job: Job<DependencyConsistencyCheckJobData>) => {
+      const { entityType, entityIds, checkLevel } = job.data;
+      const startTime = Date.now();
+      
+      this.logger.debug('Processing dependency consistency check job', { 
+        component: 'queue-service',
+        jobId: job.id, 
+        entityType,
+        entityCount: entityIds.length,
+        checkLevel,
+      });
+      
+      try {
+        // Get dependency detection engine service
+        const dependencyDetectionEngine = await this.getService<any>('dependencyDetectionEngine');
+        
+        const inconsistencies = [];
+        
+        // Check each entity for dependency consistency
+        for (const entityId of entityIds) {
+          // Validate that the entity and its dependencies exist
+          const entityExists = await dependencyDetectionEngine.validateDependency(entityType, entityId);
+          
+          if (!entityExists) {
+            inconsistencies.push({
+              entityType,
+              entityId,
+              issue: 'entity_missing',
+              severity: 'critical',
+            });
+            continue;
+          }
+          
+          if (checkLevel === 'deep') {
+            // Perform deep consistency check
+            const processedEntity = {
+              id: entityId,
+              type: entityType,
+              data: { entityType, entityId },
+              timestamp: new Date(),
+            };
+            
+            const dependencyReport = await dependencyDetectionEngine.detectMissingDependencies(processedEntity);
+            
+            if (dependencyReport.resolutionRequired) {
+              inconsistencies.push({
+                entityType,
+                entityId,
+                issue: 'missing_dependencies',
+                severity: dependencyReport.criticalMissing > 0 ? 'critical' : 'warning',
+                missingDependencies: dependencyReport.missingDependencies,
+              });
+            }
+          }
+        }
+        
+        const duration = Date.now() - startTime;
+        
+        this.logger.info('Dependency consistency check completed', {
+          component: 'queue-service',
+          jobId: job.id,
+          entityType,
+          entitiesChecked: entityIds.length,
+          inconsistenciesFound: inconsistencies.length,
+          checkLevel,
+          duration,
+        });
+        
+        return {
+          success: true,
+          data: {
+            entityType,
+            entitiesChecked: entityIds.length,
+            inconsistencies,
+            totalInconsistencies: inconsistencies.length,
+            consistencyRate: ((entityIds.length - inconsistencies.length) / entityIds.length) * 100,
+            checkLevel,
+          },
+          metrics: {
+            duration,
+            entitiesChecked: entityIds.length,
+            inconsistenciesFound: inconsistencies.length,
+            checkRate: entityIds.length / (duration / 1000),
+          },
+        };
+        
+      } catch (error) {
+        const classification = this.classifyError(error as Error, JobType.DEPENDENCY_CONSISTENCY_CHECK);
+        const duration = Date.now() - startTime;
+        
+        this.logger.error('Dependency consistency check failed', {
+          component: 'queue-service',
+          jobId: job.id,
+          entityType,
+          entityCount: entityIds.length,
+          error: (error as Error).message,
+          classification,
+          duration,
+        });
+        
+        throw error;
+      }
+    });
+
     // ==================== End Phase 2 Processors ====================
   }
 
@@ -1137,6 +1615,90 @@ export class QueueService implements QueueServiceInterface {
 
   async scheduleHealthCheck(delay = 0): Promise<QueueJob> {
     return this.addJob(JobType.HEALTH_CHECK, {}, { delay });
+  }
+
+  // ==================== Adam's Phase 2 Queue Integration - Convenience Methods ====================
+
+  /**
+   * Schedule dependency detection for an entity
+   */
+  async scheduleDependencyDetection(
+    entityType: 'block' | 'account' | 'rollup' | 'validator',
+    entityId: string,
+    priority = 1,
+  ): Promise<QueueJob> {
+    return this.addJob(JobType.DEPENDENCY_DETECTION, {
+      entityType,
+      entityId,
+      priority,
+    }, { priority: this.mapDependencyPriorityToJobPriority(priority) });
+  }
+
+  /**
+   * Schedule resolution of a specific dependency
+   */
+  async scheduleDependencyResolution(
+    dependencyType: string,
+    dependencyId: string,
+    entityType: string,
+    entityId: string,
+    priority: number,
+  ): Promise<QueueJob> {
+    return this.addJob(JobType.DEPENDENCY_RESOLUTION, {
+      dependencyType,
+      dependencyId,
+      entityType,
+      entityId,
+      priority,
+    }, { priority: this.mapDependencyPriorityToJobPriority(priority) });
+  }
+
+  /**
+   * Schedule batch resolution of multiple dependencies
+   */
+  async scheduleDependencyBatchResolution(
+    dependencies: Array<{
+      dependencyType: string;
+      dependencyId: string;
+      entityType: string;
+      entityId: string;
+    }>,
+    batchSize = 10,
+  ): Promise<QueueJob> {
+    return this.addJob(JobType.DEPENDENCY_BATCH_RESOLUTION, {
+      dependencies,
+      batchSize,
+    }, { priority: JobPriority.HIGH });
+  }
+
+  /**
+   * Schedule gap analysis for a block range
+   */
+  async scheduleDependencyGapAnalysis(
+    startBlock: number,
+    endBlock: number,
+    entityType?: string,
+  ): Promise<QueueJob> {
+    return this.addJob(JobType.DEPENDENCY_GAP_ANALYSIS, {
+      startBlock,
+      endBlock,
+      entityType,
+    }, { priority: JobPriority.MEDIUM });
+  }
+
+  /**
+   * Schedule consistency check for entities
+   */
+  async scheduleDependencyConsistencyCheck(
+    entityType: string,
+    entityIds: string[],
+    checkLevel: 'basic' | 'deep' = 'basic',
+  ): Promise<QueueJob> {
+    return this.addJob(JobType.DEPENDENCY_CONSISTENCY_CHECK, {
+      entityType,
+      entityIds,
+      checkLevel,
+    }, { priority: JobPriority.MEDIUM });
   }
 
   /**

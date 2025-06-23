@@ -56,3 +56,7 @@ Ensure all block header fields are stored in database. Check processor includes 
 Use AvailBlockchainService for proper extrinsics extraction, not BlockchainService.
 ✅ Correct: AvailBlockchainService - extracts extrinsics properly with avail-sdk
 ❌ Wrong: BlockchainService - returns empty extrinsics arrays, causes missing data
+
+## Task Assignment Conflicts
+Developer gets stuck with conflicting or unclear task assignments showing overlapping scope between parent and delegated tasks.
+✅ Solution: Create simple task guides with exact file locations and specific code to replace, clear delegation boundaries

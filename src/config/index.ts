@@ -135,6 +135,37 @@ export const config = {
         exponentialFactor: 1.5,
         jitterEnabled: false,
       },
+      // Phase 2: Dependency Management Job Retry Strategies - Adam's Implementation
+      [JobType.DEPENDENCY_DETECTION]: {
+        baseDelay: 2000,
+        maxDelay: 20000,
+        exponentialFactor: 1.8,
+        jitterEnabled: true,
+      },
+      [JobType.DEPENDENCY_RESOLUTION]: {
+        baseDelay: 3000,
+        maxDelay: 30000,
+        exponentialFactor: 2,
+        jitterEnabled: true,
+      },
+      [JobType.DEPENDENCY_BATCH_RESOLUTION]: {
+        baseDelay: 5000,
+        maxDelay: 60000,
+        exponentialFactor: 2,
+        jitterEnabled: true,
+      },
+      [JobType.DEPENDENCY_GAP_ANALYSIS]: {
+        baseDelay: 2500,
+        maxDelay: 45000,
+        exponentialFactor: 1.8,
+        jitterEnabled: true,
+      },
+      [JobType.DEPENDENCY_CONSISTENCY_CHECK]: {
+        baseDelay: 2000,
+        maxDelay: 25000,
+        exponentialFactor: 1.8,
+        jitterEnabled: true,
+      },
     },
   },
 

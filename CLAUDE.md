@@ -13,12 +13,12 @@
 11. Docs/Avail DA Explorer Scope.md - contains the scope of this project. (load optionally, as per need)
 
 12. You can recommend tasks for delegation to Adam/Brian, but only assign when told "delegate-task" followed by the task and developer name. You will always let me know whenever it makes sense to delegate a task along with how to trigger it. When a task is delegated, you will suggest what we can do meanwhile.
+13. Whenever the name John/Adam/Brian are used, you load the ./Team directory.
 
 **Developer Selection Guidelines**: When "delegate-task" is used without specifying a developer name, suggest the most suitable developer based on task complexity:
 - **Critical/Architectural tasks**: Recommend John (Senior) - System architecture, complex integrations, performance optimization, technical leadership decisions
 - **Complex/Architecture tasks**: Recommend Adam (SDE-2) - Advanced backend systems, queue management, complex TypeScript, system integration
 - **Basic/Intermediate Backend tasks**: Recommend Brian (SDE-1) - API development, database operations, service functions, testing
-- **Learning opportunities**: Match tasks slightly above developer's current level for growth 
 
 https://github.com/availproject/avail - for avail codebase 
 https://github.com/polkadot-js/api - for polkadot-js/api codebase

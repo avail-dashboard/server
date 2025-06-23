@@ -147,4 +147,10 @@ export enum JobType {
   SYNC_BLOCK_RANGE = 'sync_block_range',
   PROCESS_BLOCK_DATA = 'process_block_data',
   UPDATE_SYNC_STATE = 'update_sync_state',
+  // Phase 2: Dependency Management Job Types - Adam's Implementation
+  DEPENDENCY_DETECTION = 'dependency_detection',
+  DEPENDENCY_RESOLUTION = 'dependency_resolution',
+  DEPENDENCY_BATCH_RESOLUTION = 'dependency_batch_resolution',
+  DEPENDENCY_GAP_ANALYSIS = 'dependency_gap_analysis',
+  DEPENDENCY_CONSISTENCY_CHECK = 'dependency_consistency_check',
 } 
