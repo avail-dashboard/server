@@ -35,9 +35,6 @@ export interface ExtrinsicData {
     section: string;
     method: string;
     args: Record<string, any>;
-    // Avail SDK internal properties
-    __internal__section?: string;
-    __internal__method?: string;
   };
   signer?: string;
   nonce?: number;
@@ -57,9 +54,6 @@ export interface EventData {
     finalization?: boolean;
     initialization?: boolean;
   };
-  // Avail SDK internal properties
-  __internal__section?: string;
-  __internal__method?: string;
 }
 
 export interface ChainInfo {

@@ -184,9 +184,9 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       });
 
       const dbExtrinsics: Partial<Extrinsic>[] = extrinsics.map(ext => {
-        // Extract section and method from Avail SDK objects
-        const section = ext.method?.__internal__section || ext.method?.section;
-        const method = ext.method?.__internal__method || ext.method?.method;
+        // Extract section and method from Avail SDK objects using proper API
+        const section = ext.method?.section || 'unknown';
+        const method = ext.method?.method || 'unknown';
         
         return {
           hash: ext.hash,
@@ -243,9 +243,9 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
       });
 
       const dbEvents: Partial<Event>[] = events.map(event => {
-        // Extract section and method from Avail SDK objects
-        const section = event.__internal__section || event.section;
-        const method = event.__internal__method || event.method;
+        // Extract section and method from Avail SDK objects using proper API
+        const section = event.section || 'unknown';
+        const method = event.method || 'unknown';
         
         return {
           block_number: blockNumber,
