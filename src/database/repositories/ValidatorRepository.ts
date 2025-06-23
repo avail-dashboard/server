@@ -191,13 +191,23 @@ export class ValidatorRepository extends BaseRepository {
    * Upsert validator (create or update)
    */
   async upsert(stashAddress: string, data: ValidatorCreateInput): Promise<Validator> {
+    const { stashAddress: _, ...updateData } = data;
+    
+    // Clean update data for Prisma type compatibility
+    const cleanUpdateData: Partial<ValidatorCreateInput> = {};
+    Object.entries(updateData).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        (cleanUpdateData as any)[key] = value;
+      }
+    });
+    
     return this.prisma.validator.upsert({
       where: { stashAddress },
       create: data,
       update: {
-        ...data,
+        ...cleanUpdateData,
         updatedAt: new Date(),
-      },
+      } as any, // Type assertion to bypass strict typing
     });
   }
 

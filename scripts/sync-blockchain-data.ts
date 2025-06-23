@@ -18,7 +18,11 @@ import db from '../src/utils/database';
 import { ConnectionManager } from '../src/services/core/connection-manager';
 import { AvailBlockchainService } from '../src/services/core/avail-blockchain';
 import { createBlockIndexerService } from '../src/services/domain/indexer';
-import { createDataProcessorService } from '../src/services/domain/processor';
+
+import { createEnhancedProcessorService, EnhancedProcessorService } from '../src/services/domain/EnhancedProcessor';
+import { ValidatorRepository } from '../src/database/repositories/ValidatorRepository';
+import { TransferRepository } from '../src/database/repositories/TransferRepository';
+import { EraRepository } from '../src/database/repositories/EraRepository';
 import { createSyncService } from '../src/services/core/sync';
 import { QueueService } from '../src/services/core/queue';
 import { HybridProcessor, createHybridProcessor } from '../src/services/core/hybrid-processor';
@@ -30,26 +34,41 @@ interface SyncOptions {
   toBlock?: number;
   batchSize?: number;
   delayMs?: number;
+  phase1Enabled?: boolean;
 }
 
 class StandaloneSyncScript {
   private connectionManager: ConnectionManager;
   private blockchain: AvailBlockchainService;
   private indexer: ReturnType<typeof createBlockIndexerService>;
-  private processor: ReturnType<typeof createDataProcessorService>;
+  private processor: EnhancedProcessorService;
   private queueService: QueueService;
   private syncService: ReturnType<typeof createSyncService>;
   private hybridProcessor: HybridProcessor;
   private availIndexer: AvailDataSubmissionIndexer;
   private shouldStop = false;
   private currentBlock = 0;
+  private phase1Enabled = true;
 
   constructor() {
     // Initialize services
     this.connectionManager = new ConnectionManager();
     this.blockchain = new AvailBlockchainService();
     this.indexer = createBlockIndexerService(db, this.blockchain);
-    this.processor = createDataProcessorService(db, this.blockchain);
+    
+    // Initialize Phase 1 repositories
+    const validatorRepository = new ValidatorRepository();
+    const transferRepository = new TransferRepository();
+    const eraRepository = new EraRepository();
+    
+    // Create enhanced processor with Phase 1 support
+    this.processor = createEnhancedProcessorService(
+      db, 
+      this.blockchain,
+      validatorRepository,
+      transferRepository,
+      eraRepository,
+    );
     
     // Create a minimal queue service for sync service dependency
     this.queueService = new QueueService();
@@ -63,9 +82,17 @@ class StandaloneSyncScript {
   /**
    * Initialize all services
    */
-  async initialize(): Promise<void> {
+  async initialize(options?: SyncOptions): Promise<void> {
     try {
-      logger.info('🚀 Initializing sync script services...');
+      logger.info('🚀 Initializing sync script services...', {
+        phase1Enabled: options?.phase1Enabled ?? this.phase1Enabled,
+      });
+
+      // Configure Phase 1 based on options
+      if (options?.phase1Enabled !== undefined) {
+        this.phase1Enabled = options.phase1Enabled;
+        this.processor.setPhase1Enabled(this.phase1Enabled);
+      }
 
       // Initialize database connection
       await db.connect();
@@ -87,7 +114,9 @@ class StandaloneSyncScript {
       // Initialize dual SDK services
       await this.hybridProcessor.initialize();
       await this.availIndexer.initialize();
-      logger.info('✅ All services initialized (including dual SDK support)');
+      logger.info('✅ All services initialized (including dual SDK support)', {
+        phase1Enabled: this.phase1Enabled,
+      });
 
     } catch (error) {
       logger.error('❌ Failed to initialize services:', error);
@@ -150,6 +179,7 @@ class StandaloneSyncScript {
       mode: 'incremental',
       batchSize: 50,
       delayMs: 100,
+      phase1Enabled: process.env.PHASE1_ENABLED !== 'false', // Default to true, disable with env var
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -170,6 +200,10 @@ class StandaloneSyncScript {
       } else if (arg === '--delay' && args[i + 1]) {
         options.delayMs = parseInt(args[i + 1]);
         i++;
+      } else if (arg === '--phase1-enabled') {
+        options.phase1Enabled = true;
+      } else if (arg === '--phase1-disabled') {
+        options.phase1Enabled = false;
       }
     }
 
@@ -181,7 +215,6 @@ class StandaloneSyncScript {
    */
   async determineSyncRange(options: SyncOptions): Promise<{ from: number; to: number }> {
     const latestBlock = await this.blockchain.getLatestBlock();
-    const syncState = await this.syncService.getCurrentSyncState();
     
     let from: number;
     let to: number;
@@ -193,6 +226,8 @@ class StandaloneSyncScript {
       break;
         
     case 'incremental':
+      // Only use sync service for incremental mode
+      const syncState = await this.syncService.getCurrentSyncState();
       from = Number(syncState.last_synced_block) + 1;
       to = options.toBlock ?? latestBlock.number;
       break;
@@ -206,7 +241,9 @@ class StandaloneSyncScript {
       break;
         
     case 'live':
-      from = Number(syncState.last_synced_block) + 1;
+      // Only use sync service for live mode
+      const liveSyncState = await this.syncService.getCurrentSyncState();
+      from = Number(liveSyncState.last_synced_block) + 1;
       to = latestBlock.number;
       break;
         
@@ -242,15 +279,15 @@ class StandaloneSyncScript {
 
     for (let blockNum = from; blockNum <= to && !this.shouldStop; blockNum += batchSize) {
       const batchEnd = Math.min(blockNum + batchSize - 1, to);
-      const batchSize_ = batchEnd - blockNum + 1;
+      const currentBatchSize = batchEnd - blockNum + 1;
       
       try {
-        logger.debug(`🔄 Processing batch: ${blockNum} to ${batchEnd} (${batchSize_} blocks)`);
+        logger.debug(`🔄 Processing batch: ${blockNum} to ${batchEnd} (${currentBatchSize} blocks)`);
         
         // Process batch of blocks
         await this.processBatch(blockNum, batchEnd);
         
-        processedBlocks += batchSize_;
+        processedBlocks += currentBatchSize;
         this.currentBlock = batchEnd;
         
         // Progress reporting
@@ -276,7 +313,7 @@ class StandaloneSyncScript {
         }
         
         // Continue with next batch after error
-        processedBlocks += batchSize_;
+        processedBlocks += currentBatchSize;
         this.currentBlock = batchEnd;
       }
     }
@@ -491,7 +528,7 @@ class StandaloneSyncScript {
       this.setupGracefulShutdown();
 
       // Initialize services
-      await this.initialize();
+      await this.initialize(options);
 
       // Execute sync based on mode
       if (options.mode === 'live') {
@@ -528,4 +565,4 @@ if (require.main === module) {
     logger.error('💥 Script execution failed:', error);
     process.exit(1);
   });
-} 
+}
