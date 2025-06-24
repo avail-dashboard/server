@@ -45,12 +45,14 @@ class AvailExplorerServer {
   private app: express.Application;
   private server: any;
   private io: SocketIOServer | null = null;
+  private bullBoardRouter: express.Router;
 
   constructor() {
     // Initialize correlation ID context
     initializeCorrelationId();
     
     this.app = express();
+    this.bullBoardRouter = express.Router();
     this.setupMiddleware();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -148,6 +150,18 @@ class AvailExplorerServer {
     // Root health endpoint (outside of API versioning)
     this.app.get('/health', healthCheck);
 
+    // Bull Board router - will be populated when services are initialized
+    this.bullBoardRouter.use('*', (req, res, _next) => {
+      res.status(503).json({
+        success: false,
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Bull Board dashboard is initializing, please try again in a moment',
+        },
+      });
+    });
+    this.app.use('/admin/queues', this.bullBoardRouter);
+
     // API routes
     const apiRouter = express.Router();
 
@@ -179,8 +193,10 @@ class AvailExplorerServer {
   private setupBullBoard(): void {
     try {
       // Get queue service after services are initialized
-      const queueService = serviceFactory.get('queueService') as any;
-      if (!queueService || !queueService.queue) {
+      const queueService = serviceFactory.get('queue') as any;
+      const bullQueue = queueService?.getBullQueue();
+      
+      if (!queueService || !bullQueue) {
         logger.warn('Queue service not available, skipping Bull Board setup');
         return;
       }
@@ -189,11 +205,12 @@ class AvailExplorerServer {
       const serverAdapter = new ExpressAdapter();
       serverAdapter.setBasePath('/admin/queues');
 
-      const queues = [new BullAdapter(queueService.queue)];
+      const queues = [new BullAdapter(bullQueue)];
       
       // Add dead letter queue if available
-      if (queueService.deadLetterQueue) {
-        queues.push(new BullAdapter(queueService.deadLetterQueue));
+      const deadLetterQueue = queueService.getBullDeadLetterQueue();
+      if (deadLetterQueue) {
+        queues.push(new BullAdapter(deadLetterQueue));
       }
 
       createBullBoard({
@@ -201,8 +218,9 @@ class AvailExplorerServer {
         serverAdapter: serverAdapter,
       });
 
-      // Mount Bull Board
-      this.app.use('/admin/queues', serverAdapter.getRouter());
+      // Replace the placeholder router with Bull Board router
+      this.bullBoardRouter.stack = []; // Clear existing middleware
+      this.bullBoardRouter.use('/', serverAdapter.getRouter());
       
       logger.info('Bull Board dashboard mounted at /admin/queues');
     } catch (error) {

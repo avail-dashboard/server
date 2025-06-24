@@ -472,6 +472,20 @@ export class QueueService implements QueueServiceInterface {
   }
 
   /**
+   * Get the Bull queue instance (for Bull Board dashboard)
+   */
+  getBullQueue(): Queue | null {
+    return this.queue;
+  }
+
+  /**
+   * Get the dead letter queue instance (for Bull Board dashboard)
+   */
+  getBullDeadLetterQueue(): Queue | null {
+    return this.deadLetterQueue;
+  }
+
+  /**
    * Pause the queue
    */
   async pauseQueue(): Promise<void> {
