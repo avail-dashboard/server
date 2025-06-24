@@ -513,8 +513,8 @@ export class QueueService implements QueueServiceInterface {
    * Setup job processors for different job types
    */
   private setupJobProcessors(): void {
-    // BLOCK_INDEXING processor - John's Implementation
-    // Complex single block processing with dependency handling
+    // BLOCK_INDEXING processor - TASK-012 Simplified with Fail-Fast Pattern
+    // Simple block processing with fail-fast dependency validation
     this.jobProcessors.set(JobType.BLOCK_INDEXING, async (job: Job) => {
       const { blockNumber } = job.data;
       const startTime = Date.now();
@@ -526,22 +526,29 @@ export class QueueService implements QueueServiceInterface {
       });
       
       try {
-        // Get required services using dependency injection pattern
-        const selfHealingBlockProcessor = await this.getService<any>('selfHealingBlockProcessor');
+        // Get required services
         const blockService = await this.getService<any>('blockService');
         const availBlockchain = await this.getService<any>('availBlockchain');
         
-        // Step 1: Fetch block data from blockchain
+        // Simple validation - fail fast if block already exists
+        const existingBlock = await blockService.getBlockByNumber(blockNumber);
+        if (existingBlock) {
+          this.logger.debug('Block already indexed, skipping', { blockNumber });
+          return {
+            success: true,
+            data: { blockNumber, status: 'already_exists' },
+            metrics: { duration: Date.now() - startTime },
+          };
+        }
+        
+        // Fetch and process block data
         const blockData = await availBlockchain.getBlockByNumber(blockNumber);
         if (!blockData) {
           throw new Error(`Block ${blockNumber} not found on blockchain`);
         }
         
-        // Step 2: Process block through self-healing architecture
-        await selfHealingBlockProcessor.processBlock(blockData);
-        
-        // Step 3: Ensure block is properly indexed
-        const indexedBlock = await blockService.indexBlock(blockData);
+        // Simple block indexing without complex dependency orchestration
+        await blockService.indexBlock(blockData);
         
         const duration = Date.now() - startTime;
         
@@ -550,7 +557,7 @@ export class QueueService implements QueueServiceInterface {
           jobId: job.id,
           blockNumber,
           duration,
-          entitiesProcessed: indexedBlock?.extrinsics?.length || 0,
+          entitiesProcessed: blockData.extrinsics?.length || 0,
         });
         
         return {
@@ -558,18 +565,17 @@ export class QueueService implements QueueServiceInterface {
           data: {
             blockNumber,
             blockHash: blockData.hash,
-            extrinsicsCount: blockData.extrinsics.length,
+            extrinsicsCount: blockData.extrinsics?.length || 0,
             timestamp: blockData.timestamp,
           },
           metrics: {
             duration,
-            entitiesProcessed: blockData.extrinsics.length,
-            processingRate: blockData.extrinsics.length / (duration / 1000),
+            entitiesProcessed: blockData.extrinsics?.length || 0,
+            processingRate: (blockData.extrinsics?.length || 0) / (duration / 1000),
           },
         };
         
       } catch (error) {
-        // Apply error classification framework
         const classification = this.classifyError(error as Error, JobType.BLOCK_INDEXING);
         const duration = Date.now() - startTime;
         
@@ -647,7 +653,7 @@ export class QueueService implements QueueServiceInterface {
 
     // ==================== Phase 2: Simplified Dependency Processors - TASK-010 Implementation ====================
     
-    // DEPENDENCY_DETECTION processor - Core detection logic (simplified)
+    // DEPENDENCY_DETECTION processor - TASK-012 Simplified with Fail-Fast Pattern  
     this.jobProcessors.set(JobType.DEPENDENCY_DETECTION, async (job: Job<DependencyDetectionJobData>) => {
       const { entityType, entityId, priority = 1 } = job.data;
       const startTime = Date.now();
@@ -661,29 +667,35 @@ export class QueueService implements QueueServiceInterface {
       });
       
       try {
-        // Get dependency detection engine service
-        const dependencyDetectionEngine = await this.getService<any>('dependencyDetectionEngine');
+        // Simple validation - fail fast if required dependencies missing
+        let dependenciesQueued = 0;
         
-        // Create processed entity for dependency detection
-        const processedEntity = {
-          id: entityId,
-          type: entityType,
-          data: { entityType, entityId },
-          timestamp: new Date(),
-        };
-        
-        // Detect missing dependencies using simplified logic
-        const dependencyReport = await dependencyDetectionEngine.detectMissingDependencies(processedEntity);
-        
-        // Queue resolution jobs for each missing dependency (simplified approach)
-        for (const dependency of dependencyReport.missingDependencies) {
-          await this.addJob(JobType.DEPENDENCY_RESOLUTION, {
-            dependencyType: dependency.entityType,
-            dependencyId: dependency.entityId,
-            entityType,
-            entityId,
-            priority: dependency.priority,
-          }, { priority: this.mapDependencyPriorityToJobPriority(dependency.priority) });
+        // Check entity-specific dependencies with fail-fast pattern
+        switch (entityType) {
+        case 'block':
+          // For blocks, check if parent block exists (if not block 0)
+          if (parseInt(entityId, 10) > 0) {
+            const blockService = await this.getService<any>('blockService');
+            const parentBlockNumber = parseInt(entityId, 10) - 1;
+            const parentBlock = await blockService.getBlockByNumber(parentBlockNumber);
+            if (!parentBlock) {
+              await this.addJob(JobType.ENSURE_BLOCK, { blockNumber: parentBlockNumber }, { priority: JobPriority.CRITICAL });
+              dependenciesQueued++;
+              throw new Error(`Parent block ${parentBlockNumber} not found - queued for creation`);
+            }
+          }
+          break;
+        case 'account':
+          // For accounts, no specific dependencies required - they can be created independently
+          break;
+        case 'rollup':
+          // For rollups, no specific dependencies required - they can be created independently  
+          break;
+        case 'validator':
+          // For validators, no specific dependencies required - they can be created independently
+          break;
+        default:
+          throw new Error(`Unsupported entity type: ${entityType}`);
         }
         
         const duration = Date.now() - startTime;
@@ -693,8 +705,7 @@ export class QueueService implements QueueServiceInterface {
           jobId: job.id,
           entityType,
           entityId,
-          totalMissing: dependencyReport.totalMissing,
-          criticalMissing: dependencyReport.criticalMissing,
+          dependenciesQueued,
           duration,
         });
         
@@ -703,13 +714,12 @@ export class QueueService implements QueueServiceInterface {
           data: {
             entityType,
             entityId,
-            dependencyReport,
-            resolutionJobsQueued: dependencyReport.missingDependencies.length,
+            dependenciesQueued,
+            status: dependenciesQueued > 0 ? 'dependencies_queued' : 'no_dependencies_required',
           },
           metrics: {
             duration,
-            dependenciesDetected: dependencyReport.totalMissing,
-            criticalDependencies: dependencyReport.criticalMissing,
+            dependenciesQueued,
           },
         };
         
@@ -731,7 +741,7 @@ export class QueueService implements QueueServiceInterface {
       }
     });
 
-    // DEPENDENCY_RESOLUTION processor - Core resolution logic (simplified)
+    // DEPENDENCY_RESOLUTION processor - TASK-012 Simplified with Fail-Fast Pattern
     this.jobProcessors.set(JobType.DEPENDENCY_RESOLUTION, async (job: Job<DependencyResolutionJobData>) => {
       const { dependencyType, dependencyId, entityType, entityId, priority } = job.data;
       const startTime = Date.now();
@@ -747,21 +757,25 @@ export class QueueService implements QueueServiceInterface {
       });
       
       try {
-        // Get missing data resolver service
-        const missingDataResolver = await this.getService<any>('missingDataResolver');
+        // Simple fail-fast resolution - queue appropriate ENSURE_* job
+        let ensureJobQueued = false;
         
-        // Resolve dependency using simplified logic
-        let result;
         switch (dependencyType) {
         case 'block':
-          result = await missingDataResolver.resolveBlock(parseInt(dependencyId, 10));
+          await this.addJob(JobType.ENSURE_BLOCK, { blockNumber: parseInt(dependencyId, 10) }, { priority: JobPriority.CRITICAL });
+          ensureJobQueued = true;
           break;
         case 'account':
+          await this.addJob(JobType.ENSURE_ACCOUNT, { address: dependencyId }, { priority: JobPriority.HIGH });
+          ensureJobQueued = true;
+          break;
         case 'validator':
-          result = await missingDataResolver.resolveAccount(dependencyId);
+          await this.addJob(JobType.ENSURE_VALIDATOR, { address: dependencyId }, { priority: JobPriority.HIGH });
+          ensureJobQueued = true;
           break;
         case 'rollup':
-          result = await missingDataResolver.resolveRollup(parseInt(dependencyId, 10));
+          await this.addJob(JobType.ENSURE_ROLLUP, { appId: parseInt(dependencyId, 10) }, { priority: JobPriority.MEDIUM });
+          ensureJobQueued = true;
           break;
         default:
           throw new Error(`Unsupported dependency type: ${dependencyType}`);
@@ -769,17 +783,15 @@ export class QueueService implements QueueServiceInterface {
         
         const duration = Date.now() - startTime;
         
-        if (!result.resolved) {
-          throw new Error(`Failed to resolve dependency: ${result.error}`);
-        }
-        
-        this.logger.info('Dependency resolved successfully', {
+        this.logger.info('Dependency resolution completed - ENSURE job queued', {
           component: 'queue-service',
           jobId: job.id,
           dependencyType,
           dependencyId,
+          entityType,
+          entityId,
+          ensureJobQueued,
           duration,
-          resolutionTime: result.resolutionTime,
         });
         
         return {
@@ -789,12 +801,12 @@ export class QueueService implements QueueServiceInterface {
             dependencyId,
             entityType,
             entityId,
-            result,
+            ensureJobQueued,
+            status: 'ensure_job_queued',
           },
           metrics: {
             duration,
-            resolutionTime: result.resolutionTime,
-            resolved: result.resolved,
+            ensureJobQueued,
           },
         };
         
@@ -890,10 +902,231 @@ export class QueueService implements QueueServiceInterface {
       }
     });
 
+    // ==================== Phase 3: TASK-012 Simple Dependency Creation Processors ====================
+    
+    // ENSURE_BLOCK processor - Simple block creation
+    this.jobProcessors.set(JobType.ENSURE_BLOCK, async (job: Job) => {
+      const { blockNumber } = job.data;
+      const startTime = Date.now();
+      
+      this.logger.debug('Processing ensure block job', { 
+        component: 'queue-service',
+        jobId: job.id, 
+        blockNumber,
+      });
+      
+      try {
+        const blockService = await this.getService<any>('blockService');
+        const blockchain = await this.getService<any>('availBlockchain');
+        
+        // Check if block already exists
+        const existingBlock = await blockService.getBlockByNumber(blockNumber);
+        if (existingBlock) {
+          this.logger.debug('Block already exists', { blockNumber });
+          return { success: true, created: false, message: 'Block already exists' };
+        }
+        
+        // Fetch from blockchain and create
+        const blockData = await blockchain.getBlockByNumber(blockNumber);
+        if (blockData) {
+          await blockService.createBlock(blockData);
+          const duration = Date.now() - startTime;
+          
+          this.logger.info('Block created successfully', {
+            component: 'queue-service',
+            jobId: job.id,
+            blockNumber,
+            duration,
+          });
+          
+          return { success: true, created: true, blockData, duration };
+        } else {
+          throw new Error(`Block ${blockNumber} not found on blockchain`);
+        }
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        this.logger.error('Block creation failed', {
+          component: 'queue-service',
+          jobId: job.id,
+          blockNumber,
+          error: (error as Error).message,
+          duration,
+        });
+        throw error;
+      }
+    });
+
+    // ENSURE_ACCOUNT processor - Simple account creation
+    this.jobProcessors.set(JobType.ENSURE_ACCOUNT, async (job: Job) => {
+      const { address } = job.data;
+      const startTime = Date.now();
+      
+      this.logger.debug('Processing ensure account job', { 
+        component: 'queue-service',
+        jobId: job.id, 
+        address,
+      });
+      
+      try {
+        const accountService = await this.getService<any>('accountService');
+        const blockchain = await this.getService<any>('availBlockchain');
+        
+        // Check if account already exists
+        const existingAccount = await accountService.getAccount(address);
+        if (existingAccount) {
+          this.logger.debug('Account already exists', { address });
+          return { success: true, created: false, message: 'Account already exists' };
+        }
+        
+        // Fetch from blockchain and create (or create empty account)
+        const accountData = await blockchain.getAccount(address).catch(() => null);
+        await accountService.createAccount({
+          address,
+          balance: accountData?.balance || '0',
+          nonce: accountData?.nonce || 0,
+          createdAt: new Date(),
+        });
+        
+        const duration = Date.now() - startTime;
+        
+        this.logger.info('Account created successfully', {
+          component: 'queue-service',
+          jobId: job.id,
+          address,
+          duration,
+        });
+        
+        return { success: true, created: true, accountData, duration };
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        this.logger.error('Account creation failed', {
+          component: 'queue-service',
+          jobId: job.id,
+          address,
+          error: (error as Error).message,
+          duration,
+        });
+        throw error;
+      }
+    });
+
+    // ENSURE_ROLLUP processor - Simple rollup creation
+    this.jobProcessors.set(JobType.ENSURE_ROLLUP, async (job: Job) => {
+      const { appId } = job.data;
+      const startTime = Date.now();
+      
+      this.logger.debug('Processing ensure rollup job', { 
+        component: 'queue-service',
+        jobId: job.id, 
+        appId,
+      });
+      
+      try {
+        const dataAvailabilityService = await this.getService<any>('dataAvailabilityService');
+        const blockchain = await this.getService<any>('availBlockchain');
+        
+        // Check if rollup already exists
+        const existingRollup = await dataAvailabilityService.getRollupInfo(appId);
+        if (existingRollup) {
+          this.logger.debug('Rollup already exists', { appId });
+          return { success: true, created: false, message: 'Rollup already exists' };
+        }
+        
+        // Fetch from blockchain and create (or create basic rollup)
+        const rollupData = await blockchain.getRollupInfo(appId).catch(() => null);
+        await dataAvailabilityService.createRollup({
+          appId,
+          name: rollupData?.name || `Rollup ${appId}`,
+          description: rollupData?.description || 'Auto-created rollup',
+          createdAt: new Date(),
+        });
+        
+        const duration = Date.now() - startTime;
+        
+        this.logger.info('Rollup created successfully', {
+          component: 'queue-service',
+          jobId: job.id,
+          appId,
+          duration,
+        });
+        
+        return { success: true, created: true, rollupData, duration };
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        this.logger.error('Rollup creation failed', {
+          component: 'queue-service',
+          jobId: job.id,
+          appId,
+          error: (error as Error).message,
+          duration,
+        });
+        throw error;
+      }
+    });
+
+    // ENSURE_VALIDATOR processor - Simple validator creation
+    this.jobProcessors.set(JobType.ENSURE_VALIDATOR, async (job: Job) => {
+      const { address } = job.data;
+      const startTime = Date.now();
+      
+      this.logger.debug('Processing ensure validator job', { 
+        component: 'queue-service',
+        jobId: job.id, 
+        address,
+      });
+      
+      try {
+        const validatorService = await this.getService<any>('validatorService');
+        const blockchain = await this.getService<any>('availBlockchain');
+        
+        // Check if validator already exists
+        const existingValidator = await validatorService.getValidator(address);
+        if (existingValidator) {
+          this.logger.debug('Validator already exists', { address });
+          return { success: true, created: false, message: 'Validator already exists' };
+        }
+        
+        // Fetch from blockchain and create
+        const validatorData = await blockchain.getValidator(address).catch(() => null);
+        if (validatorData) {
+          await validatorService.createValidator(validatorData);
+        } else {
+          // Create basic validator entry
+          await validatorService.createValidator({
+            address,
+            isActive: false,
+            createdAt: new Date(),
+          });
+        }
+        
+        const duration = Date.now() - startTime;
+        
+        this.logger.info('Validator created successfully', {
+          component: 'queue-service',
+          jobId: job.id,
+          address,
+          duration,
+        });
+        
+        return { success: true, created: true, validatorData, duration };
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        this.logger.error('Validator creation failed', {
+          component: 'queue-service',
+          jobId: job.id,
+          address,
+          error: (error as Error).message,
+          duration,
+        });
+        throw error;
+      }
+    });
+
     this.logger.info('QueueService: Job processors setup completed', {
       component: 'queue-service',
       totalProcessors: this.jobProcessors.size,
       dependencyProcessors: ['DEPENDENCY_DETECTION', 'DEPENDENCY_RESOLUTION', 'DEPENDENCY_BATCH_RESOLUTION'],
+      ensureProcessors: ['ENSURE_BLOCK', 'ENSURE_ACCOUNT', 'ENSURE_ROLLUP', 'ENSURE_VALIDATOR'],
     });
   }
 
@@ -1037,6 +1270,36 @@ export class QueueService implements QueueServiceInterface {
 
   async scheduleHealthCheck(delay = 0): Promise<QueueJob> {
     return this.addJob(JobType.HEALTH_CHECK, {}, { delay });
+  }
+
+  // ==================== TASK-012 Simple Dependency Creation - Convenience Methods ====================
+
+  /**
+   * Ensure a block exists - queue creation if missing
+   */
+  async ensureBlock(blockNumber: number): Promise<QueueJob> {
+    return this.addJob(JobType.ENSURE_BLOCK, { blockNumber }, { priority: JobPriority.CRITICAL });
+  }
+
+  /**
+   * Ensure an account exists - queue creation if missing  
+   */
+  async ensureAccount(address: string): Promise<QueueJob> {
+    return this.addJob(JobType.ENSURE_ACCOUNT, { address }, { priority: JobPriority.HIGH });
+  }
+
+  /**
+   * Ensure a rollup exists - queue creation if missing
+   */
+  async ensureRollup(appId: number): Promise<QueueJob> {
+    return this.addJob(JobType.ENSURE_ROLLUP, { appId }, { priority: JobPriority.MEDIUM });
+  }
+
+  /**
+   * Ensure a validator exists - queue creation if missing
+   */
+  async ensureValidator(address: string): Promise<QueueJob> {
+    return this.addJob(JobType.ENSURE_VALIDATOR, { address }, { priority: JobPriority.HIGH });
   }
 
   // ==================== Adam's Phase 2 Queue Integration - Convenience Methods ====================

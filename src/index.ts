@@ -4,6 +4,9 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import { createBullBoard } from '@bull-board/api';
+import { BullAdapter } from '@bull-board/api/bullAdapter';
+import { ExpressAdapter } from '@bull-board/express';
 
 import config from './config';
 import { logger } from './utils/logger';
@@ -173,6 +176,40 @@ class AvailExplorerServer {
     this.app.use(`${config.api.prefix}/transfers`, transferRoutes);
   }
 
+  private setupBullBoard(): void {
+    try {
+      // Get queue service after services are initialized
+      const queueService = serviceFactory.get('queueService') as any;
+      if (!queueService || !queueService.queue) {
+        logger.warn('Queue service not available, skipping Bull Board setup');
+        return;
+      }
+
+      // Create Bull Board adapters
+      const serverAdapter = new ExpressAdapter();
+      serverAdapter.setBasePath('/admin/queues');
+
+      const queues = [new BullAdapter(queueService.queue)];
+      
+      // Add dead letter queue if available
+      if (queueService.deadLetterQueue) {
+        queues.push(new BullAdapter(queueService.deadLetterQueue));
+      }
+
+      createBullBoard({
+        queues,
+        serverAdapter: serverAdapter,
+      });
+
+      // Mount Bull Board
+      this.app.use('/admin/queues', serverAdapter.getRouter());
+      
+      logger.info('Bull Board dashboard mounted at /admin/queues');
+    } catch (error) {
+      logger.warn('Failed to setup Bull Board dashboard', { error: (error as Error).message });
+    }
+  }
+
   private setupErrorHandling(): void {
     // 404 handler
     this.app.use(notFoundHandler);
@@ -258,6 +295,9 @@ class AvailExplorerServer {
       try {
         await serviceFactory.initializeAllServices();
         logger.info('Services: All services initialized successfully');
+
+        // Setup Bull Board dashboard after services are initialized
+        this.setupBullBoard();
       } catch (error) {
         logger.error('Services: Failed to initialize', { error });
         throw error;

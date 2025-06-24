@@ -151,6 +151,11 @@ export enum JobType {
   DEPENDENCY_DETECTION = 'dependency_detection',
   DEPENDENCY_RESOLUTION = 'dependency_resolution',
   DEPENDENCY_BATCH_RESOLUTION = 'dependency_batch_resolution',
+  // Phase 3: TASK-012 Simple Dependency Creation Jobs
+  ENSURE_BLOCK = 'ensure_block',
+  ENSURE_ACCOUNT = 'ensure_account',
+  ENSURE_ROLLUP = 'ensure_rollup',
+  ENSURE_VALIDATOR = 'ensure_validator',
   // Note: Removed DEPENDENCY_GAP_ANALYSIS and DEPENDENCY_CONSISTENCY_CHECK 
   // as part of TASK-010 simplification - functionality consolidated into core processors
 } 

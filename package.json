@@ -52,6 +52,8 @@
     "prepare": "husky install"
   },
   "dependencies": {
+    "@bull-board/express": "^6.10.1",
+    "@bull-board/ui": "^6.10.1",
     "@prisma/client": "^6.9.0",
     "@types/uuid": "^10.0.0",
     "avail-js-sdk": "^0.4.2",
