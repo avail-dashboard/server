@@ -7,33 +7,54 @@ import { TransferProcessor, createTransferProcessor } from './TransferProcessor'
 import { ValidatorRepository } from '../../database/repositories/ValidatorRepository';
 import { TransferRepository } from '../../database/repositories/TransferRepository';
 import { EraRepository } from '../../database/repositories/EraRepository';
+import { QueueService } from '../core/queue';
+import { DependencyDetectionEngineService } from './dependencyDetectionEngine';
+import { ProcessedEntity } from '../types/dependency';
 import { 
   BaseService,
   ServiceHealth,
+  JobType,
 } from '../types/service';
 import { 
   BlockData,
 } from '../types/blockchain';
 
+interface DependencyResolutionStrategy {
+  waitForCritical: boolean;    // Wait for critical dependencies
+  continueWithPartial: boolean; // Continue with partial data
+  maxWaitTime: number;         // Maximum wait time before timeout
+}
+
 export interface IEnhancedProcessorService extends BaseService {
   processBlock(blockData: BlockData): Promise<void>;
   processPhase1Data(blockData: BlockData): Promise<void>;
+  processWithDependencyCheck<T>(
+    entityType: 'block' | 'account' | 'rollup' | 'validator',
+    entityId: string,
+    processingFn: () => Promise<T>
+  ): Promise<T>;
 }
 
 /**
  * EnhancedProcessorService - Extends DataProcessorService with Phase 1.2 processors
+ * 
+ * TASK-007: Now includes automatic dependency detection and resolution
  * 
  * Responsibilities:
  * - All existing DataProcessorService functionality
  * - Process validator and staking data
  * - Process transfer data with enhanced details
  * - Track era changes and validator statistics
+ * - Automatic dependency detection and resolution (NEW)
  * - Maintain backward compatibility
  */
 export class EnhancedProcessorService implements IEnhancedProcessorService {
   private dataProcessor: DataProcessorService;
   private validatorProcessor: ValidatorProcessor;
   private transferProcessor: TransferProcessor;
+  private queueService: QueueService;
+  private dependencyDetectionEngine: DependencyDetectionEngineService;
+  private dependencyStrategy: DependencyResolutionStrategy;
   private isRunning = false;
   private phase1Enabled = true; // Feature flag for Phase 1 processing
 
@@ -43,6 +64,9 @@ export class EnhancedProcessorService implements IEnhancedProcessorService {
     validatorRepository: ValidatorRepository,
     transferRepository: TransferRepository,
     eraRepository: EraRepository,
+    queueService: QueueService,
+    dependencyDetectionEngine: DependencyDetectionEngineService,
+    dependencyStrategy?: DependencyResolutionStrategy,
   ) {
     // Initialize base data processor
     this.dataProcessor = createDataProcessorService(database, blockchain);
@@ -50,6 +74,15 @@ export class EnhancedProcessorService implements IEnhancedProcessorService {
     // Initialize Phase 1 processors
     this.validatorProcessor = createValidatorProcessor(blockchain, validatorRepository, eraRepository);
     this.transferProcessor = createTransferProcessor(blockchain, transferRepository);
+
+    // TASK-007: Initialize dependency services
+    this.queueService = queueService;
+    this.dependencyDetectionEngine = dependencyDetectionEngine;
+    this.dependencyStrategy = dependencyStrategy || {
+      waitForCritical: true,
+      continueWithPartial: false,
+      maxWaitTime: 30000, // 30 seconds
+    };
   }
 
   /**
@@ -264,6 +297,152 @@ export class EnhancedProcessorService implements IEnhancedProcessorService {
       throw error;
     }
   }
+
+  /**
+   * TASK-007: Process entity with automatic dependency detection and resolution
+   */
+  async processWithDependencyCheck<T>(
+    entityType: 'block' | 'account' | 'rollup' | 'validator',
+    entityId: string,
+    processingFn: () => Promise<T>
+  ): Promise<T> {
+    try {
+      logger.debug('EnhancedProcessor: Starting dependency check', {
+        component: 'enhanced-processor',
+        entityType,
+        entityId,
+      });
+
+      // Step 1: Create a processed entity for dependency detection
+      const processedEntity: ProcessedEntity = {
+        id: entityId,
+        type: entityType,
+        blockNumber: entityType === 'block' ? parseInt(entityId) : undefined,
+        data: {}, // Will be populated by the detection engine
+        timestamp: new Date(),
+      };
+
+      // Step 2: Detect missing dependencies
+      const dependencyReport = await this.dependencyDetectionEngine.detectMissingDependencies(processedEntity);
+
+      // Step 3: If dependencies are missing, queue resolution jobs
+      if (dependencyReport.resolutionRequired && dependencyReport.missingDependencies.length > 0) {
+        logger.info('EnhancedProcessor: Missing dependencies detected, queuing resolution', {
+          component: 'enhanced-processor',
+          entityType,
+          entityId,
+          missingCount: dependencyReport.totalMissing,
+          criticalCount: dependencyReport.criticalMissing,
+        });
+
+        // Queue dependency detection job (triggers resolution workflow)
+        await this.queueService.addJob(JobType.DEPENDENCY_DETECTION, {
+          entityType,
+          entityId,
+          priority: dependencyReport.criticalMissing > 0 ? 1 : 2,
+          blockNumber: processedEntity.blockNumber,
+          requiredBy: entityId,
+        });
+
+        // Handle dependency resolution strategy
+        if (this.dependencyStrategy.waitForCritical && dependencyReport.criticalMissing > 0) {
+          logger.info('EnhancedProcessor: Waiting for critical dependencies', {
+            component: 'enhanced-processor',
+            entityType,
+            entityId,
+            waitTime: this.dependencyStrategy.maxWaitTime,
+          });
+
+          // Wait for critical dependencies with timeout
+          await this.waitForDependencyResolution(entityId, this.dependencyStrategy.maxWaitTime);
+        } else if (!this.dependencyStrategy.continueWithPartial) {
+          logger.info('EnhancedProcessor: Waiting for all dependencies', {
+            component: 'enhanced-processor',
+            entityType,
+            entityId,
+          });
+
+          // Wait for all dependencies
+          await this.waitForDependencyResolution(entityId, this.dependencyStrategy.maxWaitTime);
+        } else {
+          logger.info('EnhancedProcessor: Continuing with partial data', {
+            component: 'enhanced-processor',
+            entityType,
+            entityId,
+            missingCount: dependencyReport.totalMissing,
+          });
+        }
+      }
+
+      // Step 4: Continue with original processing
+      const result = await processingFn();
+
+      logger.debug('EnhancedProcessor: Dependency check completed', {
+        component: 'enhanced-processor',
+        entityType,
+        entityId,
+        hadDependencies: dependencyReport.resolutionRequired,
+      });
+
+      return result;
+
+    } catch (error) {
+      // TASK-007: Apply John's error classification framework
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('dependency')) {
+        logger.warn('EnhancedProcessor: Dependency resolution failed, continuing with partial data', { 
+          component: 'enhanced-processor',
+          entityType, 
+          entityId, 
+          error: errorMessage,
+        });
+        
+        // Continue with processing despite dependency issues
+        return await processingFn();
+      } else {
+        logger.error('EnhancedProcessor: Processing failed', { 
+          component: 'enhanced-processor',
+          entityType, 
+          entityId, 
+          error: errorMessage,
+        });
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * TASK-007: Wait for dependency resolution with timeout
+   */
+  private async waitForDependencyResolution(entityId: string, maxWaitTime: number): Promise<void> {
+    const startTime = Date.now();
+    const pollInterval = 1000; // Poll every second
+
+    while (Date.now() - startTime < maxWaitTime) {
+      // Check if dependencies are resolved by querying the queue
+      // This is a simplified implementation - in production, you might use Redis pub/sub
+      const queueStats = await this.queueService.getStats();
+      
+      // If no dependency jobs are in progress, assume resolution is complete
+      if (queueStats.waiting === 0 && queueStats.active === 0) {
+        logger.debug('EnhancedProcessor: Dependencies appear to be resolved', {
+          component: 'enhanced-processor',
+          entityId,
+          waitTime: Date.now() - startTime,
+        });
+        return;
+      }
+
+      // Wait before next check
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    logger.warn('EnhancedProcessor: Dependency resolution timeout', {
+      component: 'enhanced-processor',
+      entityId,
+      maxWaitTime,
+    });
+  }
 }
 
 export const createEnhancedProcessorService = (
@@ -272,6 +451,9 @@ export const createEnhancedProcessorService = (
   validatorRepository: ValidatorRepository,
   transferRepository: TransferRepository,
   eraRepository: EraRepository,
+  queueService: QueueService,
+  dependencyDetectionEngine: DependencyDetectionEngineService,
+  dependencyStrategy?: DependencyResolutionStrategy,
 ): EnhancedProcessorService => {
   return new EnhancedProcessorService(
     database,
@@ -279,5 +461,8 @@ export const createEnhancedProcessorService = (
     validatorRepository,
     transferRepository,
     eraRepository,
+    queueService,
+    dependencyDetectionEngine,
+    dependencyStrategy,
   );
 }; 

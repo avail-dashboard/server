@@ -135,7 +135,7 @@ export const config = {
         exponentialFactor: 1.5,
         jitterEnabled: false,
       },
-      // Phase 2: Dependency Management Job Retry Strategies - Adam's Implementation
+      // Phase 2: Dependency Management Job Retry Strategies - Simplified for TASK-010
       [JobType.DEPENDENCY_DETECTION]: {
         baseDelay: 2000,
         maxDelay: 20000,
@@ -152,18 +152,6 @@ export const config = {
         baseDelay: 5000,
         maxDelay: 60000,
         exponentialFactor: 2,
-        jitterEnabled: true,
-      },
-      [JobType.DEPENDENCY_GAP_ANALYSIS]: {
-        baseDelay: 2500,
-        maxDelay: 45000,
-        exponentialFactor: 1.8,
-        jitterEnabled: true,
-      },
-      [JobType.DEPENDENCY_CONSISTENCY_CHECK]: {
-        baseDelay: 2000,
-        maxDelay: 25000,
-        exponentialFactor: 1.8,
         jitterEnabled: true,
       },
     },
@@ -201,6 +189,25 @@ export const config = {
     rateLimiting: env.ENABLE_RATE_LIMITING,
     analytics: env.ENABLE_ANALYTICS,
     metrics: env.ENABLE_METRICS,
+  },
+
+  // TASK-007: Dependency Integration Configuration
+  dependencyIntegration: {
+    enabled: true,
+    autoDetection: true,
+    resolutionTimeout: 30000, // 30 seconds
+    waitForCritical: true,
+    continueWithPartial: false,
+    maxRetries: 3,
+    pollInterval: 1000, // 1 second
+    maxWaitTime: 30000, // 30 seconds
+    batchSize: 10,
+    priority: {
+      critical: 1,
+      high: 2,
+      medium: 3,
+      low: 4,
+    },
   },
 
   // Security Configuration
@@ -280,6 +287,53 @@ export const config = {
       cacheTtl: 300000, // 5 minutes
       maxMemoryUsage: '512MB',
       metricsEnabled: true,
+    },
+  },
+
+  // TASK-008: Monitoring and Operational Tools Configuration - Adam's Implementation
+  dependencyMonitoring: {
+    metrics: {
+      enabled: true,
+      collectionInterval: 30000, // 30 seconds
+      retentionPeriod: 24, // 24 hours
+      performanceThresholds: {
+        maxDetectionTime: 5000, // 5 seconds
+        maxResolutionTime: 30000, // 30 seconds
+        minSuccessRate: 95, // 95%
+        maxQueueBacklog: 100, // 100 jobs
+      },
+    },
+    healthChecks: {
+      enabled: true,
+      checkInterval: 60000, // 1 minute
+      alertThresholds: {
+        criticalHealthScore: 70,
+        warningHealthScore: 85,
+        maxQueueBacklog: 100,
+        minSuccessRate: 95,
+        maxResponseTime: 5000,
+      },
+    },
+    alerting: {
+      enabled: true,
+      cooldownPeriod: 300000, // 5 minutes
+      maxAlertsPerHour: 10,
+      webhookUrl: env.ALERT_WEBHOOK_URL,
+      emailRecipients: env.ALERT_EMAIL_RECIPIENTS?.split(',') || [],
+    },
+    reporting: {
+      enabled: true,
+      autoGenerate: true,
+      reportInterval: 3600000, // 1 hour
+      retentionDays: 30,
+      reportTypes: ['performance', 'trends', 'insights'],
+    },
+    api: {
+      enabled: true,
+      endpoints: {
+        monitoring: '/api/monitoring',
+        management: '/api/management',
+      },
     },
   },
 };

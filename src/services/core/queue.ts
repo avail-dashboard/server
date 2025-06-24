@@ -55,18 +55,6 @@ interface DependencyBatchResolutionJobData {
   batchSize?: number;
 }
 
-interface DependencyGapAnalysisJobData {
-  startBlock: number;
-  endBlock: number;
-  entityType?: string;
-}
-
-interface DependencyConsistencyCheckJobData {
-  entityType: string;
-  entityIds: string[];
-  checkLevel: 'basic' | 'deep';
-}
-
 /**
  * QueueService - Background job processing with Bull queue
  * 
@@ -336,7 +324,7 @@ export class QueueService implements QueueServiceInterface {
       const jobOptions: JobOptions = {
         priority: options.priority || JobPriority.MEDIUM,
         delay: options.delay || 0,
-        attempts: options.attempts || retryStrategy?.maxRetries || 3,
+        attempts: options.attempts || 3, // Simplified: use default attempts instead of accessing non-existent maxRetries
         backoff: retryStrategy ? this.calculateExponentialBackoff(retryStrategy, {
           type: 'exponential',
           delay: 2000,
@@ -344,8 +332,8 @@ export class QueueService implements QueueServiceInterface {
           type: 'exponential',
           delay: 2000,
         },
-        removeOnComplete: config.queue.removeOnComplete,
-        removeOnFail: config.queue.removeOnFail,
+        removeOnComplete: config.queue.defaultJobOptions.removeOnComplete,
+        removeOnFail: config.queue.defaultJobOptions.removeOnFail,
       };
 
       const job = await this.queue.add(type, jobData, jobOptions);
@@ -657,383 +645,9 @@ export class QueueService implements QueueServiceInterface {
       return { success: true, health };
     });
 
-    // ==================== Phase 2: Dependency Resolution Processors - John's Implementation ====================
+    // ==================== Phase 2: Simplified Dependency Processors - TASK-010 Implementation ====================
     
-    // Dependency Detection Scan processor
-    this.jobProcessors.set('DEPENDENCY_DETECTION_SCAN', async (job: Job) => {
-      const { entityId, entityType, entityData } = job.data;
-      const startTime = Date.now();
-      
-      this.logger.debug('Processing dependency detection scan', { 
-        component: 'queue-service',
-        jobId: job.id, 
-        entityId,
-        entityType,
-      });
-      
-      try {
-        // Get dependency detection engine service
-        const dependencyDetectionEngine = await this.getService<any>('dependencyDetectionEngine');
-        
-        // Create processed entity for dependency detection
-        const processedEntity = {
-          id: entityId,
-          type: entityType,
-          data: entityData,
-          blockNumber: entityData.blockNumber,
-          timestamp: new Date(),
-        };
-        
-        // Detect missing dependencies
-        const dependencyReport = await dependencyDetectionEngine.detectMissingDependencies(processedEntity);
-        
-        // If dependencies are missing, queue resolution jobs
-        if (dependencyReport.resolutionRequired) {
-          const resolutionPlan = await dependencyDetectionEngine.createResolutionStrategy(
-            await dependencyDetectionEngine.analyzeDependencyImpact(dependencyReport.missingDependencies),
-          );
-          
-          // Queue dependency batch resolution if batchable
-          if (resolutionPlan.batchable) {
-            await this.addJob('DEPENDENCY_BATCH_RESOLUTION', {
-              planId: resolutionPlan.planId,
-              dependencies: resolutionPlan.dependencies,
-              resolutionOrder: resolutionPlan.resolutionOrder,
-            }, { priority: JobPriority.HIGH });
-          } else {
-            // Queue individual resolution jobs
-            for (const dependency of resolutionPlan.dependencies) {
-              const jobType = this.getDependencyResolutionJobType(dependency.entityType);
-              await this.addJob(jobType, {
-                entityType: dependency.entityType,
-                entityId: dependency.entityId,
-                priority: dependency.priority,
-              }, { priority: this.mapDependencyPriorityToJobPriority(dependency.priority) });
-            }
-          }
-        }
-        
-        const duration = Date.now() - startTime;
-        
-        this.logger.info('Dependency detection scan completed', {
-          component: 'queue-service',
-          jobId: job.id,
-          entityId,
-          totalMissing: dependencyReport.totalMissing,
-          criticalMissing: dependencyReport.criticalMissing,
-          duration,
-        });
-        
-        return {
-          success: true,
-          data: {
-            entityId,
-            entityType,
-            dependencyReport,
-            resolutionRequired: dependencyReport.resolutionRequired,
-          },
-          metrics: {
-            duration,
-            dependenciesDetected: dependencyReport.totalMissing,
-            criticalDependencies: dependencyReport.criticalMissing,
-          },
-        };
-        
-      } catch (error) {
-        const classification = this.classifyError(error as Error, 'DEPENDENCY_DETECTION_SCAN');
-        const duration = Date.now() - startTime;
-        
-        this.logger.error('Dependency detection scan failed', {
-          component: 'queue-service',
-          jobId: job.id,
-          entityId,
-          error: (error as Error).message,
-          classification,
-          duration,
-        });
-        
-        throw error;
-      }
-    });
-
-    // Missing Block Resolution processor
-    this.jobProcessors.set('RESOLVE_MISSING_BLOCK', async (job: Job) => {
-      const { entityId, priority } = job.data;
-      const blockNumber = parseInt(entityId, 10);
-      const startTime = Date.now();
-      
-      this.logger.debug('Processing missing block resolution', { 
-        component: 'queue-service',
-        jobId: job.id, 
-        blockNumber,
-        priority,
-      });
-      
-      try {
-        // Get missing data resolver service
-        const missingDataResolver = await this.getService<any>('missingDataResolver');
-        
-        // Resolve missing block
-        const resolution = await missingDataResolver.resolveBlock(blockNumber);
-        
-        const duration = Date.now() - startTime;
-        
-        if (resolution.resolved) {
-          this.logger.info('Missing block resolved successfully', {
-            component: 'queue-service',
-            jobId: job.id,
-            blockNumber,
-            duration,
-            resolutionTime: resolution.resolutionTime,
-          });
-        } else {
-          this.logger.warn('Missing block resolution failed', {
-            component: 'queue-service',
-            jobId: job.id,
-            blockNumber,
-            error: resolution.error,
-            duration,
-          });
-        }
-        
-        return {
-          success: resolution.resolved,
-          data: {
-            blockNumber,
-            resolution,
-          },
-          metrics: {
-            duration,
-            resolutionTime: resolution.resolutionTime,
-            resolved: resolution.resolved,
-          },
-        };
-        
-      } catch (error) {
-        const classification = this.classifyError(error as Error, 'RESOLVE_MISSING_BLOCK');
-        const duration = Date.now() - startTime;
-        
-        this.logger.error('Missing block resolution failed', {
-          component: 'queue-service',
-          jobId: job.id,
-          blockNumber,
-          error: (error as Error).message,
-          classification,
-          duration,
-        });
-        
-        throw error;
-      }
-    });
-
-    // Missing Account Resolution processor
-    this.jobProcessors.set('RESOLVE_MISSING_ACCOUNT', async (job: Job) => {
-      const { entityId, priority } = job.data;
-      const startTime = Date.now();
-      
-      this.logger.debug('Processing missing account resolution', { 
-        component: 'queue-service',
-        jobId: job.id, 
-        address: entityId,
-        priority,
-      });
-      
-      try {
-        // Get missing data resolver service
-        const missingDataResolver = await this.getService<any>('missingDataResolver');
-        
-        // Resolve missing account
-        const resolution = await missingDataResolver.resolveAccount(entityId);
-        
-        const duration = Date.now() - startTime;
-        
-        if (resolution.resolved) {
-          this.logger.info('Missing account resolved successfully', {
-            component: 'queue-service',
-            jobId: job.id,
-            address: entityId,
-            duration,
-            resolutionTime: resolution.resolutionTime,
-          });
-        } else {
-          this.logger.warn('Missing account resolution failed', {
-            component: 'queue-service',
-            jobId: job.id,
-            address: entityId,
-            error: resolution.error,
-            duration,
-          });
-        }
-        
-        return {
-          success: resolution.resolved,
-          data: {
-            address: entityId,
-            resolution,
-          },
-          metrics: {
-            duration,
-            resolutionTime: resolution.resolutionTime,
-            resolved: resolution.resolved,
-          },
-        };
-        
-      } catch (error) {
-        const classification = this.classifyError(error as Error, 'RESOLVE_MISSING_ACCOUNT');
-        const duration = Date.now() - startTime;
-        
-        this.logger.error('Missing account resolution failed', {
-          component: 'queue-service',
-          jobId: job.id,
-          address: entityId,
-          error: (error as Error).message,
-          classification,
-          duration,
-        });
-        
-        throw error;
-      }
-    });
-
-    // Missing Rollup Resolution processor
-    this.jobProcessors.set('RESOLVE_MISSING_ROLLUP', async (job: Job) => {
-      const { entityId, priority } = job.data;
-      const appId = parseInt(entityId, 10);
-      const startTime = Date.now();
-      
-      this.logger.debug('Processing missing rollup resolution', { 
-        component: 'queue-service',
-        jobId: job.id, 
-        appId,
-        priority,
-      });
-      
-      try {
-        // Get missing data resolver service
-        const missingDataResolver = await this.getService<any>('missingDataResolver');
-        
-        // Resolve missing rollup
-        const resolution = await missingDataResolver.resolveRollup(appId);
-        
-        const duration = Date.now() - startTime;
-        
-        if (resolution.resolved) {
-          this.logger.info('Missing rollup resolved successfully', {
-            component: 'queue-service',
-            jobId: job.id,
-            appId,
-            duration,
-            resolutionTime: resolution.resolutionTime,
-          });
-        } else {
-          this.logger.warn('Missing rollup resolution failed', {
-            component: 'queue-service',
-            jobId: job.id,
-            appId,
-            error: resolution.error,
-            duration,
-          });
-        }
-        
-        return {
-          success: resolution.resolved,
-          data: {
-            appId,
-            resolution,
-          },
-          metrics: {
-            duration,
-            resolutionTime: resolution.resolutionTime,
-            resolved: resolution.resolved,
-          },
-        };
-        
-      } catch (error) {
-        const classification = this.classifyError(error as Error, 'RESOLVE_MISSING_ROLLUP');
-        const duration = Date.now() - startTime;
-        
-        this.logger.error('Missing rollup resolution failed', {
-          component: 'queue-service',
-          jobId: job.id,
-          appId,
-          error: (error as Error).message,
-          classification,
-          duration,
-        });
-        
-        throw error;
-      }
-    });
-
-    // Dependency Batch Resolution processor
-    this.jobProcessors.set('DEPENDENCY_BATCH_RESOLUTION', async (job: Job) => {
-      const { planId, dependencies, resolutionOrder } = job.data;
-      const startTime = Date.now();
-      
-      this.logger.debug('Processing dependency batch resolution', { 
-        component: 'queue-service',
-        jobId: job.id, 
-        planId,
-        dependencyCount: dependencies.length,
-        resolutionOrder,
-      });
-      
-      try {
-        // Get missing data resolver service
-        const missingDataResolver = await this.getService<any>('missingDataResolver');
-        
-        // Resolve dependencies in batch
-        const batchResolution = await missingDataResolver.resolveBatch(dependencies);
-        
-        const duration = Date.now() - startTime;
-        
-        this.logger.info('Dependency batch resolution completed', {
-          component: 'queue-service',
-          jobId: job.id,
-          planId,
-          batchId: batchResolution.batchId,
-          resolvedCount: batchResolution.resolvedCount,
-          failedCount: batchResolution.failedCount,
-          efficiency: `${batchResolution.efficiency.toFixed(2)}%`,
-          duration,
-          totalTime: batchResolution.totalTime,
-        });
-        
-        return {
-          success: batchResolution.resolvedCount > 0,
-          data: {
-            planId,
-            batchResolution,
-          },
-          metrics: {
-            duration,
-            totalTime: batchResolution.totalTime,
-            resolvedCount: batchResolution.resolvedCount,
-            failedCount: batchResolution.failedCount,
-            efficiency: batchResolution.efficiency,
-          },
-        };
-        
-      } catch (error) {
-        const classification = this.classifyError(error as Error, 'DEPENDENCY_BATCH_RESOLUTION');
-        const duration = Date.now() - startTime;
-        
-        this.logger.error('Dependency batch resolution failed', {
-          component: 'queue-service',
-          jobId: job.id,
-          planId,
-          error: (error as Error).message,
-          classification,
-          duration,
-        });
-        
-        throw error;
-      }
-    });
-
-    // ==================== Adam's Phase 2 Queue Integration - New Job Types ====================
-    
-    // DEPENDENCY_DETECTION processor - Adam's Implementation
+    // DEPENDENCY_DETECTION processor - Core detection logic (simplified)
     this.jobProcessors.set(JobType.DEPENDENCY_DETECTION, async (job: Job<DependencyDetectionJobData>) => {
       const { entityType, entityId, priority = 1 } = job.data;
       const startTime = Date.now();
@@ -1058,10 +672,10 @@ export class QueueService implements QueueServiceInterface {
           timestamp: new Date(),
         };
         
-        // Detect missing dependencies using Adam's service
+        // Detect missing dependencies using simplified logic
         const dependencyReport = await dependencyDetectionEngine.detectMissingDependencies(processedEntity);
         
-        // Queue resolution jobs for each missing dependency
+        // Queue resolution jobs for each missing dependency (simplified approach)
         for (const dependency of dependencyReport.missingDependencies) {
           await this.addJob(JobType.DEPENDENCY_RESOLUTION, {
             dependencyType: dependency.entityType,
@@ -1117,7 +731,7 @@ export class QueueService implements QueueServiceInterface {
       }
     });
 
-    // DEPENDENCY_RESOLUTION processor - Adam's Implementation
+    // DEPENDENCY_RESOLUTION processor - Core resolution logic (simplified)
     this.jobProcessors.set(JobType.DEPENDENCY_RESOLUTION, async (job: Job<DependencyResolutionJobData>) => {
       const { dependencyType, dependencyId, entityType, entityId, priority } = job.data;
       const startTime = Date.now();
@@ -1136,7 +750,7 @@ export class QueueService implements QueueServiceInterface {
         // Get missing data resolver service
         const missingDataResolver = await this.getService<any>('missingDataResolver');
         
-        // Resolve dependency using Adam's service
+        // Resolve dependency using simplified logic
         let result;
         switch (dependencyType) {
         case 'block':
@@ -1202,7 +816,7 @@ export class QueueService implements QueueServiceInterface {
       }
     });
 
-    // DEPENDENCY_BATCH_RESOLUTION processor - Adam's Implementation
+    // DEPENDENCY_BATCH_RESOLUTION processor - Simplified batch processing
     this.jobProcessors.set(JobType.DEPENDENCY_BATCH_RESOLUTION, async (job: Job<DependencyBatchResolutionJobData>) => {
       const { dependencies, batchSize = 10 } = job.data;
       const startTime = Date.now();
@@ -1227,7 +841,7 @@ export class QueueService implements QueueServiceInterface {
           discoveredAt: new Date(),
         }));
         
-        // Resolve dependencies in batch using Adam's service
+        // Resolve dependencies in batch using simplified logic
         const batchResolution = await missingDataResolver.resolveBatch(missingDependencies);
         
         const duration = Date.now() - startTime;
@@ -1276,203 +890,11 @@ export class QueueService implements QueueServiceInterface {
       }
     });
 
-    // DEPENDENCY_GAP_ANALYSIS processor - Adam's Implementation
-    this.jobProcessors.set(JobType.DEPENDENCY_GAP_ANALYSIS, async (job: Job<DependencyGapAnalysisJobData>) => {
-      const { startBlock, endBlock, entityType } = job.data;
-      const startTime = Date.now();
-      
-      this.logger.debug('Processing dependency gap analysis job', { 
-        component: 'queue-service',
-        jobId: job.id, 
-        startBlock,
-        endBlock,
-        entityType,
-        blockRange: endBlock - startBlock + 1,
-      });
-      
-      try {
-        // Get dependency detection engine service
-        const dependencyDetectionEngine = await this.getService<any>('dependencyDetectionEngine');
-        
-        const gapsFound = [];
-        const blockRange = endBlock - startBlock + 1;
-        
-        // Analyze each block in the range for dependency gaps
-        for (let blockNumber = startBlock; blockNumber <= endBlock; blockNumber++) {
-          const processedEntity = {
-            id: `block-${blockNumber}`,
-            type: 'block',
-            data: { blockNumber },
-            blockNumber,
-            timestamp: new Date(),
-          };
-          
-          // Detect missing dependencies for this block
-          const dependencyReport = await dependencyDetectionEngine.detectMissingDependencies(processedEntity);
-          
-          if (dependencyReport.resolutionRequired) {
-            gapsFound.push({
-              blockNumber,
-              missingDependencies: dependencyReport.missingDependencies,
-              criticalMissing: dependencyReport.criticalMissing,
-            });
-          }
-        }
-        
-        const duration = Date.now() - startTime;
-        
-        this.logger.info('Dependency gap analysis completed', {
-          component: 'queue-service',
-          jobId: job.id,
-          startBlock,
-          endBlock,
-          blocksAnalyzed: blockRange,
-          gapsFound: gapsFound.length,
-          duration,
-        });
-        
-        return {
-          success: true,
-          data: {
-            startBlock,
-            endBlock,
-            blocksAnalyzed: blockRange,
-            gapsFound,
-            totalGaps: gapsFound.length,
-            gapPercentage: (gapsFound.length / blockRange) * 100,
-          },
-          metrics: {
-            duration,
-            blocksAnalyzed: blockRange,
-            gapsFound: gapsFound.length,
-            analysisRate: blockRange / (duration / 1000),
-          },
-        };
-        
-      } catch (error) {
-        const classification = this.classifyError(error as Error, JobType.DEPENDENCY_GAP_ANALYSIS);
-        const duration = Date.now() - startTime;
-        
-        this.logger.error('Dependency gap analysis failed', {
-          component: 'queue-service',
-          jobId: job.id,
-          startBlock,
-          endBlock,
-          error: (error as Error).message,
-          classification,
-          duration,
-        });
-        
-        throw error;
-      }
+    this.logger.info('QueueService: Job processors setup completed', {
+      component: 'queue-service',
+      totalProcessors: this.jobProcessors.size,
+      dependencyProcessors: ['DEPENDENCY_DETECTION', 'DEPENDENCY_RESOLUTION', 'DEPENDENCY_BATCH_RESOLUTION'],
     });
-
-    // DEPENDENCY_CONSISTENCY_CHECK processor - Adam's Implementation
-    this.jobProcessors.set(JobType.DEPENDENCY_CONSISTENCY_CHECK, async (job: Job<DependencyConsistencyCheckJobData>) => {
-      const { entityType, entityIds, checkLevel } = job.data;
-      const startTime = Date.now();
-      
-      this.logger.debug('Processing dependency consistency check job', { 
-        component: 'queue-service',
-        jobId: job.id, 
-        entityType,
-        entityCount: entityIds.length,
-        checkLevel,
-      });
-      
-      try {
-        // Get dependency detection engine service
-        const dependencyDetectionEngine = await this.getService<any>('dependencyDetectionEngine');
-        
-        const inconsistencies = [];
-        
-        // Check each entity for dependency consistency
-        for (const entityId of entityIds) {
-          // Validate that the entity and its dependencies exist
-          const entityExists = await dependencyDetectionEngine.validateDependency(entityType, entityId);
-          
-          if (!entityExists) {
-            inconsistencies.push({
-              entityType,
-              entityId,
-              issue: 'entity_missing',
-              severity: 'critical',
-            });
-            continue;
-          }
-          
-          if (checkLevel === 'deep') {
-            // Perform deep consistency check
-            const processedEntity = {
-              id: entityId,
-              type: entityType,
-              data: { entityType, entityId },
-              timestamp: new Date(),
-            };
-            
-            const dependencyReport = await dependencyDetectionEngine.detectMissingDependencies(processedEntity);
-            
-            if (dependencyReport.resolutionRequired) {
-              inconsistencies.push({
-                entityType,
-                entityId,
-                issue: 'missing_dependencies',
-                severity: dependencyReport.criticalMissing > 0 ? 'critical' : 'warning',
-                missingDependencies: dependencyReport.missingDependencies,
-              });
-            }
-          }
-        }
-        
-        const duration = Date.now() - startTime;
-        
-        this.logger.info('Dependency consistency check completed', {
-          component: 'queue-service',
-          jobId: job.id,
-          entityType,
-          entitiesChecked: entityIds.length,
-          inconsistenciesFound: inconsistencies.length,
-          checkLevel,
-          duration,
-        });
-        
-        return {
-          success: true,
-          data: {
-            entityType,
-            entitiesChecked: entityIds.length,
-            inconsistencies,
-            totalInconsistencies: inconsistencies.length,
-            consistencyRate: ((entityIds.length - inconsistencies.length) / entityIds.length) * 100,
-            checkLevel,
-          },
-          metrics: {
-            duration,
-            entitiesChecked: entityIds.length,
-            inconsistenciesFound: inconsistencies.length,
-            checkRate: entityIds.length / (duration / 1000),
-          },
-        };
-        
-      } catch (error) {
-        const classification = this.classifyError(error as Error, JobType.DEPENDENCY_CONSISTENCY_CHECK);
-        const duration = Date.now() - startTime;
-        
-        this.logger.error('Dependency consistency check failed', {
-          component: 'queue-service',
-          jobId: job.id,
-          entityType,
-          entityCount: entityIds.length,
-          error: (error as Error).message,
-          classification,
-          duration,
-        });
-        
-        throw error;
-      }
-    });
-
-    // ==================== End Phase 2 Processors ====================
   }
 
   /**
@@ -1669,36 +1091,6 @@ export class QueueService implements QueueServiceInterface {
       dependencies,
       batchSize,
     }, { priority: JobPriority.HIGH });
-  }
-
-  /**
-   * Schedule gap analysis for a block range
-   */
-  async scheduleDependencyGapAnalysis(
-    startBlock: number,
-    endBlock: number,
-    entityType?: string,
-  ): Promise<QueueJob> {
-    return this.addJob(JobType.DEPENDENCY_GAP_ANALYSIS, {
-      startBlock,
-      endBlock,
-      entityType,
-    }, { priority: JobPriority.MEDIUM });
-  }
-
-  /**
-   * Schedule consistency check for entities
-   */
-  async scheduleDependencyConsistencyCheck(
-    entityType: string,
-    entityIds: string[],
-    checkLevel: 'basic' | 'deep' = 'basic',
-  ): Promise<QueueJob> {
-    return this.addJob(JobType.DEPENDENCY_CONSISTENCY_CHECK, {
-      entityType,
-      entityIds,
-      checkLevel,
-    }, { priority: JobPriority.MEDIUM });
   }
 
   /**

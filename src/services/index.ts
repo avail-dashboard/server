@@ -83,7 +83,6 @@ import {
 // Phase 2: Dependency Management Services - John's Implementation
 import { createDependencyDetectionEngine } from './domain/dependencyDetectionEngine';
 import { createMissingDataResolver } from './domain/missingDataResolver';
-import { DependencyConfig } from './types/dependency';
 
 // Service Factory for dependency injection
 export class ServiceFactory {
@@ -272,12 +271,32 @@ export class ServiceFactory {
         dataSubmissionRepository,
       );
 
+      // ==================== Phase 2: Dependency Management Services - John's Implementation ====================
+      
+      // Create Phase 2 services with configuration
+      const dependencyConfig = config.dependencyManagement;
+      const dependencyDetectionEngine = createDependencyDetectionEngine(dependencyConfig, this);
+      const missingDataResolver = createMissingDataResolver(dependencyConfig, this);
+      
+      // Register Phase 2 services
+      this.register('dependencyDetectionEngine', dependencyDetectionEngine);
+      this.register('missingDataResolver', missingDataResolver);
+      
+      // Start Phase 2 services
+      await dependencyDetectionEngine.start();
+      await missingDataResolver.start();
+      
+      // ==================== End Phase 2 Services ====================
+
       // Phase 6: Create SelfHealingBlockProcessor (replaces DataProcessorService)
+      // Note: Now includes queueService and dependencyDetectionEngine for TASK-007 integration
       const selfHealingBlockProcessor = createSelfHealingBlockProcessor(
         accountService,
         validatorService,
         transferService,
         dataSubmissionService,
+        queueService,
+        dependencyDetectionEngine,
       );
       
       // Register domain services
@@ -313,23 +332,6 @@ export class ServiceFactory {
       // Start sync services
       await syncService.start();
       await blockIndexerService.start();
-      
-      // ==================== Phase 2: Dependency Management Services - John's Implementation ====================
-      
-      // Create Phase 2 services with configuration
-      const dependencyConfig = config.dependencyManagement;
-      const dependencyDetectionEngine = createDependencyDetectionEngine(dependencyConfig, this);
-      const missingDataResolver = createMissingDataResolver(dependencyConfig, this);
-      
-      // Register Phase 2 services
-      this.register('dependencyDetectionEngine', dependencyDetectionEngine);
-      this.register('missingDataResolver', missingDataResolver);
-      
-      // Start Phase 2 services
-      await dependencyDetectionEngine.start();
-      await missingDataResolver.start();
-      
-      // ==================== End Phase 2 Services ====================
       
       // Initialize queue service dependencies (John's Service Integration Architecture)
       const queueServiceInstance = this.get<QueueService>('queue');

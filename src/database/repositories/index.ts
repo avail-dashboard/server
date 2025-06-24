@@ -9,6 +9,8 @@ export { TransferRepository } from './TransferRepository';
 export { NominationRepository } from './NominationRepository';
 export { EraRepository } from './EraRepository';
 export { RewardRepository } from './RewardRepository';
+// Phase 2 repositories
+export { DependencyRepository } from './DependencyRepository';
 
 // Repository instances for dependency injection
 import { BlockRepository } from './BlockRepository';
@@ -21,6 +23,8 @@ import { TransferRepository } from './TransferRepository';
 import { NominationRepository } from './NominationRepository';
 import { EraRepository } from './EraRepository';
 import { RewardRepository } from './RewardRepository';
+// Phase 2 repository instances
+import { DependencyRepository } from './DependencyRepository';
 
 export const blockRepository = new BlockRepository();
 export const dataSubmissionRepository = new DataSubmissionRepository();
@@ -32,6 +36,8 @@ export const transferRepository = new TransferRepository();
 export const nominationRepository = new NominationRepository();
 export const eraRepository = new EraRepository();
 export const rewardRepository = new RewardRepository();
+// Phase 2 repository instances
+export const dependencyRepository = new DependencyRepository();
 
 // Type exports
 export type { BlockWithExtrinsics, BlockCreateInput } from './BlockRepository';
@@ -60,3 +66,10 @@ export type {
 } from './NominationRepository';
 export type { EraCreateInput } from './EraRepository';
 export type { RewardCreateInput } from './RewardRepository';
+// Phase 2 type exports
+export type { 
+  CreateDependencyTrackingData,
+  UpdateDependencyTrackingData,
+  CreateResolutionHistoryData,
+  DependencyTrackingWithHistory
+} from './DependencyRepository';
