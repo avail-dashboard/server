@@ -244,8 +244,8 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
 
       const dbEvents: Partial<Event>[] = events.map((event, index) => {
         // PHASE 1 FIX: Enhanced event method extraction
-        const section = event.section || event.module || 'unknown';
-        const method = event.method || event.event || event.name || 'unknown';
+        const section = event.section || 'unknown';
+        const method = event.method || 'unknown';
         
         // PHASE 1 FIX: Extract phase information
         let phaseType: string | undefined;
@@ -298,7 +298,7 @@ export class DataProcessorService implements BaseService, IDataProcessorService 
         component: 'processor', 
         blockNumber,
         count: events.length,
-        phaseTypes: dbEvents.map(e => e.phase_type).filter(Boolean),
+        modules: dbEvents.map(e => e.module).filter(Boolean),
       });
       
     } catch (error) {

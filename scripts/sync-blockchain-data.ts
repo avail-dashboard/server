@@ -14,12 +14,15 @@
  */
 
 import { logger } from '../src/utils/logger';
+import { initializeCorrelationId } from '../src/utils/correlationId';
 import db from '../src/utils/database';
 import { AvailBlockchainService } from '../src/services/core/avail-blockchain';
 import { createBlockIndexerService } from '../src/services/domain/indexer';
 // Phase 7: Use ServiceFactory instead of individual processors
 import { ServiceFactory } from '../src/services';
 import { SelfHealingBlockProcessor } from '../src/services/domain/selfHealingProcessor';
+import { SyncService } from '../src/services/core/sync';
+import { QueueService } from '../src/services/core/queue';
 
 interface SyncOptions {
   mode: 'full' | 'incremental' | 'range' | 'live';
@@ -27,6 +30,7 @@ interface SyncOptions {
   toBlock?: number;
   batchSize?: number;
   delayMs?: number;
+  useQueue?: boolean;
 }
 
 class StandaloneSyncScript {
@@ -34,10 +38,15 @@ class StandaloneSyncScript {
   private blockchain: AvailBlockchainService;
   private indexer: ReturnType<typeof createBlockIndexerService>;
   private processor: SelfHealingBlockProcessor;
+  private syncService: SyncService;
+  private queueService: QueueService;
   private shouldStop = false;
   private currentBlock = 0;
 
   constructor() {
+    // Initialize correlation ID namespace for background job processing
+    initializeCorrelationId();
+    
     // Phase 7: Initialize with ServiceFactory for integrated self-healing services
     this.serviceFactory = ServiceFactory.getInstance();
     
@@ -63,6 +72,8 @@ class StandaloneSyncScript {
       // Get services from factory
       this.blockchain = this.serviceFactory.get('availBlockchain');
       this.processor = this.serviceFactory.get('selfHealingBlockProcessor');
+      this.syncService = this.serviceFactory.get('syncService');
+      this.queueService = this.serviceFactory.get('queue');
       
       // Create independent indexer (not part of self-healing architecture)
       this.indexer = createBlockIndexerService(db, this.blockchain);
@@ -102,9 +113,6 @@ class StandaloneSyncScript {
     }
   }
 
-  /**
-   * Parse command line arguments
-   */
   /**
    * Get last synced block from database (replaces syncService dependency)
    */
@@ -146,6 +154,8 @@ class StandaloneSyncScript {
       } else if (arg === '--delay' && args[i + 1]) {
         options.delayMs = parseInt(args[i + 1]);
         i++;
+      } else if (arg === '--use-queue') {
+        options.useQueue = true;
       }
     }
 
@@ -343,6 +353,62 @@ class StandaloneSyncScript {
   }
 
   /**
+   * Sync using queue system instead of direct processing
+   */
+  async syncBlockRangeWithQueue(from: number, to: number): Promise<void> {
+    try {
+      logger.info(`🔄 Starting queue-based sync: blocks ${from} to ${to}`);
+      
+      // Start sync through SyncService (this will queue DATA_SYNC jobs)
+      await this.syncService.startSync('incremental', from, to);
+      
+      // Monitor queue progress
+      await this.monitorQueueProgress(from, to);
+      
+      logger.info(`✅ Queue-based sync completed: blocks ${from} to ${to}`);
+      
+    } catch (error) {
+      logger.error('❌ Queue-based sync failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Monitor queue progress until sync completes
+   */
+  private async monitorQueueProgress(from: number, to: number): Promise<void> {
+    const startTime = Date.now();
+    const totalBlocks = to - from + 1;
+    
+    while (!this.shouldStop) {
+      try {
+        // Get queue stats
+        const queueStats = await this.queueService.getStats();
+        
+        // Calculate progress estimate based on queue completion
+        const completed = queueStats.completed;
+        const progress = totalBlocks > 0 ? Math.min(completed / Math.ceil(totalBlocks / 50) * 100, 100) : 100; // Assume batch size 50
+        const elapsed = (Date.now() - startTime) / 1000;
+        
+        logger.info(`📊 Queue Sync Progress: ${progress.toFixed(1)}% | Queue: ${queueStats.waiting} waiting, ${queueStats.active} active, ${queueStats.completed} completed, ${queueStats.failed} failed | Elapsed: ${elapsed.toFixed(0)}s`);
+        
+        // Check if completed (no active or waiting jobs)
+        if (queueStats.waiting === 0 && queueStats.active === 0) {
+          logger.info('✅ Queue processing completed - no more jobs waiting or active');
+          break;
+        }
+        
+        // Wait before next check
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+      } catch (error) {
+        logger.error('Error monitoring queue progress:', error);
+        await new Promise(resolve => setTimeout(resolve, 10000));
+      }
+    }
+  }
+
+  /**
    * Live sync mode - continuously sync new blocks
    */
   async liveSyncMode(options: SyncOptions): Promise<void> {
@@ -411,12 +477,19 @@ class StandaloneSyncScript {
       // Initialize services
       await this.initialize(options);
 
-      // Execute sync based on mode
+      // Execute sync based on mode and queue option
       if (options.mode === 'live') {
         await this.liveSyncMode(options);
       } else {
         const { from, to } = await this.determineSyncRange(options);
-        await this.syncBlockRange(from, to, options.batchSize || 50, options.delayMs || 100);
+        
+        if (options.useQueue) {
+          // Use queue-based approach
+          await this.syncBlockRangeWithQueue(from, to);
+        } else {
+          // Use direct processing approach (existing)
+          await this.syncBlockRange(from, to, options.batchSize || 50, options.delayMs || 100);
+        }
       }
 
     } catch (error) {
