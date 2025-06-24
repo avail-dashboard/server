@@ -1,37 +1,31 @@
 import { logger, logError } from '../../utils/logger';
-import { BaseService, ServiceHealth, JobType } from '../types/service';
-import { SelfHealingProcessor } from '../types/self-healing';
+import { BaseService, ServiceHealth } from '../types/service';
 import { BlockData } from '../types/blockchain';
+import { SelfHealingProcessor } from '../types/self-healing';
 import { AccountService } from './account';
 import { ValidatorService } from './validator';
 import { TransferService } from './transfer';
 import { DataSubmissionService } from './dataSubmission';
 import { QueueService } from '../core/queue';
-import { DependencyDetectionEngineService } from './dependencyDetectionEngine';
-import { ProcessedEntity } from '../types/dependency';
+// Dependency detection engine removed - using queue-based approach
 
 /**
- * SelfHealingBlockProcessor - Orchestrates all self-healing services (Phase 6)
+ * Self-Healing Block Processor Service
  * 
- * TASK-007: Now includes automatic dependency detection and resolution
+ * Orchestrates block processing across multiple domain services
+ * with automatic error recovery and self-healing capabilities.
  * 
- * Responsibilities:
- * - Process blocks using all self-healing services in parallel
- * - Ensure service failures don't cascade to other services
- * - Provide comprehensive logging and error reporting
- * - Replace the complex DataProcessorService with simple orchestration
- * - Enable independent service processing without tight coupling
- * - Automatic dependency detection and resolution (NEW)
+ * TASK-007: Enhanced with dependency detection and queue integration
+ * Now uses queue-based dependency management instead of complex detection engine
  */
 export class SelfHealingBlockProcessor implements BaseService {
   private services: Map<string, SelfHealingProcessor> = new Map();
   private queueService: QueueService;
-  private dependencyDetectionEngine: DependencyDetectionEngineService;
+  // dependencyDetectionEngine removed - using queue-based approach
   private isRunning = false;
   private processingStats = {
     blocksProcessed: 0,
-    totalEntitiesProcessed: 0,
-    totalFailures: 0,
+    totalErrors: 0,
     serviceSuccessRates: new Map<string, { success: number; total: number }>(),
   };
 
@@ -41,7 +35,6 @@ export class SelfHealingBlockProcessor implements BaseService {
     transferService: TransferService,
     dataSubmissionService: DataSubmissionService,
     queueService: QueueService,
-    dependencyDetectionEngine: DependencyDetectionEngineService,
   ) {
     // Register all self-healing services
     this.services.set('account', accountService);
@@ -49,9 +42,8 @@ export class SelfHealingBlockProcessor implements BaseService {
     this.services.set('transfer', transferService);
     this.services.set('dataSubmission', dataSubmissionService);
 
-    // TASK-007: Initialize dependency services
+    // TASK-007: Initialize queue service (dependency detection now handled by queue)
     this.queueService = queueService;
-    this.dependencyDetectionEngine = dependencyDetectionEngine;
 
     // Initialize service stats
     for (const serviceName of this.services.keys()) {
@@ -61,7 +53,7 @@ export class SelfHealingBlockProcessor implements BaseService {
     logger.info('SelfHealingBlockProcessor: Initialized with services', {
       component: 'self-healing-processor',
       services: Array.from(this.services.keys()),
-      dependencyIntegration: true,
+      queueIntegration: true,
     });
   }
 
@@ -124,7 +116,7 @@ export class SelfHealingBlockProcessor implements BaseService {
 
   /**
    * Process a block using all self-healing services in parallel
-   * TASK-007: Now includes automatic dependency detection and resolution
+   * TASK-013: Simplified - now uses queue-based dependency management
    * This is the main orchestration method that replaces complex sync logic
    */
   async processBlock(blockData: BlockData): Promise<void> {
@@ -134,7 +126,7 @@ export class SelfHealingBlockProcessor implements BaseService {
 
     const startTime = Date.now();
 
-    logger.debug('SelfHealingBlockProcessor: Processing block with dependency detection', {
+    logger.debug('SelfHealingBlockProcessor: Processing block with queue-based dependencies', {
       component: 'self-healing-processor',
       blockNumber: blockData.number,
       hash: blockData.hash,
@@ -142,15 +134,8 @@ export class SelfHealingBlockProcessor implements BaseService {
       timestamp: blockData.timestamp,
     });
 
-    // TASK-007: Use dependency detection pattern for block processing
-    await this.processWithDependencyCheck(
-      'block',
-      blockData.number.toString(),
-      async () => {
-        // Original block processing logic
-        return this.performBlockProcessing(blockData);
-      }
-    );
+    // TASK-013: Simplified dependency handling - queue manages dependencies automatically
+    await this.performBlockProcessing(blockData);
 
     const processingTime = Date.now() - startTime;
     this.processingStats.blocksProcessed++;
@@ -161,97 +146,6 @@ export class SelfHealingBlockProcessor implements BaseService {
       processingTimeMs: processingTime,
       totalBlocksProcessed: this.processingStats.blocksProcessed,
     });
-  }
-
-  /**
-   * TASK-007: Process block with automatic dependency detection and resolution
-   * Adapted from EnhancedProcessor pattern
-   */
-  private async processWithDependencyCheck(
-    entityType: 'block' | 'account' | 'rollup' | 'validator',
-    entityId: string,
-    processingFn: () => Promise<void>
-  ): Promise<void> {
-    try {
-      logger.debug('SelfHealingBlockProcessor: Starting dependency check', {
-        component: 'self-healing-processor',
-        entityType,
-        entityId,
-      });
-
-      // Step 1: Create a processed entity for dependency detection
-      const processedEntity: ProcessedEntity = {
-        id: entityId,
-        type: entityType,
-        blockNumber: entityType === 'block' ? parseInt(entityId) : undefined,
-        data: {}, // Will be populated by the detection engine
-        timestamp: new Date(),
-      };
-
-      // Step 2: Detect missing dependencies
-      const dependencyReport = await this.dependencyDetectionEngine.detectMissingDependencies(processedEntity);
-
-      // Step 3: If dependencies are missing, queue resolution jobs
-      if (dependencyReport.resolutionRequired && dependencyReport.missingDependencies.length > 0) {
-        logger.info('SelfHealingBlockProcessor: Missing dependencies detected, queuing resolution', {
-          component: 'self-healing-processor',
-          entityType,
-          entityId,
-          missingCount: dependencyReport.totalMissing,
-          criticalCount: dependencyReport.criticalMissing,
-        });
-
-        // Queue dependency detection job (triggers resolution workflow)
-        await this.queueService.addJob(JobType.DEPENDENCY_DETECTION, {
-          entityType,
-          entityId,
-          priority: dependencyReport.criticalMissing > 0 ? 1 : 2,
-          blockNumber: processedEntity.blockNumber,
-          requiredBy: entityId,
-        });
-
-        // For self-healing, we continue with partial data but log the dependency issues
-        logger.info('SelfHealingBlockProcessor: Continuing with partial data (self-healing mode)', {
-          component: 'self-healing-processor',
-          entityType,
-          entityId,
-          missingCount: dependencyReport.totalMissing,
-        });
-      }
-
-      // Step 4: Continue with original processing
-      await processingFn();
-
-      logger.debug('SelfHealingBlockProcessor: Dependency check completed', {
-        component: 'self-healing-processor',
-        entityType,
-        entityId,
-        hadDependencies: dependencyReport.resolutionRequired,
-      });
-
-    } catch (error) {
-      // TASK-007: Apply John's error classification framework
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('dependency')) {
-        logger.warn('SelfHealingBlockProcessor: Dependency resolution failed, continuing with self-healing', { 
-          component: 'self-healing-processor',
-          entityType, 
-          entityId, 
-          error: errorMessage,
-        });
-        
-        // Continue with processing despite dependency issues (self-healing behavior)
-        await processingFn();
-      } else {
-        logger.error('SelfHealingBlockProcessor: Processing failed', { 
-          component: 'self-healing-processor',
-          entityType, 
-          entityId, 
-          error: errorMessage,
-        });
-        throw error;
-      }
-    }
   }
 
   /**
@@ -326,7 +220,7 @@ export class SelfHealingBlockProcessor implements BaseService {
         if (serviceStats) {
           serviceStats.total++;
         }
-        this.processingStats.totalFailures++;
+        this.processingStats.totalErrors++;
 
         return {
           service: serviceName,
@@ -344,7 +238,7 @@ export class SelfHealingBlockProcessor implements BaseService {
     const successfulServices = results.filter(r => r.success).length;
     const totalEntitiesProcessed = results.reduce((sum, r) => sum + (r.extractedCount || 0), 0);
     
-    this.processingStats.totalEntitiesProcessed += totalEntitiesProcessed;
+    // totalEntitiesProcessed tracking removed for simplification
 
     logger.debug('SelfHealingBlockProcessor: All services completed', {
       component: 'self-healing-processor',
@@ -379,10 +273,9 @@ export class SelfHealingBlockProcessor implements BaseService {
 
     return {
       blocksProcessed: this.processingStats.blocksProcessed,
-      totalEntitiesProcessed: this.processingStats.totalEntitiesProcessed,
-      totalFailures: this.processingStats.totalFailures,
+      totalErrors: this.processingStats.totalErrors,
       overallSuccessRate: this.processingStats.blocksProcessed > 0 
-        ? ((this.processingStats.blocksProcessed - this.processingStats.totalFailures) / this.processingStats.blocksProcessed * 100).toFixed(2) + '%'
+        ? ((this.processingStats.blocksProcessed - this.processingStats.totalErrors) / this.processingStats.blocksProcessed * 100).toFixed(2) + '%'
         : '0%',
       serviceStatistics: serviceStats,
       registeredServices: Array.from(this.services.keys()),
@@ -395,8 +288,7 @@ export class SelfHealingBlockProcessor implements BaseService {
   resetStats(): void {
     this.processingStats = {
       blocksProcessed: 0,
-      totalEntitiesProcessed: 0,
-      totalFailures: 0,
+      totalErrors: 0,
       serviceSuccessRates: new Map(),
     };
 
@@ -432,7 +324,6 @@ export const createSelfHealingBlockProcessor = (
   transferService: TransferService,
   dataSubmissionService: DataSubmissionService,
   queueService: QueueService,
-  dependencyDetectionEngine: DependencyDetectionEngineService,
 ): SelfHealingBlockProcessor => {
   return new SelfHealingBlockProcessor(
     accountService, 
@@ -440,6 +331,5 @@ export const createSelfHealingBlockProcessor = (
     transferService, 
     dataSubmissionService,
     queueService,
-    dependencyDetectionEngine,
   );
 }; 

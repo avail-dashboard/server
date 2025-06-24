@@ -80,9 +80,7 @@ import {
   eraRepository,
 } from '../database/repositories';
 
-// Phase 2: Dependency Management Services - John's Implementation
-import { createDependencyDetectionEngine } from './domain/dependencyDetectionEngine';
-import { createMissingDataResolver } from './domain/missingDataResolver';
+// Phase 2: Dependency Management Services - Removed (replaced by queue-based approach)
 
 // Service Factory for dependency injection
 export class ServiceFactory {
@@ -271,32 +269,18 @@ export class ServiceFactory {
         dataSubmissionRepository,
       );
 
-      // ==================== Phase 2: Dependency Management Services - John's Implementation ====================
-      
-      // Create Phase 2 services with configuration
-      const dependencyConfig = config.dependencyManagement;
-      const dependencyDetectionEngine = createDependencyDetectionEngine(dependencyConfig, this);
-      const missingDataResolver = createMissingDataResolver(dependencyConfig, this);
-      
-      // Register Phase 2 services
-      this.register('dependencyDetectionEngine', dependencyDetectionEngine);
-      this.register('missingDataResolver', missingDataResolver);
-      
-      // Start Phase 2 services
-      await dependencyDetectionEngine.start();
-      await missingDataResolver.start();
-      
+      // ==================== Phase 2: Dependency Management Services - Removed ====================
+      // Complex dependency services removed - now using queue-based ENSURE_* processors
       // ==================== End Phase 2 Services ====================
 
       // Phase 6: Create SelfHealingBlockProcessor (replaces DataProcessorService)
-      // Note: Now includes queueService and dependencyDetectionEngine for TASK-007 integration
+      // Note: Simplified - no longer needs dependency detection engine (queue handles dependencies)
       const selfHealingBlockProcessor = createSelfHealingBlockProcessor(
         accountService,
         validatorService,
         transferService,
         dataSubmissionService,
         queueService,
-        dependencyDetectionEngine,
       );
       
       // Register domain services
@@ -340,9 +324,7 @@ export class ServiceFactory {
         analyticsService,
         blockService,
         serviceFactory: this,
-        // Phase 2 dependencies
-        dependencyDetectionEngine,
-        missingDataResolver,
+        // Phase 2 dependencies removed - queue now handles dependencies directly
       });
       // Phase 6: Start SelfHealingBlockProcessor instead of DataProcessorService
       await selfHealingBlockProcessor.start();

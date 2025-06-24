@@ -18,9 +18,7 @@ interface JobProcessorDependencies {
   analyticsService?: any;
   blockService?: any;
   serviceFactory?: any;
-  // Phase 2: Dependency Management Services
-  dependencyDetectionEngine?: any;
-  missingDataResolver?: any;
+  // Phase 2: Dependency Management Services - Removed (using queue-based approach)
 }
 
 interface ErrorClassification {

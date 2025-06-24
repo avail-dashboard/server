@@ -259,36 +259,7 @@ export const config = {
     pingInterval: 25000,
   },
 
-  // Phase 2: Dependency Management Configuration - John's Implementation
-  dependencyManagement: {
-    detection: {
-      enabled: true,
-      scanDepth: 3,
-      batchSize: 100,
-      priority: {
-        blocks: 10,
-        accounts: 7,
-        rollups: 5,
-      },
-    },
-    resolution: {
-      maxConcurrentResolutions: 5,
-      retryAttempts: 3,
-      backoffStrategy: {
-        baseDelay: 2000,
-        maxDelay: 30000,
-        exponentialFactor: 2,
-        jitterEnabled: true,
-      },
-      batchTimeout: 60000, // 1 minute
-    },
-    performance: {
-      cacheEnabled: true,
-      cacheTtl: 300000, // 5 minutes
-      maxMemoryUsage: '512MB',
-      metricsEnabled: true,
-    },
-  },
+  // Phase 2: Dependency Management Configuration - Removed (replaced by queue-based approach)
 
   // TASK-008: Monitoring and Operational Tools Configuration - Adam's Implementation
   dependencyMonitoring: {
