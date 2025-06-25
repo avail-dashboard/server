@@ -94,9 +94,8 @@ async function runIndexing(options: IndexingOptions) {
     
     switch (options.mode) {
     case 'test':
-      console.log('🧪 Running test mode with known blocks...');
-      await indexer.testIndexer();
-      stats = indexer.getStats();
+      console.log('🧪 Running test mode with recent blocks...');
+      stats = await indexer.indexRecentBlocks(10);
       break;
         
     case 'range':

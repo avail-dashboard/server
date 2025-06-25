@@ -242,34 +242,7 @@ export class AvailDataSubmissionIndexer {
     return this.indexBlockRange(startBlock, endBlock);
   }
 
-  /**
-   * Test indexer with known blocks
-   */
-  async testIndexer(): Promise<void> {
-    logger.info('Testing AvailDataSubmissionIndexer with known blocks', {
-      component: 'avail-data-submission-indexer',
-    });
 
-    // Test with blocks we know have data submissions
-    const testBlocks = [1478095, 1478096];
-    
-    for (const blockNumber of testBlocks) {
-      try {
-        const result = await this.indexBlock(blockNumber);
-        logger.info('Test block indexed', {
-          component: 'avail-data-submission-indexer',
-          blockNumber,
-          result,
-        });
-      } catch (error) {
-        logger.error('Test block failed', {
-          component: 'avail-data-submission-indexer',
-          blockNumber,
-          error: (error as Error).message,
-        });
-      }
-    }
-  }
 
   /**
    * Get indexing statistics
