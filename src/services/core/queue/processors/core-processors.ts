@@ -5,7 +5,7 @@ import { ErrorClassifier } from '../error-classifier';
 import { 
   JobProcessorDependencies, 
   BlockIndexingJobData, 
-  DataSyncJobData 
+  DataSyncJobData,
 } from '../types';
 
 /**
@@ -19,7 +19,7 @@ import {
 export class CoreProcessors {
   constructor(
     private dependencies: JobProcessorDependencies,
-    private getService: <T>(serviceName: string) => Promise<T>
+    private getService: <T>(serviceName: string) => Promise<T>,
   ) {}
 
   /**
@@ -29,45 +29,138 @@ export class CoreProcessors {
     const { blockNumber } = job.data;
     const startTime = Date.now();
     
-    logger.debug('Processing block indexing job', { 
-      component: 'queue-service',
+    logger.info('🔧 PROCESSOR: Starting block indexing job', { 
+      component: 'block-indexing-processor',
+      operation: 'processBlockIndexing',
       jobId: job.id, 
       blockNumber,
+      priority: job.opts?.priority,
+      attempts: job.attemptsMade,
+      maxAttempts: job.opts?.attempts,
+      correlationId: (job.data as any)._correlationId,
+      timestamp: new Date().toISOString(),
     });
     
     try {
-      // Get required services
+      // Step 1: Get required services
+      logger.debug('🔧 PROCESSOR: Getting required services', {
+        component: 'block-indexing-processor',
+        operation: 'getServices',
+        jobId: job.id,
+        blockNumber,
+        requiredServices: ['blockService', 'availBlockchain'],
+      });
+      
       const blockService = await this.getService<any>('blockService');
       const availBlockchain = await this.getService<any>('availBlockchain');
       
-      // Simple validation - fail fast if block already exists
+      logger.debug('✅ PROCESSOR: Services obtained successfully', {
+        component: 'block-indexing-processor',
+        operation: 'servicesObtained',
+        jobId: job.id,
+        blockNumber,
+        servicesObtained: ['blockService', 'availBlockchain'],
+      });
+      
+      // Step 2: Validation - fail fast if block already exists
+      logger.debug('🔧 PROCESSOR: Checking if block already exists', {
+        component: 'block-indexing-processor',
+        operation: 'checkExisting',
+        jobId: job.id,
+        blockNumber,
+      });
+      
       const existingBlock = await blockService.getBlockByNumber(blockNumber);
       if (existingBlock) {
-        logger.debug('Block already indexed, skipping', { blockNumber });
+        const skipDuration = Date.now() - startTime;
+        logger.info('⏭️ PROCESSOR: Block already indexed, skipping', {
+          component: 'block-indexing-processor',
+          operation: 'skipExisting',
+          jobId: job.id,
+          blockNumber,
+          blockId: existingBlock.id,
+          skipDuration,
+          reason: 'already_exists',
+        });
         return {
           success: true,
-          data: { blockNumber, status: 'already_exists' },
-          metrics: { duration: Date.now() - startTime },
+          data: { blockNumber, status: 'already_exists', existingBlockId: existingBlock.id },
+          metrics: { duration: skipDuration },
         };
       }
       
-      // Fetch and process block data
+      logger.debug('✅ PROCESSOR: Block not found in database, proceeding with indexing', {
+        component: 'block-indexing-processor',
+        operation: 'proceedWithIndexing',
+        jobId: job.id,
+        blockNumber,
+      });
+      
+      // Step 3: Fetch block data from blockchain
+      logger.debug('🔧 PROCESSOR: Fetching block data from blockchain', {
+        component: 'block-indexing-processor',
+        operation: 'fetchBlockData',
+        jobId: job.id,
+        blockNumber,
+      });
+      
       const blockData = await availBlockchain.getBlockByNumber(blockNumber);
       if (!blockData) {
+        const fetchDuration = Date.now() - startTime;
+        logger.error('❌ PROCESSOR: Block not found on blockchain', {
+          component: 'block-indexing-processor',
+          operation: 'blockNotFound',
+          jobId: job.id,
+          blockNumber,
+          fetchDuration,
+          error: `Block ${blockNumber} not found on blockchain`,
+        });
         throw new Error(`Block ${blockNumber} not found on blockchain`);
       }
       
-      // Simple block indexing without complex dependency orchestration
-      await blockService.indexBlock(blockData);
-      
-      const duration = Date.now() - startTime;
-      
-      logger.info('Block indexing completed successfully', {
-        component: 'queue-service',
+      logger.info('✅ PROCESSOR: Block data fetched successfully', {
+        component: 'block-indexing-processor',
+        operation: 'blockDataFetched',
         jobId: job.id,
         blockNumber,
-        duration,
+        blockHash: blockData.hash,
+        extrinsicsCount: blockData.extrinsics?.length || 0,
+        eventsCount: blockData.events?.length || 0,
+        timestamp: blockData.timestamp,
+        fetchDuration: Date.now() - startTime,
+      });
+      
+      // Step 4: Index block data
+      logger.debug('🔧 PROCESSOR: Starting block indexing', {
+        component: 'block-indexing-processor',
+        operation: 'indexBlock',
+        jobId: job.id,
+        blockNumber,
+        blockHash: blockData.hash,
+        dataToIndex: {
+          extrinsics: blockData.extrinsics?.length || 0,
+          events: blockData.events?.length || 0,
+        },
+      });
+      
+      const indexingStartTime = Date.now();
+      await blockService.indexBlock(blockData);
+      const indexingDuration = Date.now() - indexingStartTime;
+      
+      const totalDuration = Date.now() - startTime;
+      
+      logger.info('✅ PROCESSOR: Block indexing completed successfully', {
+        component: 'block-indexing-processor',
+        operation: 'indexingComplete',
+        jobId: job.id,
+        blockNumber,
+        blockHash: blockData.hash,
+        totalDuration,
+        indexingDuration,
         entitiesProcessed: blockData.extrinsics?.length || 0,
+        eventsProcessed: blockData.events?.length || 0,
+        processingRate: (blockData.extrinsics?.length || 0) / (totalDuration / 1000),
+        timestamp: new Date().toISOString(),
       });
       
       return {
@@ -76,12 +169,14 @@ export class CoreProcessors {
           blockNumber,
           blockHash: blockData.hash,
           extrinsicsCount: blockData.extrinsics?.length || 0,
+          eventsCount: blockData.events?.length || 0,
           timestamp: blockData.timestamp,
         },
         metrics: {
-          duration,
+          totalDuration,
+          indexingDuration,
           entitiesProcessed: blockData.extrinsics?.length || 0,
-          processingRate: (blockData.extrinsics?.length || 0) / (duration / 1000),
+          processingRate: (blockData.extrinsics?.length || 0) / (totalDuration / 1000),
         },
       };
       
@@ -89,21 +184,32 @@ export class CoreProcessors {
       const classification = ErrorClassifier.classifyError(error as Error, JobType.BLOCK_INDEXING);
       const duration = Date.now() - startTime;
       
-      logger.error('Block indexing failed', {
-        component: 'queue-service',
+      logger.error('❌ PROCESSOR: Block indexing failed', {
+        component: 'block-indexing-processor',
+        operation: 'indexingFailed',
         jobId: job.id,
         blockNumber,
         error: (error as Error).message,
+        errorStack: (error as Error).stack,
         classification,
         duration,
+        attempts: job.attemptsMade,
+        maxAttempts: job.opts?.attempts,
+        willRetry: classification.isRetryable && job.attemptsMade < (job.opts?.attempts || 3),
+        correlationId: (job.data as any)._correlationId,
       });
       
       // Log non-retryable errors for immediate attention
       if (!classification.isRetryable) {
-        logger.error('BLOCK_INDEXING permanent failure', { 
+        logger.error('🚨 PROCESSOR: BLOCK_INDEXING permanent failure - requires attention', { 
+          component: 'block-indexing-processor',
+          operation: 'permanentFailure',
           blockNumber, 
           error: (error as Error).message,
           alertLevel: classification.alertLevel,
+          requiresManualIntervention: true,
+          jobId: job.id,
+          correlationId: (job.data as any)._correlationId,
         });
       }
       

@@ -2,6 +2,7 @@ import { Job } from 'bull';
 import { JobType, JobPriority } from '../../../types/service';
 import { CoreProcessors } from './core-processors';
 import { JobProcessorDependencies } from '../types';
+import { logger } from '../../../../utils/logger';
 
 /**
  * Job Processor Registry
@@ -18,36 +19,54 @@ export class JobProcessorRegistry {
   constructor(
     private dependencies: JobProcessorDependencies,
     private getService: <T>(serviceName: string) => Promise<T>,
-    private addJob: <T>(type: string, data: T, options?: any) => Promise<any>
+    private addJob: <T>(type: string, data: T, options?: any) => Promise<any>,
   ) {
+    logger.info('🔧 PROCESSOR_REGISTRY: Initializing job processor registry', {
+      component: 'processor-registry',
+      operation: 'constructor',
+      availableDependencies: Object.keys(dependencies),
+    });
+    
     this.coreProcessors = new CoreProcessors(dependencies, getService);
     this.setupProcessors();
+    
+    logger.info('✅ PROCESSOR_REGISTRY: Job processor registry initialized', {
+      component: 'processor-registry',
+      operation: 'constructor',
+      totalProcessors: this.processors.size,
+      registeredTypes: Array.from(this.processors.keys()),
+    });
   }
 
   private setupProcessors(): void {
+    logger.debug('🔧 PROCESSOR_REGISTRY: Setting up processors', {
+      component: 'processor-registry',
+      operation: 'setupProcessors',
+    });
+
     // ==================== Core Processors ====================
     this.processors.set(JobType.BLOCK_INDEXING, (job: Job) => 
-      this.coreProcessors.processBlockIndexing(job)
+      this.coreProcessors.processBlockIndexing(job),
     );
 
     this.processors.set(JobType.DATA_SYNC, (job: Job) => 
-      this.coreProcessors.processDataSync(job)
+      this.coreProcessors.processDataSync(job),
     );
 
     this.processors.set(JobType.HEALTH_CHECK, (job: Job) => 
-      this.coreProcessors.processHealthCheck(job)
+      this.coreProcessors.processHealthCheck(job),
     );
 
     // ==================== TODO Processors (Stubs) ====================
-    this.processors.set(JobType.EXTRINSIC_PROCESSING, async (job: Job) => {
+    this.processors.set(JobType.EXTRINSIC_PROCESSING, async (_job: Job) => {
       return { success: true, message: 'Extrinsic processing completed' };
     });
 
-    this.processors.set(JobType.ANALYTICS_CALCULATION, async (job: Job) => {
+    this.processors.set(JobType.ANALYTICS_CALCULATION, async (_job: Job) => {
       return { success: true, message: 'Analytics calculation completed' };
     });
 
-    this.processors.set(JobType.ROLLUP_STATISTICS, async (job: Job) => {
+    this.processors.set(JobType.ROLLUP_STATISTICS, async (_job: Job) => {
       return { success: true, message: 'Rollup statistics completed' };
     });
 
@@ -62,6 +81,14 @@ export class JobProcessorRegistry {
     this.processors.set(JobType.DEPENDENCY_DETECTION, async (job: Job) => {
       const { entityType, entityId, priority = 1 } = job.data;
       let dependenciesQueued = 0;
+      
+      logger.debug('🔧 PROCESSOR: Processing dependency detection', {
+        component: 'dependency-detection-processor',
+        jobId: job.id,
+        entityType,
+        entityId,
+        priority,
+      });
       
       // Simple dependency validation
       if (entityType === 'block' && parseInt(entityId, 10) > 0) {

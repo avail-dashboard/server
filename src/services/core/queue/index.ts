@@ -45,11 +45,22 @@ export class QueueService implements QueueServiceInterface {
    * Initialize queue dependencies and set up processors
    */
   initializeDependencies(dependencies: JobProcessorDependencies): void {
-    console.log('🔧 INIT DEPENDENCIES: Starting dependency initialization...');
+    const startTime = Date.now();
+    
+    this.logger.info('🔧 QUEUE: Starting dependency initialization', {
+      component: 'queue-service',
+      operation: 'initializeDependencies',
+      dependencyCount: Object.keys(dependencies).length,
+      timestamp: new Date().toISOString(),
+    });
     
     this.dependencies = dependencies;
     
-    console.log('🔧 INIT DEPENDENCIES: Creating JobProcessorRegistry...');
+    this.logger.debug('🔧 QUEUE: Creating JobProcessorRegistry', {
+      component: 'queue-service',
+      operation: 'createRegistry',
+      availableDependencies: Object.keys(dependencies),
+    });
     
     // Initialize processor registry with dependencies
     this.processorRegistry = new JobProcessorRegistry(
@@ -58,36 +69,37 @@ export class QueueService implements QueueServiceInterface {
       this.addJob.bind(this),
     );
     
-    console.log('🔧 INIT DEPENDENCIES: Registry created with', this.processorRegistry.getProcessorCount(), 'processors');
-    
-    this.logger.info('🔧 JobProcessorRegistry created', {
+    this.logger.info('🔧 QUEUE: JobProcessorRegistry created successfully', {
       component: 'queue-service',
+      operation: 'registryCreated',
       processorCount: this.processorRegistry.getProcessorCount(),
       registeredTypes: this.processorRegistry.getRegisteredTypes(),
+      setupDuration: Date.now() - startTime,
     });
-    
-    console.log('🔧 INIT DEPENDENCIES: Checking if queue exists...', !!this.queue);
     
     // Set up queue processors now that dependencies are available
     if (this.queue) {
-      console.log('🔧 INIT DEPENDENCIES: Calling setupQueueProcessors from initializeDependencies()...');
-      this.logger.info('🔧 Setting up queue processors with Bull queue', {
+      this.logger.info('🔧 QUEUE: Setting up queue processors with Bull queue', {
         component: 'queue-service',
+        operation: 'setupProcessors',
         queueExists: !!this.queue,
         processorRegistryExists: !!this.processorRegistry,
+        queueName: this.queue.name,
       });
       this.setupQueueProcessors();
     } else {
-      console.log('❌ INIT DEPENDENCIES: Bull queue not available yet - processors will be set up when queue starts');
-      this.logger.warn('⚠️ Bull queue not available yet - processors will be set up when queue starts', {
+      this.logger.warn('⚠️ QUEUE: Bull queue not available yet - processors will be set up when queue starts', {
         component: 'queue-service',
+        operation: 'deferredSetup',
+        reason: 'queueNotInitialized',
       });
     }
     
-    console.log('✅ INIT DEPENDENCIES COMPLETE');
-    
-    this.logger.info('✅ QueueService: Dependencies initialized', {
+    const totalDuration = Date.now() - startTime;
+    this.logger.info('✅ QUEUE: Dependencies initialized successfully', {
       component: 'queue-service',
+      operation: 'initializationComplete',
+      totalDuration,
       availableDependencies: Object.keys(dependencies),
       processorCount: this.processorRegistry.getProcessorCount(),
       queueProcessorsSetup: !!this.queue && !!(this.queue as any)._processorsInitialized,
@@ -137,22 +149,53 @@ export class QueueService implements QueueServiceInterface {
    * Start the queue service
    */
   async start(): Promise<void> {
+    const startTime = Date.now();
+    
     if (this.isStarted) {
-      this.logger.warn('QueueService is already started');
+      this.logger.warn('🔧 QUEUE: Service is already started', {
+        component: 'queue-service',
+        operation: 'start',
+        status: 'already_running',
+      });
       return;
     }
 
     try {
-      console.log('🔧 QUEUE START: Creating Redis connection...');
+      this.logger.info('🚀 QUEUE: Starting queue service', {
+        component: 'queue-service',
+        operation: 'start',
+        timestamp: new Date().toISOString(),
+        config: {
+          redisUrl: config.redis.url,
+          queueDb: config.redis.queueDb,
+          defaultJobOptions: config.queue.defaultJobOptions,
+        },
+      });
       
       // Create Redis connection for queue
+      this.logger.debug('🔧 QUEUE: Creating Redis connection', {
+        component: 'queue-service',
+        operation: 'createRedisConnection',
+        redisUrl: config.redis.url,
+        queueDb: config.redis.queueDb,
+      });
+      
       this.redis = new Redis(config.redis.url, {
         db: config.redis.queueDb,
         maxRetriesPerRequest: 3,
         lazyConnect: true,
       });
 
-      console.log('🔧 QUEUE START: Creating Bull queue...');
+      this.logger.debug('🔧 QUEUE: Creating Bull queue instance', {
+        component: 'queue-service',
+        operation: 'createBullQueue',
+        queueName: 'avail-explorer-queue',
+        redisConfig: {
+          port: this.redis.options.port || 6379,
+          host: this.redis.options.host || 'localhost',
+          db: config.redis.queueDb,
+        },
+      });
       
       // Create Bull queue
       this.queue = new Bull('avail-explorer-queue', {
@@ -168,7 +211,11 @@ export class QueueService implements QueueServiceInterface {
         },
       });
 
-      console.log('🔧 QUEUE START: Creating Dead Letter Queue...');
+      this.logger.debug('🔧 QUEUE: Creating Dead Letter Queue', {
+        component: 'queue-service',
+        operation: 'createDeadLetterQueue',
+        queueName: 'avail-explorer-dead-letter',
+      });
       
       // Create Dead Letter Queue
       this.deadLetterQueue = new Bull('avail-explorer-dead-letter', {
@@ -184,29 +231,48 @@ export class QueueService implements QueueServiceInterface {
       });
 
       // Set up event listeners
+      this.logger.debug('🔧 QUEUE: Setting up event listeners', {
+        component: 'queue-service',
+        operation: 'setupEventListeners',
+      });
       this.setupEventListeners();
-      
-      console.log('🔧 QUEUE START: Checking processor registry...', !!this.processorRegistry);
       
       // Set up queue processors if dependencies are available
       if (this.processorRegistry) {
-        console.log('🔧 QUEUE START: Calling setupQueueProcessors from start()...');
+        this.logger.info('🔧 QUEUE: Setting up queue processors', {
+          component: 'queue-service',
+          operation: 'setupProcessors',
+          processorCount: this.processorRegistry.getProcessorCount(),
+          registeredTypes: this.processorRegistry.getRegisteredTypes(),
+        });
         this.setupQueueProcessors();
       } else {
-        console.log('❌ QUEUE START: No processor registry available, processors will be set up later');
+        this.logger.warn('⚠️ QUEUE: No processor registry available, processors will be set up later', {
+          component: 'queue-service',
+          operation: 'deferredProcessorSetup',
+          reason: 'registryNotInitialized',
+        });
       }
 
       // Test Redis connection
+      this.logger.debug('🔧 QUEUE: Testing Redis connection', {
+        component: 'queue-service',
+        operation: 'testRedisConnection',
+      });
       await this.redis.ping();
 
       this.isStarted = true;
       
-      console.log('✅ QUEUE START COMPLETE: processorCount =', this.processorRegistry?.getProcessorCount() || 0);
+      const initializationDuration = Date.now() - startTime;
       
-      this.logger.info('QueueService started successfully', {
+      this.logger.info('✅ QUEUE: Service started successfully', {
+        component: 'queue-service',
+        operation: 'startComplete',
         queueName: this.queue.name,
         concurrency: config.queue.concurrency,
         processorCount: this.processorRegistry?.getProcessorCount() || 0,
+        initializationDuration,
+        timestamp: new Date().toISOString(),
       });
 
     } catch (error) {
@@ -256,13 +322,34 @@ export class QueueService implements QueueServiceInterface {
     data: T, 
     options: JobOptions = {},
   ): Promise<QueueJob<T>> {
+    const startTime = Date.now();
+    
     if (!this.queue) {
+      this.logger.error('🔧 QUEUE: Cannot add job - service not started', {
+        component: 'queue-service',
+        operation: 'addJob',
+        jobType: type,
+        error: 'QueueService not started',
+      });
       throw new Error('QueueService not started');
     }
 
     try {
       // Capture current correlation ID to pass to job
       const correlationId = getCorrelationId();
+      
+      this.logger.debug('🔧 QUEUE: Adding job to queue', {
+        component: 'queue-service',
+        operation: 'addJob',
+        jobType: type,
+        correlationId,
+        dataSize: JSON.stringify(data).length,
+        options: {
+          priority: options.priority,
+          delay: options.delay,
+          attempts: options.attempts,
+        },
+      });
       
       const jobData = {
         ...data,
@@ -271,6 +358,14 @@ export class QueueService implements QueueServiceInterface {
 
       // Get job-specific retry strategy
       const retryStrategy = config.queue.retryStrategies[type as keyof typeof config.queue.retryStrategies];
+      
+      this.logger.debug('🔧 QUEUE: Applying retry strategy', {
+        component: 'queue-service',
+        operation: 'addJob',
+        jobType: type,
+        retryStrategy: retryStrategy ? 'custom' : 'default',
+        retryConfig: retryStrategy,
+      });
       
       // Enhanced job options with exponential backoff integration
       const jobOptions: JobOptions = {
@@ -299,16 +394,32 @@ export class QueueService implements QueueServiceInterface {
         attempts: options.attempts,
       };
 
-      this.logger.debug('Job added to queue', {
+      const addDuration = Date.now() - startTime;
+      
+      this.logger.info('✅ QUEUE: Job added successfully', {
+        component: 'queue-service',
+        operation: 'addJob',
         jobId: job.id,
-        type,
+        jobType: type,
         priority: options.priority,
+        delay: options.delay,
+        attempts: jobOptions.attempts,
+        addDuration,
+        queueLength: await this.queue.count(),
       });
 
       return queueJob;
 
     } catch (error) {
-      this.logger.error('Failed to add job to queue', { type, error });
+      const addDuration = Date.now() - startTime;
+      this.logger.error('❌ QUEUE: Failed to add job to queue', {
+        component: 'queue-service',
+        operation: 'addJob',
+        jobType: type,
+        error: (error as Error).message,
+        addDuration,
+        correlationId: getCorrelationId(),
+      });
       throw error;
     }
   }
@@ -530,35 +641,220 @@ export class QueueService implements QueueServiceInterface {
    */
   private setupEventListeners(): void {
     if (!this.queue) {
+      this.logger.warn('🔧 QUEUE: Cannot setup event listeners - queue not available', {
+        component: 'queue-service',
+        operation: 'setupEventListeners',
+      });
       return;
     }
 
+    this.logger.info('🔧 QUEUE: Setting up comprehensive event listeners', {
+      component: 'queue-service',
+      operation: 'setupEventListeners',
+      queueName: this.queue.name,
+    });
+
+    // Job completion events
     this.queue.on('completed', (job: Job, result: any) => {
-      this.logger.debug('Job completed', {
+      this.logger.info('✅ QUEUE: Job completed successfully', {
+        component: 'queue-service',
+        event: 'completed',
         jobId: job.id,
-        type: job.name,
-        result,
+        jobType: job.name,
+        priority: job.opts?.priority,
+        attempts: job.attemptsMade,
+        processedOn: new Date(job.processedOn || Date.now()).toISOString(),
+        duration: job.finishedOn ? job.finishedOn - job.processedOn! : undefined,
+        resultKeys: result ? Object.keys(result) : [],
+        correlationId: job.data._correlationId,
       });
     });
 
     this.queue.on('failed', (job: Job, error: Error) => {
-      this.logger.error('Job failed', {
+      this.logger.error('❌ QUEUE: Job failed', {
+        component: 'queue-service',
+        event: 'failed',
         jobId: job.id,
-        type: job.name,
-        error: error.message,
+        jobType: job.name,
+        priority: job.opts?.priority,
         attempts: job.attemptsMade,
+        maxAttempts: job.opts?.attempts,
+        error: error.message,
+        errorStack: error.stack,
+        failedReason: job.failedReason,
+        processedOn: job.processedOn ? new Date(job.processedOn).toISOString() : undefined,
+        failedOn: job.finishedOn ? new Date(job.finishedOn).toISOString() : undefined,
+        correlationId: job.data._correlationId,
+        willRetry: job.attemptsMade < (job.opts?.attempts || 3),
       });
+
+      // If this is the final failure, move to dead letter queue
+      if (job.attemptsMade >= (job.opts?.attempts || 3) && this.deadLetterQueue) {
+        this.deadLetterQueue.add('failed-job', {
+          originalJobId: job.id,
+          jobType: job.name,
+          jobData: job.data,
+          error: error.message,
+          attempts: job.attemptsMade,
+          failedAt: new Date().toISOString(),
+        });
+
+        this.logger.warn('🔄 QUEUE: Moving failed job to dead letter queue', {
+          component: 'queue-service',
+          event: 'deadLetter',
+          jobId: job.id,
+          jobType: job.name,
+          finalAttempt: job.attemptsMade,
+          maxAttempts: job.opts?.attempts,
+        });
+      }
     });
 
     this.queue.on('stalled', (job: Job) => {
-      this.logger.warn('Job stalled', {
+      this.logger.warn('⚠️ QUEUE: Job stalled (taking too long)', {
+        component: 'queue-service',
+        event: 'stalled',
         jobId: job.id,
-        type: job.name,
+        jobType: job.name,
+        priority: job.opts?.priority,
+        processedOn: job.processedOn ? new Date(job.processedOn).toISOString() : undefined,
+        stallDuration: job.processedOn ? Date.now() - job.processedOn : undefined,
+        correlationId: job.data._correlationId,
       });
     });
 
+    this.queue.on('progress', (job: Job, progress: any) => {
+      this.logger.debug('🔄 QUEUE: Job progress update', {
+        component: 'queue-service',
+        event: 'progress',
+        jobId: job.id,
+        jobType: job.name,
+        progress,
+        correlationId: job.data._correlationId,
+      });
+    });
+
+    this.queue.on('active', (job: Job) => {
+      this.logger.debug('▶️ QUEUE: Job started processing', {
+        component: 'queue-service',
+        event: 'active',
+        jobId: job.id,
+        jobType: job.name,
+        priority: job.opts?.priority,
+        attempts: job.attemptsMade,
+        startedAt: new Date().toISOString(),
+        correlationId: job.data._correlationId,
+      });
+    });
+
+    this.queue.on('waiting', (job: Job) => {
+      this.logger.debug('⏳ QUEUE: Job waiting in queue', {
+        component: 'queue-service',
+        event: 'waiting',
+        jobId: job.id,
+        jobType: job.name,
+        priority: job.opts?.priority,
+        delay: job.opts?.delay,
+        correlationId: job.data._correlationId,
+      });
+    });
+
+    this.queue.on('delayed', (job: Job) => {
+      this.logger.debug('⏰ QUEUE: Job delayed', {
+        component: 'queue-service',
+        event: 'delayed',
+        jobId: job.id,
+        jobType: job.name,
+        delay: job.opts?.delay,
+        delayedUntil: job.opts?.delay ? new Date(Date.now() + job.opts.delay).toISOString() : undefined,
+        correlationId: job.data._correlationId,
+      });
+    });
+
+    this.queue.on('removed', (job: Job) => {
+      this.logger.debug('🗑️ QUEUE: Job removed from queue', {
+        component: 'queue-service',
+        event: 'removed',
+        jobId: job.id,
+        jobType: job.name,
+        correlationId: job.data._correlationId,
+      });
+    });
+
+    // Queue-level events
     this.queue.on('error', (error: Error) => {
-      this.logger.error('Queue error', { error });
+      this.logger.error('❌ QUEUE: Queue system error', {
+        component: 'queue-service',
+        event: 'error',
+        error: error.message,
+        errorStack: error.stack,
+        queueName: this.queue?.name,
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    this.queue.on('paused', () => {
+      this.logger.warn('⏸️ QUEUE: Queue paused', {
+        component: 'queue-service',
+        event: 'paused',
+        queueName: this.queue?.name,
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    this.queue.on('resumed', () => {
+      this.logger.info('▶️ QUEUE: Queue resumed', {
+        component: 'queue-service',
+        event: 'resumed',
+        queueName: this.queue?.name,
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    this.queue.on('cleaned', (jobs: Job[], jobType: string) => {
+      this.logger.info('🧹 QUEUE: Jobs cleaned from queue', {
+        component: 'queue-service',
+        event: 'cleaned',
+        cleanedCount: jobs.length,
+        jobType,
+        queueName: this.queue?.name,
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    // Dead Letter Queue events if available
+    if (this.deadLetterQueue) {
+      this.deadLetterQueue.on('completed', (job: Job) => {
+        this.logger.info('🔄 DEAD_LETTER: Dead letter job processed', {
+          component: 'queue-service',
+          event: 'deadLetterCompleted',
+          jobId: job.id,
+          originalJobId: job.data.originalJobId,
+          originalJobType: job.data.jobType,
+        });
+      });
+
+      this.deadLetterQueue.on('failed', (job: Job, error: Error) => {
+        this.logger.error('❌ DEAD_LETTER: Dead letter job failed', {
+          component: 'queue-service',
+          event: 'deadLetterFailed',
+          jobId: job.id,
+          originalJobId: job.data.originalJobId,
+          originalJobType: job.data.jobType,
+          error: error.message,
+        });
+      });
+    }
+
+    this.logger.info('✅ QUEUE: Event listeners setup complete', {
+      component: 'queue-service',
+      operation: 'setupEventListeners',
+      eventsRegistered: [
+        'completed', 'failed', 'stalled', 'progress', 'active', 
+        'waiting', 'delayed', 'removed', 'error', 'paused', 
+        'resumed', 'cleaned',
+      ],
+      deadLetterQueueEvents: !!this.deadLetterQueue,
     });
   }
 
