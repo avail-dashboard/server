@@ -53,8 +53,8 @@ class AvailSubscriptionManager implements SubscriptionManager {
 /**
  * AvailBlockchainService - Avail-SDK based blockchain operations
  * 
- * This service mirrors BlockchainService but uses avail-js-sdk instead of polkadot.js
- * for better handling of Avail-specific operations like data submissions
+ * This service provides native Avail blockchain operations using avail-js-sdk
+ * with enhanced support for Avail-specific features like data submissions
  */
 export class AvailBlockchainService implements BaseService {
   private connectionManager: AvailConnectionManager;
@@ -203,7 +203,7 @@ export class AvailBlockchainService implements BaseService {
 
   /**
    * Get specific block by hash or number using avail-sdk
-   * This method provides better data submission handling than polkadot.js
+   * This method provides enhanced data submission handling with Avail SDK
    */
   async getBlock(hashOrNumber: string | number): Promise<BlockData> {
     const connection = await this.connectionManager.getHealthyConnection();

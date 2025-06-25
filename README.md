@@ -7,7 +7,7 @@ This is the backend server for the Avail blockchain explorer, providing APIs for
 - **Runtime**: Node.js 18+
 - **Framework**: Express.js with TypeScript
 - **Database**: PostgreSQL (primary), Redis (caching)
-- **Blockchain**: Polkadot API for Avail blockchain integration
+- **Blockchain**: Avail SDK for Avail blockchain integration
 - **Testing**: Jest with supertest
 - **Process Management**: PM2 with ecosystem.config.js
 
@@ -64,7 +64,7 @@ npm run sync:e2e        # End-to-end sync test
 ## Architecture
 
 ### Core Services
-- **Blockchain Service** (`src/services/core/blockchain.ts`) - Polkadot API integration
+- **Blockchain Service** (`src/services/core/avail-blockchain.ts`) - Avail SDK integration
 - **Connection Manager** (`src/services/core/connection-manager.ts`) - Connection pooling
 - **Sync Service** (`src/services/core/sync.ts`) - Blockchain data synchronization
 - **Queue Service** (`src/services/core/queue.ts`) - Bull queue for async processing
@@ -91,7 +91,7 @@ npm run sync:e2e        # End-to-end sync test
 - **chain_stats** - Cached chain statistics
 
 ## Key Dependencies
-- `@polkadot/api` - Blockchain API integration
+- `avail-js-sdk` - Avail blockchain SDK integration
 - `express` - Web framework
 - `pg` - PostgreSQL client
 - `bull` - Queue system

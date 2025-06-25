@@ -59,8 +59,8 @@ const consoleFormat = winston.format.combine(
   }),
 );
 
-// Add a custom filter for Polkadot API warnings
-const polkadotApiFilter = winston.format((info) => {
+// Add a custom filter for Avail SDK warnings
+const availSdkFilter = winston.format((info) => {
   // Filter out known Avail-specific warnings that are not critical
   const message = typeof info.message === 'string' ? info.message : '';
   
@@ -138,7 +138,7 @@ export const logger = winston.createLogger({
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
     addCorrelationId(),
-    polkadotApiFilter(),
+    availSdkFilter(),
     winston.format.json(),
   ),
   transports,

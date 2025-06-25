@@ -217,8 +217,8 @@
 - [ ] **DataSubmissionIndexingExample.ts**: Fix BigInt vs Number conflicts
 - [ ] **Consider**: Exclude examples from build if not needed
 
-### Polkadot API
-- [ ] **Investigate**: Version conflicts between avail-js-sdk and @polkadot/api
+### Avail SDK Integration
+- [ ] **Investigate**: Any remaining compatibility issues with avail-js-sdk
 - [ ] **Fix**: Type incompatibilities if needed
 
 ## TESTING TASKS
