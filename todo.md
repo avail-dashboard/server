@@ -214,8 +214,7 @@
 ## DEPENDENCY ISSUES (Phase 3 - If still blocking)
 
 ### Example Files
-- [ ] **DataSubmissionIndexingExample.ts**: Fix BigInt vs Number conflicts
-- [ ] **Consider**: Exclude examples from build if not needed
+- ✅ **Removed**: DataSubmissionIndexingExample.ts - was unused development example
 
 ### Avail SDK Integration
 - [ ] **Investigate**: Any remaining compatibility issues with avail-js-sdk
