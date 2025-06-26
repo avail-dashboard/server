@@ -226,7 +226,7 @@ export class QueueService implements QueueServiceInterface {
         },
         defaultJobOptions: {
           removeOnComplete: 50,
-          removeOnFail: 0,
+          removeOnFail: 25, // Keep 25 failed jobs for debugging, prevent memory leak
         },
       });
 
@@ -291,11 +291,15 @@ export class QueueService implements QueueServiceInterface {
 
     try {
       if (this.queue) {
+        // Remove all event listeners to prevent memory leaks
+        this.queue.removeAllListeners();
         await this.queue.close();
         this.queue = null;
       }
 
       if (this.deadLetterQueue) {
+        // Remove all event listeners from dead letter queue
+        this.deadLetterQueue.removeAllListeners();
         await this.deadLetterQueue.close();
         this.deadLetterQueue = null;
       }

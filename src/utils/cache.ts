@@ -53,6 +53,8 @@ class CacheService {
 
   async disconnect(): Promise<void> {
     try {
+      // Remove all event listeners to prevent memory leaks
+      this.redis.removeAllListeners();
       await this.redis.disconnect();
     } catch (error) {
       logError(error as Error, { component: 'cache', action: 'disconnect' });

@@ -14,7 +14,15 @@ export class QueueHealthMonitor {
   private healthHistory: HealthSnapshot[] = [];
   private readonly maxHistorySize = 100;
 
-  constructor(private queueService: QueueService) {}
+  constructor(private queueService: QueueService) {
+    // Ensure cleanup on process exit to prevent memory leaks
+    process.on('beforeExit', () => {
+      if (this.monitoringInterval) {
+        clearInterval(this.monitoringInterval);
+        this.monitoringInterval = undefined;
+      }
+    });
+  }
 
   /**
    * Start continuous health monitoring
