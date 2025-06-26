@@ -50,6 +50,8 @@ import { createBlockIndexerService } from './domain/indexer';
 import { createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
 // Phase 2: Block Processing Orchestrator
 import { createBlockProcessingOrchestrator } from './domain/blockProcessingOrchestrator';
+// Phase 3: Domain Processing Orchestrator
+import { createDomainProcessingOrchestrator } from './domain/domainProcessingOrchestrator';
 import { createSearchService } from './domain/search';
 // Phase 2 Services
 import { createAccountApiService, createAccountProcessor } from './domain/account';
@@ -352,6 +354,14 @@ export class ServiceFactory {
         config.blockProcessing,
       );
 
+      // Phase 3: Create Domain Processing Orchestrator
+      const domainProcessingOrchestrator = createDomainProcessingOrchestrator(
+        accountProcessor,
+        validatorProcessor,
+        transferProcessor,
+        dataSubmissionProcessor,
+      );
+
       // Register new sync services
       this.register('syncService', syncService);
       this.register('blockIndexerService', blockIndexerService);
@@ -359,6 +369,8 @@ export class ServiceFactory {
       this.register('selfHealingBlockProcessor', selfHealingBlockProcessor);
       // Phase 2: Register Block Processing Orchestrator
       this.register('blockProcessingOrchestrator', blockProcessingOrchestrator);
+      // Phase 3: Register Domain Processing Orchestrator
+      this.register('domainProcessingOrchestrator', domainProcessingOrchestrator);
       
       // Start sync services
       await syncService.start();
@@ -377,6 +389,8 @@ export class ServiceFactory {
       await selfHealingBlockProcessor.start();
       // Phase 2: Start Block Processing Orchestrator
       await blockProcessingOrchestrator.start();
+      // Phase 3: Start Domain Processing Orchestrator
+      await domainProcessingOrchestrator.start();
       
       console.log('✅ Domain services initialized successfully');
     } catch (error) {

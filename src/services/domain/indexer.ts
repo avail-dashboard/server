@@ -10,12 +10,20 @@ import {
   ExtrinsicData, 
 } from '../types/blockchain';
 import { withRetry, retryConfigs } from '../../utils/retry';
+import { 
+  DomainProcessingMetadata,
+  IndexingWithDomainResult,
+} from './types/domainProcessing';
 
 export interface IBlockIndexerService {
   indexBlock(blockNumber: number): Promise<BlockData>;
   indexBlockRange(startBlock: number, endBlock: number): Promise<BlockData[]>;
   validateBlock(blockData: BlockData): Promise<boolean>;
   handleReorganization(fromBlock: number): Promise<void>;
+  // Phase 3: Enhanced methods for domain processing handoff
+  indexBlockWithDomainHandoff(blockNumber: number): Promise<IndexingWithDomainResult>;
+  indexBlockRangeWithDomainPrep(startBlock: number, endBlock: number): Promise<IndexingWithDomainResult[]>;
+  analyzeDomainProcessingRequirements(blockData: BlockData): DomainProcessingMetadata;
 }
 
 /**
@@ -525,6 +533,158 @@ export class BlockIndexerService implements BaseService, IBlockIndexerService {
       extrinsics: [], // Will be fetched separately if needed
       events: [], // Will be fetched separately if needed
     };
+  }
+
+  /**
+   * Phase 3: Index block with domain processing handoff preparation
+   */
+  async indexBlockWithDomainHandoff(blockNumber: number): Promise<IndexingWithDomainResult> {
+    try {
+      logger.debug('BlockIndexerService: Indexing block with domain handoff', {
+        component: 'indexer',
+        blockNumber,
+      });
+
+      // Step 1: Index block normally
+      const blockData = await this.indexBlock(blockNumber);
+
+      // Step 2: Prepare metadata for domain processing
+      const metadata = this.analyzeDomainProcessingRequirements(blockData);
+
+      logger.debug('BlockIndexerService: Block indexed with domain handoff prepared', {
+        component: 'indexer',
+        blockNumber,
+        complexity: metadata.processingComplexity,
+        estimatedTime: metadata.estimatedProcessingTime,
+      });
+
+      return {
+        blockData,
+        readyForDomainProcessing: true,
+        domainProcessingMetadata: metadata,
+      };
+    } catch (error) {
+      logError(error as Error, {
+        component: 'indexer',
+        action: 'indexBlockWithDomainHandoff',
+        blockNumber,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Phase 3: Index block range with domain processing preparation
+   */
+  async indexBlockRangeWithDomainPrep(startBlock: number, endBlock: number): Promise<IndexingWithDomainResult[]> {
+    try {
+      logger.info('BlockIndexerService: Indexing block range with domain prep', {
+        component: 'indexer',
+        startBlock,
+        endBlock,
+        totalBlocks: endBlock - startBlock + 1,
+      });
+
+      // Step 1: Index blocks normally
+      const blocksData = await this.indexBlockRange(startBlock, endBlock);
+
+      // Step 2: Prepare domain processing metadata for each block
+      const results: IndexingWithDomainResult[] = blocksData.map(blockData => {
+        const metadata = this.analyzeDomainProcessingRequirements(blockData);
+        return {
+          blockData,
+          readyForDomainProcessing: true,
+          domainProcessingMetadata: metadata,
+        };
+      });
+
+      logger.info('BlockIndexerService: Block range indexed with domain prep completed', {
+        component: 'indexer',
+        startBlock,
+        endBlock,
+        processedBlocks: results.length,
+        complexityDistribution: this.getComplexityDistribution(results),
+      });
+
+      return results;
+    } catch (error) {
+      logError(error as Error, {
+        component: 'indexer',
+        action: 'indexBlockRangeWithDomainPrep',
+        startBlock,
+        endBlock,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Phase 3: Analyze domain processing requirements for a block
+   */
+  analyzeDomainProcessingRequirements(blockData: BlockData): DomainProcessingMetadata {
+    const extrinsicsCount = blockData.extrinsics?.length || 0;
+    const eventsCount = blockData.events?.length || 0;
+
+    // Analyze complexity based on content
+    let complexity: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
+    let estimatedTime = 1000; // Base 1 second
+
+    if (extrinsicsCount > 100 || eventsCount > 500) {
+      complexity = 'HIGH';
+      estimatedTime = 5000;
+    } else if (extrinsicsCount > 20 || eventsCount > 100) {
+      complexity = 'MEDIUM';
+      estimatedTime = 2000;
+    }
+
+    // Check for validator-related extrinsics (more complex)
+    const hasValidatorExtrinsics = blockData.extrinsics?.some(ext =>
+      ext.method?.section === 'staking' || 
+      ext.method?.section === 'session' ||
+      ext.method?.section === 'validatorSet',
+    ) || false;
+
+    // Check for large data submissions
+    const hasLargeDataSubmissions = blockData.extrinsics?.some(ext =>
+      ext.method?.section === 'dataAvailability' && 
+      ext.method?.args && 
+      JSON.stringify(ext.method.args).length > 10000,
+    ) || false;
+
+    // Adjust complexity based on special conditions
+    if (hasValidatorExtrinsics) {
+      complexity = 'HIGH';
+      estimatedTime += 2000;
+    }
+
+    if (hasLargeDataSubmissions) {
+      complexity = complexity === 'LOW' ? 'MEDIUM' : 'HIGH';
+      estimatedTime += 1500;
+    }
+
+    // Determine if sequential processing is required
+    const requiresSequentialProcessing = complexity === 'HIGH' || hasValidatorExtrinsics;
+
+    return {
+      extrinsicsCount,
+      eventsCount,
+      processingComplexity: complexity,
+      estimatedProcessingTime: estimatedTime,
+      hasValidatorExtrinsics,
+      hasLargeDataSubmissions,
+      requiresSequentialProcessing,
+    };
+  }
+
+  /**
+   * Helper method to get complexity distribution for logging
+   */
+  private getComplexityDistribution(results: IndexingWithDomainResult[]): Record<string, number> {
+    return results.reduce((acc, result) => {
+      const complexity = result.domainProcessingMetadata.processingComplexity;
+      acc[complexity] = (acc[complexity] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
   }
 
   /**

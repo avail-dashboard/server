@@ -3,8 +3,9 @@
 /**
  * Standalone Blockchain Data Sync Script
  * 
- * This script syncs blockchain data directly using our services without the queue system.
- * Perfect for initial sync, development, and controlled operations.
+ * Phase 1: Pure Job Scheduler - No Domain Processing
+ * This script coordinates blockchain data sync through the queue system only.
+ * All domain processing is handled by queue workers, maintaining clean separation.
  * 
  * Usage:
  *   npm run sync:full                    # Full sync from genesis
@@ -18,9 +19,7 @@ import { initializeCorrelationId } from '../src/utils/correlationId';
 import db from '../src/utils/database';
 import { AvailBlockchainService } from '../src/services/core/avail-blockchain';
 import { createBlockIndexerService } from '../src/services/domain/indexer';
-// Phase 4: Use ServiceFactory with queue-based processing
 import { ServiceFactory } from '../src/services';
-import { BlockProcessingOrchestrator } from '../src/services/domain/blockProcessingOrchestrator';
 import { SyncService } from '../src/services/core/sync';
 import { QueueService } from '../src/services/core/queue';
 
@@ -30,32 +29,29 @@ interface SyncOptions {
   toBlock?: number;
   batchSize?: number;
   delayMs?: number;
-  useQueue?: boolean;
+  waitForCompletion?: boolean;
 }
 
 class StandaloneSyncScript {
   private serviceFactory: ServiceFactory;
   private blockchain: AvailBlockchainService;
   private indexer: ReturnType<typeof createBlockIndexerService>;
-  private processor: BlockProcessingOrchestrator;
   private syncService: SyncService;
   private queueService: QueueService;
   private shouldStop = false;
   private currentBlock = 0;
+  private readonly BATCH_SIZE = 50;
 
   constructor() {
     // Initialize correlation ID namespace for background job processing
     initializeCorrelationId();
     
-    // Phase 7: Initialize with ServiceFactory for integrated self-healing services
+    // Initialize with ServiceFactory for integrated queue-based services
     this.serviceFactory = ServiceFactory.getInstance();
-    
-    // Note: Individual services will be initialized through ServiceFactory
-    // This provides the complete self-healing architecture (Phases 1-6)
   }
 
   /**
-   * Initialize all services using ServiceFactory (Phase 7)
+   * Initialize all services using ServiceFactory
    */
   async initialize(_options?: SyncOptions): Promise<void> {
     try {
@@ -65,22 +61,21 @@ class StandaloneSyncScript {
       await db.connect();
       logger.info('✅ Database connected');
 
-      // Initialize ServiceFactory with all self-healing services (Phases 1-6)
+      // Initialize ServiceFactory with queue-based services
       await this.serviceFactory.initializeAllServices();
-      logger.info('✅ ServiceFactory initialized with all self-healing services');
+      logger.info('✅ ServiceFactory initialized with queue-based services');
 
-      // Get services from factory
+      // Get services from factory - only coordination services, no domain processors
       this.blockchain = this.serviceFactory.get('availBlockchain');
-      this.processor = this.serviceFactory.get('blockProcessingOrchestrator');
       this.syncService = this.serviceFactory.get('syncService');
       this.queueService = this.serviceFactory.get('queue');
       
-      // Create independent indexer (not part of self-healing architecture)
+      // Create independent indexer (for job scheduling coordination)
       this.indexer = createBlockIndexerService(db, this.blockchain);
       await this.indexer.start();
       
-      logger.info('✅ All services initialized (Queue-Based Architecture)');
-      logger.info('📊 BlockProcessingOrchestrator ready for queue-based processing');
+      logger.info('✅ All coordination services initialized (Queue-Based Architecture)');
+      logger.info('📊 Sync script ready for pure job scheduling');
 
     } catch (error) {
       logger.error('❌ Failed to initialize services:', error);
@@ -89,7 +84,7 @@ class StandaloneSyncScript {
   }
 
   /**
-   * Cleanup and shutdown services (Phase 7)
+   * Cleanup and shutdown services
    */
   async cleanup(): Promise<void> {
     try {
@@ -100,7 +95,7 @@ class StandaloneSyncScript {
         await this.indexer.stop();
       }
       
-      // Shutdown ServiceFactory (handles all self-healing services)
+      // Shutdown ServiceFactory (handles all queue-based services)
       if (this.serviceFactory && this.serviceFactory.isInitialized()) {
         await this.serviceFactory.shutdown();
       }
@@ -134,6 +129,7 @@ class StandaloneSyncScript {
       mode: 'incremental',
       batchSize: 50,
       delayMs: 100,
+      waitForCompletion: true,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -154,8 +150,8 @@ class StandaloneSyncScript {
       } else if (arg === '--delay' && args[i + 1]) {
         options.delayMs = parseInt(args[i + 1]);
         i++;
-      } else if (arg === '--use-queue') {
-        options.useQueue = true;
+      } else if (arg === '--no-wait') {
+        options.waitForCompletion = false;
       }
     }
 
@@ -205,180 +201,58 @@ class StandaloneSyncScript {
       throw new Error(`Unknown sync mode: ${options.mode}`);
     }
 
-    // Validation
-    if (from < 0) {
-      throw new Error('From block cannot be negative');
-    }
-    if (to < from) {
-      throw new Error('To block must be greater than or equal to from block');
-    }
-    if (to > latestBlock.number) {
-      logger.warn(`To block ${to} is greater than latest block ${latestBlock.number}, adjusting...`);
-      to = latestBlock.number;
+    // Validate range
+    if (from > to) {
+      logger.warn(`⚠ Start block (${from}) is greater than end block (${to}), no sync needed`);
+      return { from: to + 1, to }; // Return invalid range to skip processing
     }
 
+    if (from < 0) {
+      logger.warn('⚠ Start block cannot be negative, setting to 0');
+      from = 0;
+    }
+
+    logger.info(`📋 Sync range determined: ${from} to ${to} (${to - from + 1} blocks)`);
     return { from, to };
   }
 
   /**
-   * Sync a range of blocks
+   * Schedule sync jobs through queue system - Pure Job Scheduler
    */
-  async syncBlockRange(from: number, to: number, batchSize: number, delayMs: number): Promise<void> {
+  async syncBlockRange(from: number, to: number, batchSize: number, options: SyncOptions): Promise<void> {
     const totalBlocks = to - from + 1;
-    let processedBlocks = 0;
-    let errors = 0;
     const startTime = Date.now();
 
-    logger.info(`📦 Starting sync: blocks ${from} to ${to} (${totalBlocks} total)`);
+    logger.info(`📦 Starting queue-based sync: blocks ${from} to ${to} (${totalBlocks} total)`);
 
-    for (let blockNum = from; blockNum <= to && !this.shouldStop; blockNum += batchSize) {
-      const batchEnd = Math.min(blockNum + batchSize - 1, to);
-      const currentBatchSize = batchEnd - blockNum + 1;
-      
-      try {
-        logger.debug(`🔄 Processing batch: ${blockNum} to ${batchEnd} (${currentBatchSize} blocks)`);
-        
-        // Process batch of blocks
-        await this.processBatch(blockNum, batchEnd);
-        
-        processedBlocks += currentBatchSize;
-        this.currentBlock = batchEnd;
-        
-        // Progress reporting
-        const progress = (processedBlocks / totalBlocks) * 100;
-        const elapsed = (Date.now() - startTime) / 1000;
-        const rate = processedBlocks / elapsed;
-        const eta = totalBlocks > processedBlocks ? (totalBlocks - processedBlocks) / rate : 0;
-        
-        logger.info(`📊 Progress: ${progress.toFixed(1)}% (${processedBlocks}/${totalBlocks}) | Rate: ${rate.toFixed(1)} blocks/sec | ETA: ${eta.toFixed(0)}s | Errors: ${errors}`);
-        
-        // Delay between batches to avoid overwhelming RPC
-        if (delayMs > 0 && blockNum + batchSize <= to) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-        
-      } catch (error) {
-        errors++;
-        logger.error(`❌ Error processing batch ${blockNum}-${batchEnd}:`, error);
-        
-        // If too many errors, abort
-        if (errors > 10) {
-          throw new Error(`Too many errors (${errors}), aborting sync`);
-        }
-        
-        // Continue with next batch after error
-        processedBlocks += currentBatchSize;
-        this.currentBlock = batchEnd;
-      }
-    }
-
-    const elapsed = (Date.now() - startTime) / 1000;
-    const rate = processedBlocks / elapsed;
-    
-    if (this.shouldStop) {
-      logger.warn(`⏹️ Sync stopped by user at block ${this.currentBlock}`);
-    } else {
-      logger.info(`✅ Sync completed! Processed ${processedBlocks} blocks in ${elapsed.toFixed(1)}s (${rate.toFixed(1)} blocks/sec)`);
-    }
-  }
-
-  /**
-   * Process a batch of blocks
-   */
-  async processBatch(fromBlock: number, toBlock: number): Promise<void> {
     try {
-      logger.debug(`🔄 Processing batch: ${fromBlock} to ${toBlock} (${toBlock - fromBlock + 1} blocks)`);
+      // Schedule data sync jobs through queue service
+      await this.queueService.scheduleDataSync(from, to);
 
-      // First try to index blocks normally
-      const indexedBlocks = await this.indexer.indexBlockRange(fromBlock, toBlock);
-      
-      if (indexedBlocks.length === 0) {
-        logger.warn(`⚠️ No blocks indexed for range ${fromBlock}-${toBlock}, trying direct processing`);
-        
-        // Try direct processing with Avail SDK
-        const processedBlocks = await this.processBlocksWithAvailSDK(fromBlock, toBlock);
-        
-        if (processedBlocks.length > 0) {
-          logger.info(`✅ Direct processing completed for range ${fromBlock}-${toBlock}: ${processedBlocks.length} blocks processed`);
-          
-          // Process each block through the enhanced processor
-          for (const blockData of processedBlocks) {
-            await this.processor.processBlock(blockData.block);
-            logger.debug(`✅ Processed block ${blockData.block.number}`);
-          }
-        }
-      } else {
-        logger.info(`✅ Successfully indexed ${indexedBlocks.length} blocks from range ${fromBlock}-${toBlock}`);
-        
-        // Process indexed blocks through enhanced processor
-        for (const block of indexedBlocks) {
-          await this.processor.processBlock(block);
-          logger.debug(`✅ Processed block ${block.number}`);
-        }
+      logger.info(`✅ Scheduled sync jobs for blocks ${from} to ${to}`);
+
+      // Monitor job completion if requested
+      if (options.waitForCompletion) {
+        await this.monitorBatchCompletion(from, to);
       }
+
+      const elapsed = (Date.now() - startTime) / 1000;
+      logger.info(`✅ Queue-based sync completed! Range ${from}-${to} processed in ${elapsed.toFixed(1)}s`);
 
     } catch (error) {
-      logger.error(`❌ Error processing batch ${fromBlock}-${toBlock}:`, error);
+      logger.error(`❌ Error scheduling sync jobs for range ${from}-${to}:`, error);
       throw error;
     }
   }
 
   /**
-   * Process blocks with direct Avail SDK approach (no hybrid fallback)
+   * Monitor batch completion through queue system
    */
-  private async processBlocksWithAvailSDK(fromBlock: number, toBlock: number): Promise<any[]> {
-    const processedBlocks: any[] = [];
-    
-    logger.info(`🔄 Processing blocks ${fromBlock}-${toBlock} with Avail SDK`);
-    
-    for (let blockNum = fromBlock; blockNum <= toBlock; blockNum++) {
-      try {
-        // Get block data directly from Avail SDK
-        const blockData = await this.blockchain.getBlockWithDataSubmissions(blockNum);
-        
-        if (blockData) {
-          processedBlocks.push(blockData);
-          logger.debug(`✅ Processed block ${blockNum} with Avail SDK`);
-        } else {
-          logger.warn(`⚠️ No block data returned for block ${blockNum}`);
-        }
-      } catch (error) {
-        logger.error(`❌ Failed to process block ${blockNum} with Avail SDK:`, error);
-        // With Avail SDK as primary, we want to see errors clearly
-        throw error;
-      }
-    }
-    
-    return processedBlocks;
-  }
-
-  /**
-   * Sync using queue system instead of direct processing
-   */
-  async syncBlockRangeWithQueue(from: number, to: number): Promise<void> {
-    try {
-      logger.info(`🔄 Starting queue-based sync: blocks ${from} to ${to}`);
-      
-      // Start sync through SyncService (this will queue DATA_SYNC jobs)
-      await this.syncService.startSync('incremental', from, to);
-      
-      // Monitor queue progress
-      await this.monitorQueueProgress(from, to);
-      
-      logger.info(`✅ Queue-based sync completed: blocks ${from} to ${to}`);
-      
-    } catch (error) {
-      logger.error('❌ Queue-based sync failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Monitor queue progress until sync completes
-   */
-  private async monitorQueueProgress(from: number, to: number): Promise<void> {
+  private async monitorBatchCompletion(from: number, to: number): Promise<void> {
     const startTime = Date.now();
     const totalBlocks = to - from + 1;
+    
+    logger.info(`📊 Monitoring queue progress for blocks ${from} to ${to}...`);
     
     while (!this.shouldStop) {
       try {
@@ -387,13 +261,14 @@ class StandaloneSyncScript {
         
         // Calculate progress estimate based on queue completion
         const completed = queueStats.completed;
-        const progress = totalBlocks > 0 ? Math.min(completed / Math.ceil(totalBlocks / 50) * 100, 100) : 100; // Assume batch size 50
+        const estimatedBatches = Math.ceil(totalBlocks / this.BATCH_SIZE);
+        const progress = estimatedBatches > 0 ? Math.min((completed / estimatedBatches) * 100, 100) : 100;
         const elapsed = (Date.now() - startTime) / 1000;
         
-        logger.info(`📊 Queue Sync Progress: ${progress.toFixed(1)}% | Queue: ${queueStats.waiting} waiting, ${queueStats.active} active, ${queueStats.completed} completed, ${queueStats.failed} failed | Elapsed: ${elapsed.toFixed(0)}s`);
+        logger.info(`📊 Queue Progress: ${progress.toFixed(1)}% | Queue: ${queueStats.waiting} waiting, ${queueStats.active} active, ${queueStats.completed} completed, ${queueStats.failed} failed | Elapsed: ${elapsed.toFixed(0)}s`);
         
         // Check if completed (no active or waiting jobs)
-        if (queueStats.waiting === 0 && queueStats.active === 0) {
+        if (queueStats.waiting === 0 && queueStats.active === 0 && queueStats.completed > 0) {
           logger.info('✅ Queue processing completed - no more jobs waiting or active');
           break;
         }
@@ -409,7 +284,7 @@ class StandaloneSyncScript {
   }
 
   /**
-   * Live sync mode - continuously sync new blocks
+   * Live sync mode - continuously schedule new block sync jobs
    */
   async liveSyncMode(options: SyncOptions): Promise<void> {
     logger.info('🔴 Starting live sync mode...');
@@ -420,8 +295,8 @@ class StandaloneSyncScript {
         const { from, to } = await this.determineSyncRange(options);
         
         if (from <= to) {
-          logger.info(`🔄 Live sync: processing blocks ${from} to ${to}`);
-          await this.syncBlockRange(from, to, options.batchSize || 10, options.delayMs || 1000);
+          logger.info(`🔄 Live sync: scheduling jobs for blocks ${from} to ${to}`);
+          await this.syncBlockRange(from, to, options.batchSize || 10, options);
         } else {
           logger.debug('📡 Live sync: no new blocks, waiting...');
         }
@@ -477,19 +352,14 @@ class StandaloneSyncScript {
       // Initialize services
       await this.initialize(options);
 
-      // Execute sync based on mode and queue option
+      // Execute sync based on mode - All modes use queue-based approach
       if (options.mode === 'live') {
         await this.liveSyncMode(options);
       } else {
         const { from, to } = await this.determineSyncRange(options);
         
-        if (options.useQueue) {
-          // Use queue-based approach
-          await this.syncBlockRangeWithQueue(from, to);
-        } else {
-          // Use direct processing approach (existing)
-          await this.syncBlockRange(from, to, options.batchSize || 50, options.delayMs || 100);
-        }
+        // Always use queue-based approach (Phase 1: Single processing path)
+        await this.syncBlockRange(from, to, options.batchSize || 50, options);
       }
 
     } catch (error) {
