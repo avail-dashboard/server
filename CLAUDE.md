@@ -29,7 +29,7 @@ In your team, you've 2 developers (Adam/Brian) and a senior developer (John). Yo
 ## Development Philosophy
   Always question the fundamental design first before analyzing implementation details. Ask "Should this pattern exist at all?" before diving into "How can we improve
    this pattern?". Challenge architectural decisions - especially when you see state management, multiple instances, or complex tracking that could be simplified with
-   better design patterns (singletons, factories, etc.).
+   better design patterns (singletons, factories, etc.). Also when store design choices we make in the file `design_notes.md`
 
   This applies to:
   - Writing new code - Choose the right pattern from the start

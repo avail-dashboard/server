@@ -6,10 +6,8 @@
  * Checks the actual database schema to verify field types
  */
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../src/database/client';
 import { logger } from '../src/utils/logger';
-
-const prisma = new PrismaClient();
 
 async function checkSchema(): Promise<void> {
   try {
@@ -59,12 +57,11 @@ async function checkSchema(): Promise<void> {
   }
 }
 
-// Run the check
-if (require.main === module) {
-  checkSchema().catch((error) => {
-    logger.error('💥 Schema check execution failed:', error);
+// Execute schema check
+checkSchema()
+  .catch((error) => {
+    console.error('❌ Schema check failed:', error);
     process.exit(1);
   });
-}
 
 export default checkSchema; 

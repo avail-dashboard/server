@@ -1,5 +1,5 @@
 import { logger } from '../../utils/logger';
-import { AvailConnectionManager, createAvailConnectionManager } from './avail-connection-manager';
+import { AvailConnectionManager } from './avail-connection-manager';
 import { 
   BaseService, 
   ServiceHealth, 
@@ -11,8 +11,8 @@ import {
   BlockData,
 } from '../types/blockchain';
 
-// Avail RPC Providers for avail-sdk
-const AVAIL_SDK_PROVIDERS: ConnectionProvider[] = [
+// Default Avail RPC Providers for avail-sdk
+const DEFAULT_AVAIL_PROVIDERS: ConnectionProvider[] = [
   { url: 'wss://mainnet-rpc.avail.so/ws', type: 'ws', priority: 1, provider: 'Avail Official (SDK)', region: 'global' },
   { url: 'wss://avail-mainnet.public.blastapi.io/', type: 'ws', priority: 2, provider: 'BlastAPI (SDK)', region: 'global' },
   { url: 'wss://mainnet.avail-rpc.com/', type: 'ws', priority: 3, provider: 'Ankr (SDK)', region: 'global' },
@@ -61,7 +61,7 @@ export class AvailBlockchainService implements BaseService {
   private subscriptionManager: AvailSubscriptionManager;
 
   constructor(providers?: ConnectionProvider[]) {
-    this.connectionManager = createAvailConnectionManager(providers || AVAIL_SDK_PROVIDERS);
+    this.connectionManager = new AvailConnectionManager(providers || DEFAULT_AVAIL_PROVIDERS);
     this.subscriptionManager = new AvailSubscriptionManager();
   }
 
@@ -74,10 +74,7 @@ export class AvailBlockchainService implements BaseService {
       
       await this.connectionManager.initialize();
       
-      logger.info('AvailBlockchainService: Service started successfully', { 
-        component: 'avail-blockchain',
-        connectionType: 'avail-sdk',
-      });
+      logger.info('AvailBlockchainService: Service started successfully', { component: 'avail-blockchain' });
       
     } catch (error) {
       logger.error('AvailBlockchainService: Error starting service', { component: 'avail-blockchain', error: (error as Error).message });

@@ -7,10 +7,8 @@
  * This replaces the old init.sql approach with a clean Prisma-based solution.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../src/database/client';
 import { logger } from '../src/utils/logger';
-
-const prisma = new PrismaClient();
 
 async function seedDatabase(): Promise<void> {
   try {
@@ -46,12 +44,11 @@ async function seedDatabase(): Promise<void> {
   }
 }
 
-// Run the seeding
-if (require.main === module) {
-  seedDatabase().catch((error) => {
-    logger.error('💥 Database seeding execution failed:', error);
+// Execute seeding
+seedDatabase()
+  .catch((error) => {
+    console.error('❌ Seeding failed:', error);
     process.exit(1);
   });
-}
 
 export default seedDatabase; 
