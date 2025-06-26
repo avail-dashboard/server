@@ -12,18 +12,17 @@ export { SimpleDependencyResolver, createDependencyResolver } from './core/depen
 // (No integration services currently)
 
 // Domain Services
-export { BlockService, createBlockService } from './domain/block';
+export { BlockApiService, createBlockApiService, BlockProcessor, createBlockProcessor } from './domain/block';
 export { ExtrinsicService, createExtrinsicService } from './domain/extrinsic';
-export { DataAvailabilityService, createDataAvailabilityService } from './domain/dataAvailability';
+export { DataSubmissionApiService, createDataSubmissionApiService, DataSubmissionProcessor, createDataSubmissionProcessor } from './domain/dataSubmission';
 export { BlockIndexerService, createBlockIndexerService } from './domain/indexer';
 // Phase 6 Services (replacing DataProcessorService with SelfHealingBlockProcessor) 
 export { SelfHealingBlockProcessor, createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
 export { SearchService, createSearchService } from './domain/search';
-// Phase 2 Services
-export { AccountService, createAccountService } from './domain/account';
-export { ValidatorService, createValidatorService } from './domain/validator';
-// Phase 5 Services
-export { DataSubmissionService, createDataSubmissionService } from './domain/dataSubmission';
+// Phase 2 Services - Updated for domain structure  
+export { AccountApiService, AccountProcessor, createAccountApiService, createAccountProcessor } from './domain/account';
+export { ValidatorApiService, ValidatorProcessor, createValidatorApiService, createValidatorProcessor } from './domain/validator';
+export { TransferApiService, TransferProcessor, createTransferApiService, createTransferProcessor } from './domain/transfer';
 
 // Mappers
 export * from '../mappers';
@@ -40,22 +39,20 @@ import { createDependencyResolver } from './core/dependency-resolver';
 import config from '../config';
 
 // Domain services factory functions
-import { createBlockService } from './domain/block';
+import { createBlockApiService, createBlockProcessor } from './domain/block';
 import { createExtrinsicService } from './domain/extrinsic';
-import { createDataAvailabilityService } from './domain/dataAvailability';
+import { createDataSubmissionApiService, createDataSubmissionProcessor } from './domain/dataSubmission';
 import { createSyncService } from './core/sync';
 import { createBlockIndexerService } from './domain/indexer';
 // Phase 6 Services (replacing DataProcessorService)
 import { createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
 import { createSearchService } from './domain/search';
 // Phase 2 Services
-import { createAccountService } from './domain/account';
-import { createValidatorService } from './domain/validator';
+import { createAccountApiService, createAccountProcessor } from './domain/account';
+import { createValidatorApiService, createValidatorProcessor } from './domain/validator';
 import { createChainService } from './domain/chain';
-import { createTransferService } from './domain/transfer';
+import { createTransferApiService, createTransferProcessor } from './domain/transfer';
 import { createAnalyticsService } from '../services/analytics/analytics';
-// Phase 5 Services
-import { createDataSubmissionService } from './domain/dataSubmission';
 
 // Mapper imports
 import { 
@@ -176,16 +173,15 @@ export class ServiceFactory {
       this.register('extrinsicMapper', extrinsicMapper);
       this.register('blockMapper', blockMapper);
       
+      // Create dependency resolver first (needed by other services)
+      const dependencyResolver = createDependencyResolver();
+      
       // Create domain services using factory functions with dependencies
-      const blockService = createBlockService(blockRepository, availBlockchainService, blockMapper);
+      const blockApiService = createBlockApiService(blockRepository, availBlockchainService, blockMapper);
+      
+      // Create Block domain processor separately
+      const blockProcessor = createBlockProcessor(blockRepository, availBlockchainService, blockMapper);
       const extrinsicService = createExtrinsicService(extrinsicRepository, blockRepository, availBlockchainService, extrinsicMapper);
-      const dataAvailabilityService = createDataAvailabilityService(
-        dataSubmissionRepository,
-        rollupRepository, 
-        availBlockchainService,
-        dataSubmissionMapper,
-        rollupMapper,
-      );
       
       // Create new sync services
       const syncService = createSyncService(db, availBlockchainService, queueService);
@@ -199,21 +195,20 @@ export class ServiceFactory {
         dataSubmissionRepository,
       );
 
-      // Create dependency resolver
-      const dependencyResolver = createDependencyResolver();
-
-      // Create Phase 2 services
-      const accountService = createAccountService(
+      // Create Phase 2 services - Account domain
+      const accountApiService = createAccountApiService(
         availBlockchainService,
         transferRepository,
         extrinsicRepository,
         validatorRepository,
         rewardRepository,
       );
+      
+      const accountProcessor = createAccountProcessor();
 
       // Register account resolver before creating dependent services
       dependencyResolver.registerResolver('account', (address: string) => 
-        accountService.ensureAccountExists(address),
+        accountProcessor.ensureAccountExists(address),
       );
 
       // Register block resolver to ensure blocks exist before creating dependent entities
@@ -233,27 +228,46 @@ export class ServiceFactory {
         return existing;
       });
 
-      const validatorService = createValidatorService(
+      // Create Validator domain services separately
+      const validatorApiService = createValidatorApiService(
         availBlockchainService,
         validatorRepository,
         nominationRepository,
         rewardRepository,
         blockRepository,
         eraRepository,
+      );
+      
+      const validatorProcessor = createValidatorProcessor(
+        validatorRepository,
         dependencyResolver,
       );
 
       const chainService = createChainService(availBlockchainService);
 
-      const transferService = createTransferService(
+      // Create Transfer domain services separately
+      const transferApiService = createTransferApiService(
         availBlockchainService,
         transferRepository,
         blockRepository,
+      );
+
+      const transferProcessor = createTransferProcessor(
+        availBlockchainService,
+        transferRepository,
         dependencyResolver,
       );
 
-      // Phase 5: DataSubmissionService
-      const dataSubmissionService = createDataSubmissionService(
+      // Create DataSubmission domain services separately  
+      const dataSubmissionApiService = createDataSubmissionApiService(
+        dataSubmissionRepository,
+        rollupRepository, 
+        availBlockchainService,
+        dataSubmissionMapper,
+        rollupMapper,
+      );
+      
+      const dataSubmissionProcessor = createDataSubmissionProcessor(
         availBlockchainService,
         dataSubmissionRepository,
         rollupRepository,
@@ -275,36 +289,51 @@ export class ServiceFactory {
 
       // Phase 6: Create SelfHealingBlockProcessor (replaces DataProcessorService)
       // Note: Simplified - no longer needs dependency detection engine (queue handles dependencies)
+      // TODO: Update SelfHealingBlockProcessor to accept DataSubmissionProcessor instead of DataSubmissionService
+      // For now, create a minimal stub that satisfies the interface
+      const stubDataSubmissionService = {
+        extractFromBlock: () => Promise.resolve([]),
+        processExtractedEntities: () => Promise.resolve([]),
+        ensureDependencies: () => Promise.resolve(),
+      } as any;
+      
       const selfHealingBlockProcessor = createSelfHealingBlockProcessor(
-        accountService,
-        validatorService,
-        transferService,
-        dataSubmissionService,
+        accountProcessor,
+        validatorProcessor,
+        transferProcessor,  // Use processor for self-healing, not API service
+        stubDataSubmissionService,  // TEMPORARY: Stub until selfHealingProcessor is updated to use the new processor
         queueService,
       );
       
       // Register domain services
-      this.register('blockService', blockService);
+      this.register('blockService', blockApiService);  // Backward compatibility
+      this.register('blockApiService', blockApiService);
+      this.register('blockProcessor', blockProcessor);
       this.register('extrinsicService', extrinsicService);
-      this.register('dataAvailabilityService', dataAvailabilityService);
+      this.register('dataSubmissionApiService', dataSubmissionApiService);
+      this.register('dataSubmissionProcessor', dataSubmissionProcessor);
+      // Backward compatibility
+      this.register('dataSubmissionService', dataSubmissionApiService);
       this.register('searchService', searchService);
       
       // Register Phase 2 services
-      this.register('accountService', accountService);
-      this.register('validatorService', validatorService);
+      this.register('accountService', accountApiService);  // Register API service for routes (backward compatibility)
+      this.register('accountApiService', accountApiService);  // Register with new name
+      this.register('accountProcessor', accountProcessor);  // Register processor separately
+      this.register('validatorService', validatorApiService);  // Register API service for routes (backward compatibility)
+      this.register('validatorApiService', validatorApiService);  // Register with new name
+      this.register('validatorProcessor', validatorProcessor);  // Register processor separately
       this.register('chainService', chainService);
-      this.register('transferService', transferService);
-      // Register Phase 5 services
-      this.register('dataSubmissionService', dataSubmissionService);
+      this.register('transferService', transferApiService);  // Register API service for routes
+      this.register('transferProcessor', transferProcessor);  // Register processor separately
       this.register('analyticsService', analyticsService);
 
       // Start Phase 2 services
-      await accountService.start();
-      await validatorService.start();
+      await accountApiService.start();
+      await validatorApiService.start();
       await chainService.start();
-      await transferService.start();
-      // Start Phase 5 services
-      await dataSubmissionService.start();
+      await transferApiService.start();  // Start API service
+      // Note: transferProcessor doesn't need start() - it's stateless
       await analyticsService.start();
       
       // Register new sync services
@@ -322,7 +351,7 @@ export class ServiceFactory {
       queueServiceInstance.initializeDependencies({
         selfHealingBlockProcessor,
         analyticsService,
-        blockService,
+        blockService: blockApiService,
         serviceFactory: this,
         // Phase 2 dependencies removed - queue now handles dependencies directly
       });

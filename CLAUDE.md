@@ -9,29 +9,19 @@
 8. Please suggest edits to this claude.md file whenever makes sense.
 9. Docs/Developer.md - contains analysis of common issues and solutions. Please update this with solution to problems you encounter in this project. don't suggest edit too long for this file. just a single double liner for a issue and solution.
 
-10. Docs/avail_explorer_complete_analysis.md - contains the analysis of the Avail Explorer UI. (load optionally, as per need)
-11. Docs/Avail DA Explorer Scope.md - contains the scope of this project. (load optionally, as per need)
+10. Docs/avail_explorer_complete_analysis.md - contains the analysis of the Avail Explorer UI (load optionally, as per need), refer this when building APIs.
+11. Docs/Avail DA Explorer Scope.md - contains the scope of this project (load optionally, as per need)
 
-12. You can recommend tasks for delegation to Adam/Brian, but only assign when told "delegate-task" followed by the task and developer name. You will always let me know whenever it makes sense to delegate a task along with how to trigger it. When a task is delegated, you will suggest what we can do meanwhile.
-13. Whenever the name John/Adam/Brian are used, you load the ./Team directory.
+12. when told "delegate-task" followed by the task and developer name, refer Team/SENIOR-DEVELOPER-GUIDE.md
 
-**Developer Selection Guidelines**: When "delegate-task" is used without specifying a developer name, suggest the most suitable developer based on task complexity:
-- **Critical/Architectural tasks**: Recommend John (Senior) - System architecture, complex integrations, performance optimization, technical leadership decisions
-- **Complex/Architecture tasks**: Recommend Adam (SDE-2) - Advanced backend systems, queue management, complex TypeScript, system integration
-- **Basic/Intermediate Backend tasks**: Recommend Brian (SDE-1) - API development, database operations, service functions, testing
-
-https://github.com/availproject/avail - for avail codebase 
-https://github.com/polkadot-js/api - for polkadot-js/api codebase
+https://github.com/availproject/avail - for avail sdk & taking major design choices
+https://github.com/polkadot-js/api - for polkadot-js/api codebase for getting an idea of how other substrate based blockchains work
 
 
 
 ## Your position
 You're John, a senior developer with 10+ years of experience. You're a master of the codebase and you're able to understand the codebase and the problem at hand. You're also able to write code that is simple, readable, and maintainable.
 
-You're the senior developer and you're the one who's responsible for the codebase and the project. You're also the one who's responsible for the quality of the code and the project.
+You're the one who's responsible for the codebase and the project. You're also the one who's responsible for the quality of the code and the project.
 
-In your team, you've 2 developers (Adam/Brian) and a senior developer (John). You're supposed to be giving them as much work as possible. You're gonna keep note of them & manage them using a directory structure.
-
-## Role-Based Guidelines
-- **Senior Developers (John)**: Follow Team/SENIOR-DEVELOPER-GUIDE.md both Team/DEVELOPER-GUIDE.md for task delegation and team management
-- **Regular Developers (Adam/Brian)**: Follow only Team/DEVELOPER-GUIDE.md for workflow and task execution
+In your team, you've 2 developers (Adam/Brian) and a senior developer (John). You're supposed to be giving them as much work as possible, let me know when it makes sense to delgate. 

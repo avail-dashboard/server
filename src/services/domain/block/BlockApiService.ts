@@ -1,29 +1,39 @@
-import { logger, logError } from '../../utils/logger';
-import { AvailBlockchainService } from '../core/avail-blockchain';
-import { BlockRepository } from '../../database/repositories/BlockRepository';
-import { Block } from '../../database';
+import { logger, logError } from '../../../utils/logger';
+import { AvailBlockchainService } from '../../core/avail-blockchain';
+import { BlockRepository } from '../../../database/repositories/BlockRepository';
+import { Block } from '../../../database';
+import { IBlockMapper } from '../../../mappers';
+import {
+  IBlockService,
+  BlockValidationResult,
+} from './BlockInterfaces';
 import { 
   BlockWithMetadataApiResponse,
   BlockApiResponse,
   PaginatedResponse,
   PaginationParams,
   SortParams,
-} from '../../types/database';
+} from '../../../types/database';
 
-import { IBlockMapper } from '../../mappers';
-
-export interface IBlockService {
-  getBlock(hashOrNumber: string | number): Promise<BlockWithMetadataApiResponse>;
-  getLatestBlock(): Promise<BlockWithMetadataApiResponse>;
-  getBlocks(pagination?: PaginationParams, sort?: SortParams): Promise<PaginatedResponse<BlockApiResponse>>;
-}
-
-export class BlockService implements IBlockService {
+/**
+ * BlockApiService - Read Operations for Block Data
+ * 
+ * Responsibilities:
+ * - Fetch block details by hash, number, or latest
+ * - Get paginated lists of blocks with filtering
+ * - Provide block validation utilities
+ * - Support queue processor read operations
+ */
+export class BlockApiService implements IBlockService {
   private blockRepository: BlockRepository;
   private blockchain: AvailBlockchainService;
   private blockMapper: IBlockMapper;
 
-  constructor(blockRepository: BlockRepository, blockchain: AvailBlockchainService, blockMapper: IBlockMapper) {
+  constructor(
+    blockRepository: BlockRepository, 
+    blockchain: AvailBlockchainService, 
+    blockMapper: IBlockMapper,
+  ) {
     this.blockRepository = blockRepository;
     this.blockchain = blockchain;
     this.blockMapper = blockMapper;
@@ -39,7 +49,7 @@ export class BlockService implements IBlockService {
       
       if (existingBlock) {
         logger.info('Block found in database', { 
-          component: 'block-service',
+          component: 'block-api-service',
           identifier: hashOrNumber,
           source: 'database',
         });
@@ -48,7 +58,7 @@ export class BlockService implements IBlockService {
 
       // Block not found - return null or throw appropriate error
       logger.info('Block not found in database', {
-        component: 'block-service',
+        component: 'block-api-service',
         identifier: hashOrNumber,
         source: 'database',
       });
@@ -57,9 +67,44 @@ export class BlockService implements IBlockService {
 
     } catch (error) {
       logError(error as Error, {
-        component: 'block-service',
+        component: 'block-api-service',
         action: 'getBlock',
         identifier: hashOrNumber,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get block by number specifically (needed by queue processors)
+   */
+  async getBlockByNumber(blockNumber: number): Promise<BlockWithMetadataApiResponse | null> {
+    try {
+      const block = await this.blockRepository.findByNumber(blockNumber);
+      
+      if (!block) {
+        logger.debug('Block not found by number', {
+          component: 'block-api-service',
+          blockNumber,
+          source: 'database',
+        });
+        return null;
+      }
+
+      logger.debug('Block found by number', {
+        component: 'block-api-service',
+        blockNumber,
+        blockHash: block.hash,
+        source: 'database',
+      });
+
+      return this.blockMapper.toWithMetadataApiResponse(block);
+
+    } catch (error) {
+      logError(error as Error, {
+        component: 'block-api-service',
+        action: 'getBlockByNumber',
+        blockNumber,
       });
       throw error;
     }
@@ -78,7 +123,7 @@ export class BlockService implements IBlockService {
       }
 
       logger.info('Latest block retrieved from database', {
-        component: 'block-service',
+        component: 'block-api-service',
         blockNumber: latestBlock.number,
         source: 'database',
       });
@@ -88,7 +133,7 @@ export class BlockService implements IBlockService {
 
     } catch (error) {
       logError(error as Error, {
-        component: 'block-service',
+        component: 'block-api-service',
         action: 'getLatestBlock',
       });
       throw error;
@@ -126,12 +171,65 @@ export class BlockService implements IBlockService {
 
     } catch (error) {
       logError(error as Error, {
-        component: 'block-service',
+        component: 'block-api-service',
         action: 'getBlocks',
       });
       throw error;
     }
   }
+
+  /**
+   * Validate block data structure
+   */
+  async validateBlock(blockData: any): Promise<BlockValidationResult> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    try {
+      // Basic validation
+      if (!blockData) {
+        errors.push('Block data is null or undefined');
+        return { isValid: false, errors, warnings };
+      }
+
+      if (!blockData.number && blockData.number !== 0) {
+        errors.push('Block number is required');
+      }
+
+      if (!blockData.hash) {
+        errors.push('Block hash is required');
+      }
+
+      if (!blockData.timestamp) {
+        warnings.push('Block timestamp is missing');
+      }
+
+      // Check for reasonable block number
+      if (typeof blockData.number === 'number' && blockData.number < 0) {
+        errors.push('Block number cannot be negative');
+      }
+
+      return {
+        isValid: errors.length === 0,
+        errors,
+        warnings,
+      };
+
+    } catch (error) {
+      logError(error as Error, {
+        component: 'block-api-service',
+        action: 'validateBlock',
+      });
+      
+      return {
+        isValid: false,
+        errors: [`Validation error: ${(error as Error).message}`],
+        warnings,
+      };
+    }
+  }
+
+
 
   /**
    * Private: Get block from database using repository
@@ -156,16 +254,19 @@ export class BlockService implements IBlockService {
 
     } catch (error) {
       logError(error as Error, {
-        component: 'block-service',
+        component: 'block-api-service',
         action: 'getBlockFromDatabase',
         identifier: hashOrNumber,
       });
       throw error;
     }
   }
-
 }
 
-export const createBlockService = (blockRepository: BlockRepository, blockchain: AvailBlockchainService, blockMapper: IBlockMapper): BlockService => {
-  return new BlockService(blockRepository, blockchain, blockMapper);
+export const createBlockApiService = (
+  blockRepository: BlockRepository, 
+  blockchain: AvailBlockchainService, 
+  blockMapper: IBlockMapper,
+): BlockApiService => {
+  return new BlockApiService(blockRepository, blockchain, blockMapper);
 }; 

@@ -3,8 +3,7 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
-import { ServiceFactory } from '../services';
-import { AccountService } from '../services/domain/account';
+import { ServiceFactory, AccountApiService } from '../services';
 
 const router = Router();
 
@@ -14,7 +13,7 @@ router.get('/discover',
   async (req: Request, res: Response) => {
     try {
       const serviceFactory = ServiceFactory.getInstance();
-      const accountService = serviceFactory.get<AccountService>('accountService');
+      const accountService = serviceFactory.get<AccountApiService>('accountService');
       
       const sampleAddresses = await accountService.discoverSampleAddresses();
 
@@ -43,7 +42,7 @@ router.get('/:address',
       }
 
       const serviceFactory = ServiceFactory.getInstance();
-      const accountService = serviceFactory.get<AccountService>('accountService');
+      const accountService = serviceFactory.get<AccountApiService>('accountService');
       
       // Get account details and balance
       const [accountDetails, accountBalance] = await Promise.all([

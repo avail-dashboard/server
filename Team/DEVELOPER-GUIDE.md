@@ -2,9 +2,10 @@
 
 ## Your Workflow
 - Check `Management/Developers/Adam/tasks.md` or `Management/Developers/Brian/tasks.md` for assignments
+- look for `in-progress` tasks first then `pending` tasks, for picking up in your `Developers/<your-name>/tasks.md`
+- if a task is blocked by another non-completed task, task status can be checked in your `Developers/<your-name>/tasks.md` or `Developers/Brian/tasks.md` or the `Tasks/TASK-XXX.md` file
 - Update task status as you progress
-- Document questions in `feedback.md`
-- Submit completed work for review
+- Document questions or change in plans etc in `feedback.md`
 
 ## Task Management
 1. Review assigned tasks in your `tasks.md` file

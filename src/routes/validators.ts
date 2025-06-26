@@ -4,7 +4,7 @@ import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
 import { ServiceFactory } from '../services';
-import { ValidatorService } from '../services/domain/validator';
+import { IValidatorService } from '../services/domain/validator';
 
 const router = Router();
 
@@ -16,7 +16,7 @@ router.get('/',
       const { page = '1', limit = '20', status, minStake, maxStake, hasIdentity } = req.query;
 
       const serviceFactory = ServiceFactory.getInstance();
-      const validatorService = serviceFactory.get<ValidatorService>('validatorService');
+      const validatorService = serviceFactory.get<IValidatorService>('validatorApiService');
 
       // Parse pagination
       const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
@@ -63,7 +63,7 @@ router.get('/:address',
       }
 
       const serviceFactory = ServiceFactory.getInstance();
-      const validatorService = serviceFactory.get<ValidatorService>('validatorService');
+      const validatorService = serviceFactory.get<IValidatorService>('validatorApiService');
 
       const validatorDetails = await validatorService.getValidator(address);
 
@@ -90,7 +90,7 @@ router.get('/staking/overview',
   async (req: Request, res: Response) => {
     try {
       const serviceFactory = ServiceFactory.getInstance();
-      const validatorService = serviceFactory.get<ValidatorService>('validatorService');
+      const validatorService = serviceFactory.get<IValidatorService>('validatorApiService');
 
       const stakingOverview = await validatorService.getStakingOverview();
 

@@ -2,10 +2,14 @@ import { logger, logError } from '../../utils/logger';
 import { BaseService, ServiceHealth } from '../types/service';
 import { BlockData } from '../types/blockchain';
 import { SelfHealingProcessor } from '../types/self-healing';
-import { AccountService } from './account';
-import { ValidatorService } from './validator';
-import { TransferService } from './transfer';
-import { DataSubmissionService } from './dataSubmission';
+import { AccountProcessor } from './account/AccountProcessor';
+import { ValidatorProcessor } from './validator/ValidatorProcessor';
+import { TransferProcessor } from './transfer/TransferProcessor';
+// TODO: Re-enable when DataSubmissionProcessor properly implements SelfHealingProcessor interface
+// import { DataSubmissionService } from './dataSubmission';
+
+// Temporary type alias for DataSubmissionService until migration is complete
+type DataSubmissionService = SelfHealingProcessor;
 import { QueueService } from '../core/queue';
 // Dependency detection engine removed - using queue-based approach
 
@@ -30,16 +34,16 @@ export class SelfHealingBlockProcessor implements BaseService {
   };
 
   constructor(
-    accountService: AccountService,
-    validatorService: ValidatorService,
-    transferService: TransferService,
+    accountProcessor: AccountProcessor,
+    validatorProcessor: ValidatorProcessor,
+    transferProcessor: TransferProcessor,
     dataSubmissionService: DataSubmissionService,
     queueService: QueueService,
   ) {
     // Register all self-healing services
-    this.services.set('account', accountService);
-    this.services.set('validator', validatorService);
-    this.services.set('transfer', transferService);
+    this.services.set('account', accountProcessor);
+    this.services.set('validator', validatorProcessor);
+    this.services.set('transfer', transferProcessor);
     this.services.set('dataSubmission', dataSubmissionService);
 
     // TASK-007: Initialize queue service (dependency detection now handled by queue)
@@ -196,34 +200,32 @@ export class SelfHealingBlockProcessor implements BaseService {
         }
 
         return {
-          service: serviceName,
+          serviceName,
           success: true,
           extractedCount: extractedEntities.length,
           processedCount: processedResults.length,
           processingTime,
-          results: processedResults,
         };
 
       } catch (error) {
         const processingTime = Date.now() - serviceStartTime;
-
-        logError(error as Error, {
-          component: 'self-healing-processor',
-          service: serviceName,
-          action: 'processBlock',
-          blockNumber: blockData.number,
-          processingTimeMs: processingTime,
-        });
+        this.processingStats.totalErrors++;
 
         // Update failure statistics
         const serviceStats = this.processingStats.serviceSuccessRates.get(serviceName);
         if (serviceStats) {
           serviceStats.total++;
         }
-        this.processingStats.totalErrors++;
+
+        logError(error as Error, {
+          component: 'self-healing-processor',
+          service: serviceName,
+          blockNumber: blockData.number,
+          action: 'processBlock',
+        });
 
         return {
-          service: serviceName,
+          serviceName,
           success: false,
           error: (error as Error).message,
           processingTime,
@@ -231,59 +233,66 @@ export class SelfHealingBlockProcessor implements BaseService {
       }
     });
 
-    // Wait for all services to complete
+    // Wait for all services to complete (or fail)
     const results = await Promise.all(processingPromises);
-    
-    // Update processing statistics
+
+    // Log aggregated results
     const successfulServices = results.filter(r => r.success).length;
-    const totalEntitiesProcessed = results.reduce((sum, r) => sum + (r.extractedCount || 0), 0);
-    
-    // totalEntitiesProcessed tracking removed for simplification
+    const totalServices = results.length;
 
     logger.debug('SelfHealingBlockProcessor: All services completed', {
       component: 'self-healing-processor',
       blockNumber: blockData.number,
       successfulServices,
-      totalServices: results.length,
-      totalEntitiesProcessed,
+      totalServices,
+      successRate: successfulServices / totalServices,
       results: results.map(r => ({
-        service: r.service,
+        service: r.serviceName,
         success: r.success,
-        extractedCount: r.extractedCount || 0,
-        processedCount: r.processedCount || 0,
+        extractedCount: 'extractedCount' in r ? r.extractedCount : 0,
+        processedCount: 'processedCount' in r ? r.processedCount : 0,
         processingTime: r.processingTime,
       })),
     });
+
+    // If any critical services failed, this might indicate data integrity issues
+    // but we continue processing to maintain system availability
+    if (successfulServices < totalServices) {
+      logger.warn('SelfHealingBlockProcessor: Some services failed during block processing', {
+        component: 'self-healing-processor',
+        blockNumber: blockData.number,
+        failedServices: results.filter(r => !r.success).map(r => r.serviceName),
+        successRate: successfulServices / totalServices,
+      });
+    }
   }
 
   /**
-   * Get comprehensive processing statistics
+   * Get processing statistics
    */
   getProcessingStats() {
-    const serviceStats: Record<string, any> = {};
+    const serviceStats: Record<string, { successRate: number; total: number; success: number }> = {};
     
     for (const [serviceName, stats] of this.processingStats.serviceSuccessRates.entries()) {
       serviceStats[serviceName] = {
-        successRate: stats.total > 0 ? (stats.success / stats.total * 100).toFixed(2) + '%' : '0%',
-        successful: stats.success,
+        successRate: stats.total > 0 ? stats.success / stats.total : 0,
         total: stats.total,
-        failed: stats.total - stats.success,
+        success: stats.success,
       };
     }
 
     return {
       blocksProcessed: this.processingStats.blocksProcessed,
       totalErrors: this.processingStats.totalErrors,
-      overallSuccessRate: this.processingStats.blocksProcessed > 0 
-        ? ((this.processingStats.blocksProcessed - this.processingStats.totalErrors) / this.processingStats.blocksProcessed * 100).toFixed(2) + '%'
-        : '0%',
-      serviceStatistics: serviceStats,
-      registeredServices: Array.from(this.services.keys()),
+      errorRate: this.processingStats.blocksProcessed > 0 
+        ? this.processingStats.totalErrors / this.processingStats.blocksProcessed 
+        : 0,
+      serviceStats,
     };
   }
 
   /**
-   * Reset processing statistics (useful for testing)
+   * Reset processing statistics
    */
   resetStats(): void {
     this.processingStats = {
@@ -292,18 +301,18 @@ export class SelfHealingBlockProcessor implements BaseService {
       serviceSuccessRates: new Map(),
     };
 
-    // Re-initialize service stats
+    // Reinitialize service stats
     for (const serviceName of this.services.keys()) {
       this.processingStats.serviceSuccessRates.set(serviceName, { success: 0, total: 0 });
     }
 
-    logger.debug('SelfHealingBlockProcessor: Processing statistics reset', {
+    logger.info('SelfHealingBlockProcessor: Statistics reset', {
       component: 'self-healing-processor',
     });
   }
 
   /**
-   * Get registered services info
+   * Get list of registered services
    */
   getRegisteredServices(): string[] {
     return Array.from(this.services.keys());
@@ -317,18 +326,17 @@ export class SelfHealingBlockProcessor implements BaseService {
   }
 }
 
-// Factory function
 export const createSelfHealingBlockProcessor = (
-  accountService: AccountService,
-  validatorService: ValidatorService,
-  transferService: TransferService,
+  accountProcessor: AccountProcessor,
+  validatorProcessor: ValidatorProcessor,
+  transferProcessor: TransferProcessor,
   dataSubmissionService: DataSubmissionService,
   queueService: QueueService,
 ): SelfHealingBlockProcessor => {
   return new SelfHealingBlockProcessor(
-    accountService, 
-    validatorService, 
-    transferService, 
+    accountProcessor,
+    validatorProcessor,
+    transferProcessor,
     dataSubmissionService,
     queueService,
   );

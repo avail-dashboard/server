@@ -3,7 +3,8 @@ import { logError } from '../utils/logger';
 import { pagination, cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatPaginatedResponse, formatErrorResponse, formatSingleResponse } from '../utils/responseFormatter';
-import { serviceFactory, DataAvailabilityService } from '../services';
+import { serviceFactory } from '../services';
+import { IDataSubmissionService, DataSubmissionFilterOptions } from '../services/domain/dataSubmission';
 
 const router = Router();
 
@@ -22,10 +23,11 @@ router.get('/',
       const sortBy = (req.query.sort_by as string) || 'block_number';
       const sortOrder = (req.query.sort_order as string) || 'desc';
 
-      const dataAvailabilityService = serviceFactory.get<DataAvailabilityService>('dataAvailabilityService');
-      const result = await dataAvailabilityService.getDataSubmissions(
-        { page, limit },
-        { sort_by: sortBy, sort_order: sortOrder as 'asc' | 'desc' },
+      const dataSubmissionService = serviceFactory.get<IDataSubmissionService>('dataSubmissionApiService');
+      const filters: DataSubmissionFilterOptions = { appId: undefined, submitter: undefined, success: undefined };
+      const result = await dataSubmissionService.getDataSubmissions(
+        filters,
+        { page, limit, sortBy: sortBy as 'timestamp' | 'dataSize' | 'blockNumber', sortOrder: sortOrder as 'asc' | 'desc' },
       );
 
       const response = formatPaginatedResponse(result, {
@@ -54,8 +56,8 @@ router.get(
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const dataAvailabilityService = serviceFactory.get<DataAvailabilityService>('dataAvailabilityService');
-      const stats = await dataAvailabilityService.getDataSubmissionStats();
+      const dataSubmissionService = serviceFactory.get<IDataSubmissionService>('dataSubmissionApiService');
+      const stats = await dataSubmissionService.getDataSubmissionStatistics();
 
       res.json(formatSingleResponse(stats));
     } catch (error) {
@@ -79,8 +81,9 @@ router.get('/rollup/:appId',
       const { appId } = req.params;
 
       // Get data submissions for the specific rollup (returns array, not paginated)
-      const dataAvailabilityService = serviceFactory.get<DataAvailabilityService>('dataAvailabilityService');
-      const submissions = await dataAvailabilityService.getDataSubmissionsForRollup(parseInt(appId, 10));
+      const dataSubmissionService = serviceFactory.get<IDataSubmissionService>('dataSubmissionApiService');
+      const result = await dataSubmissionService.getDataSubmissionsByApp(parseInt(appId, 10));
+      const submissions = result.data;
 
       res.json(formatSingleResponse({
         dataSubmissions: submissions,
@@ -123,9 +126,9 @@ router.get('/:submissionId',
         return res.status(400).json(formatErrorResponse('Invalid submission ID format. Block number and extrinsic index must be numbers.', 'INVALID_PARAMETERS', 400));
       }
 
-      const dataAvailabilityService = serviceFactory.get<DataAvailabilityService>('dataAvailabilityService');
-      const blockSubmissions = await dataAvailabilityService.getDataSubmissionsForBlock(blockNumber);
-      const submission = blockSubmissions.find(sub => sub.extrinsic_index === extrinsicIndex);
+      const dataSubmissionService = serviceFactory.get<IDataSubmissionService>('dataSubmissionApiService');
+      const blockResult = await dataSubmissionService.getDataSubmissionsByBlock(blockNumber);
+      const submission = blockResult.data.find((sub: any) => sub.extrinsicIndex === extrinsicIndex);
 
       if (!submission) {
         return res.status(404).json(formatErrorResponse('Data submission not found', 'NOT_FOUND', 404));

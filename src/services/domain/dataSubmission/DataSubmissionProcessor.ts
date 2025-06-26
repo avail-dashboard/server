@@ -1,102 +1,31 @@
-import { logger, logError } from '../../utils/logger';
-import { AvailBlockchainService } from '../core/avail-blockchain';
-import { DataSubmissionRepository, RollupRepository } from '../../database/repositories';
-import { DataSubmission, Rollup } from '@prisma/client';
-import { BaseService, ServiceHealth } from '../types/service';
-import { SelfHealingProcessor, ExtractedEntity, DependencyResolver } from '../types/self-healing';
-import { BlockData, ExtrinsicData } from '../types/blockchain';
-
-// Service interfaces
-export interface DataSubmissionFilters {
-  appId?: number;
-  submitter?: string;
-  success?: boolean;
-  minDataSize?: number;
-  maxDataSize?: number;
-  startDate?: Date;
-  endDate?: Date;
-  blockNumber?: number;
-}
-
-export interface DataSubmissionWithDetails extends DataSubmission {
-  rollup?: Rollup;
-  submitterIdentity?: {
-    display?: string;
-    legal?: string;
-    web?: string;
-    twitter?: string;
-  };
-  blockDetails?: {
-    timestamp: Date;
-    validator: string;
-    validatorName?: string;
-  };
-}
-
-export interface DataSubmissionList {
-  submissions: DataSubmissionWithDetails[];
-  total: number;
-  page: number;
-  limit: number;
-  hasMore: boolean;
-}
-
-export interface DataSubmissionStats {
-  totalSubmissions: number;
-  totalDataSize: number;
-  uniqueApps: number;
-  uniqueSubmitters: number;
-  submissionsToday: number;
-  dataSizeToday: number;
-  topAppsBySubmissions: Array<{
-    appId: number;
-    name: string;
-    submissionCount: number;
-    totalDataSize: number;
-  }>;
-  mostActiveSubmitters: Array<{
-    address: string;
-    submissionCount: number;
-    totalDataSize: number;
-    identity?: {
-      display?: string;
-      legal?: string;
-    };
-  }>;
-}
-
-export interface PaginationOptions {
-  page: number;
-  limit: number;
-  sortBy?: 'timestamp' | 'dataSize' | 'blockNumber';
-  sortOrder?: 'asc' | 'desc';
-}
-
-export interface IDataSubmissionService {
-  getDataSubmissions(filters?: DataSubmissionFilters, options?: PaginationOptions): Promise<DataSubmissionList>;
-  getDataSubmission(extrinsicHash: string): Promise<DataSubmissionWithDetails | null>;
-  getDataSubmissionsByBlock(blockNumber: number, options?: PaginationOptions): Promise<DataSubmissionList>;
-  getDataSubmissionsByApp(appId: number, options?: PaginationOptions): Promise<DataSubmissionList>;
-  getDataSubmissionsBySubmitter(address: string, options?: PaginationOptions): Promise<DataSubmissionList>;
-  getDataSubmissionStatistics(period?: string): Promise<DataSubmissionStats>;
-  getRollupInfo(appId: number): Promise<Rollup | null>;
-}
+import { logger, logError } from '../../../utils/logger';
+import { AvailBlockchainService } from '../../core/avail-blockchain';
+import { DataSubmissionRepository, RollupRepository } from '../../../database/repositories';
+import { Rollup } from '@prisma/client';
+import { SelfHealingProcessor, ExtractedEntity, DependencyResolver } from '../../types/self-healing';
+import { BlockData, ExtrinsicData } from '../../types/blockchain';
+import {
+  IDataSubmissionProcessor,
+  DataSubmissionProcessingOptions,
+  DataSubmissionProcessingResult,
+  DataSubmissionInfo,
+} from './DataSubmissionInterfaces';
 
 /**
- * DataSubmissionService - Manages data submission data and operations (Phase 5)
+ * DataSubmissionProcessor - Self-Healing Processing Logic for DataSubmission Data
  * 
  * Responsibilities:
- * - Extract and process data submissions from blockchain data
+ * - Extract data submission information from blockchain data
+ * - Process data submissions with Avail SDK integration
  * - Auto-create rollups for new app IDs
  * - Ensure submitter accounts exist via dependency resolver
  * - Process data submissions independently with error isolation
  */
-export class DataSubmissionService implements BaseService, SelfHealingProcessor {
+export class DataSubmissionProcessor implements SelfHealingProcessor, IDataSubmissionProcessor {
   private blockchain: AvailBlockchainService;
   private dataSubmissionRepository: DataSubmissionRepository;
   private rollupRepository: RollupRepository;
   private dependencyResolver: DependencyResolver;
-  private isRunning = false;
 
   constructor(
     blockchain: AvailBlockchainService,
@@ -110,49 +39,14 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
     this.dependencyResolver = dependencyResolver;
   }
 
-  async start(): Promise<void> {
-    if (this.isRunning) {
-      return;
-    }
-    
-    logger.info('DataSubmissionService: Starting service', { component: 'data-submission-service' });
-    this.isRunning = true;
-  }
-
-  async stop(): Promise<void> {
-    if (!this.isRunning) {
-      return;
-    }
-    
-    logger.info('DataSubmissionService: Stopping service', { component: 'data-submission-service' });
-    this.isRunning = false;
-  }
-
-  async getHealth(): Promise<ServiceHealth> {
-    return {
-      healthy: this.isRunning,
-      lastCheck: new Date(),
-      details: {
-        service: 'DataSubmissionService',
-        version: '1.0.0',
-      },
-    };
-  }
-
-  isHealthy(): boolean {
-    return this.isRunning;
-  }
-
-  // Self-Healing Processor Methods (Phase 5 Implementation)
-
   /**
    * Extract data submission information from block data
    * Uses avail-sdk for enhanced data submission detection
    */
   async extractFromBlock(blockData: BlockData): Promise<ExtractedEntity[]> {
     try {
-      logger.debug('DataSubmissionService: Extracting data submissions from block', { 
-        component: 'data-submission-service',
+      logger.debug('DataSubmissionProcessor: Extracting data submissions from block', { 
+        component: 'data-submission-processor',
         blockNumber: blockData.number,
         extrinsicCount: blockData.extrinsics.length,
       });
@@ -190,8 +84,8 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
           });
         }
       } catch (sdkError) {
-        logger.warn('DataSubmissionService: SDK enhanced detection failed, falling back to extrinsic parsing', {
-          component: 'data-submission-service',
+        logger.warn('DataSubmissionProcessor: SDK enhanced detection failed, falling back to extrinsic parsing', {
+          component: 'data-submission-processor',
           blockNumber: blockData.number,
           error: (sdkError as Error).message,
         });
@@ -225,8 +119,8 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
         });
       }
 
-      logger.debug('DataSubmissionService: Extracted data submissions from block', { 
-        component: 'data-submission-service',
+      logger.debug('DataSubmissionProcessor: Extracted data submissions from block', { 
+        component: 'data-submission-processor',
         blockNumber: blockData.number,
         submissionCount: submissions.length,
       });
@@ -235,7 +129,7 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'data-submission-service', 
+        component: 'data-submission-processor', 
         action: 'extractFromBlock',
         blockNumber: blockData.number,
       });
@@ -249,8 +143,8 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
    */
   async processExtractedEntities(entities: ExtractedEntity[]): Promise<any[]> {
     try {
-      logger.debug('DataSubmissionService: Processing extracted data submission entities', { 
-        component: 'data-submission-service',
+      logger.debug('DataSubmissionProcessor: Processing extracted data submission entities', { 
+        component: 'data-submission-processor',
         entityCount: entities.length,
       });
 
@@ -269,7 +163,7 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
 
         } catch (error) {
           logError(error as Error, { 
-            component: 'data-submission-service', 
+            component: 'data-submission-processor', 
             action: 'processExtractedEntity',
             entityId: entity.id,
           });
@@ -277,8 +171,8 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
         }
       }
 
-      logger.debug('DataSubmissionService: Processed data submission entities', { 
-        component: 'data-submission-service',
+      logger.debug('DataSubmissionProcessor: Processed data submission entities', { 
+        component: 'data-submission-processor',
         processedCount: results.length,
         totalEntities: entities.length,
       });
@@ -287,7 +181,7 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'data-submission-service', 
+        component: 'data-submission-processor', 
         action: 'processExtractedEntities',
       });
       return [];
@@ -316,12 +210,105 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'data-submission-service', 
+        component: 'data-submission-processor', 
         action: 'ensureDependencies',
         entityId: entity.id,
       });
       throw error;
     }
+  }
+
+  /**
+   * Public method for dependency resolver integration
+   */
+  async ensureDataSubmissionExists(extrinsicHash: string): Promise<any> {
+    try {
+      const submission = await this.dataSubmissionRepository.findByExtrinsicHash(extrinsicHash);
+      return submission;
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'data-submission-processor', 
+        action: 'ensureDataSubmissionExists',
+        extrinsicHash,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Process multiple data submissions with batch optimization
+   */
+  async processDataSubmissions(
+    entities: ExtractedEntity[], 
+    options: DataSubmissionProcessingOptions = {}
+  ): Promise<DataSubmissionProcessingResult[]> {
+    const results: DataSubmissionProcessingResult[] = [];
+    
+    logger.info('DataSubmissionProcessor: Processing multiple data submissions', {
+      component: 'data-submission-processor',
+      submissionCount: entities.length,
+      skipValidation: options.skipValidation,
+      ensureDependencies: options.ensureDependencies,
+    });
+
+    for (const entity of entities) {
+      const startTime = Date.now();
+      
+      try {
+        if (options.ensureDependencies !== false) {
+          await this.ensureDependencies(entity);
+        }
+        
+        const submission = await this.processDataSubmission(entity);
+        
+        const result: DataSubmissionProcessingResult = {
+          success: true,
+          extrinsicHash: entity.data.extrinsicHash,
+          appId: entity.data.appId,
+          dataSize: entity.data.dataSize,
+          created: !!submission,
+          updated: false,
+          duration: Date.now() - startTime,
+        };
+        
+        results.push(result);
+        
+      } catch (error) {
+        const result: DataSubmissionProcessingResult = {
+          success: false,
+          extrinsicHash: entity.data.extrinsicHash || 'unknown',
+          appId: entity.data.appId || 0,
+          dataSize: entity.data.dataSize || 0,
+          created: false,
+          updated: false,
+          duration: Date.now() - startTime,
+          errors: [(error as Error).message],
+        };
+        
+        results.push(result);
+        
+        logError(error as Error, {
+          component: 'data-submission-processor',
+          action: 'processDataSubmissions',
+          entityId: entity.id,
+        });
+        
+        // Continue processing other submissions
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.length - successCount;
+    
+    logger.info('DataSubmissionProcessor: Batch processing completed', {
+      component: 'data-submission-processor',
+      totalSubmissions: entities.length,
+      successCount,
+      failureCount,
+      successRate: (successCount / entities.length) * 100,
+    });
+
+    return results;
   }
 
   /**
@@ -353,7 +340,7 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
       };
     } catch (error) {
       logError(error as Error, { 
-        component: 'data-submission-service', 
+        component: 'data-submission-processor', 
         action: 'extractDataSubmissionData',
         submissionIndex: index,
       });
@@ -403,7 +390,7 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'data-submission-service', 
+        component: 'data-submission-processor', 
         action: 'extractDataSubmissionFromExtrinsic',
         extrinsicHash: extrinsic.hash,
       });
@@ -421,8 +408,8 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
       // Check if data submission already exists
       const existing = await this.dataSubmissionRepository.findByExtrinsicHash(submissionData.extrinsicHash);
       if (existing) {
-        logger.debug('DataSubmissionService: Data submission already exists, skipping', {
-          component: 'data-submission-service',
+        logger.debug('DataSubmissionProcessor: Data submission already exists, skipping', {
+          component: 'data-submission-processor',
           extrinsicHash: submissionData.extrinsicHash,
         });
         return existing;
@@ -443,8 +430,8 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
         kateCommitment: submissionData.kateCommitment,
       });
 
-      logger.debug('DataSubmissionService: Data submission created', {
-        component: 'data-submission-service',
+      logger.debug('DataSubmissionProcessor: Data submission created', {
+        component: 'data-submission-processor',
         extrinsicHash: submissionData.extrinsicHash,
         appId: submissionData.appId,
         dataSize: submissionData.dataSize,
@@ -455,7 +442,7 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'data-submission-service', 
+        component: 'data-submission-processor', 
         action: 'processDataSubmission',
         entityId: entity.id,
       });
@@ -482,8 +469,8 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
           totalFeesPaid: 0,
         });
         
-        logger.debug('DataSubmissionService: Rollup auto-created', {
-          component: 'data-submission-service',
+        logger.debug('DataSubmissionProcessor: Rollup auto-created', {
+          component: 'data-submission-processor',
           appId,
           blockNumber,
         });
@@ -493,38 +480,20 @@ export class DataSubmissionService implements BaseService, SelfHealingProcessor 
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'data-submission-service', 
+        component: 'data-submission-processor', 
         action: 'ensureRollupExists',
         appId,
       });
       throw error;
     }
   }
-
-  /**
-   * Public method for dependency resolver integration
-   */
-  async ensureDataSubmissionExists(extrinsicHash: string): Promise<any> {
-    try {
-      const submission = await this.dataSubmissionRepository.findByExtrinsicHash(extrinsicHash);
-      return submission;
-    } catch (error) {
-      logError(error as Error, { 
-        component: 'data-submission-service', 
-        action: 'ensureDataSubmissionExists',
-        extrinsicHash,
-      });
-      throw error;
-    }
-  }
 }
 
-// Factory function
-export const createDataSubmissionService = (
+export const createDataSubmissionProcessor = (
   blockchain: AvailBlockchainService,
   dataSubmissionRepository: DataSubmissionRepository,
   rollupRepository: RollupRepository,
   dependencyResolver: DependencyResolver,
-): DataSubmissionService => {
-  return new DataSubmissionService(blockchain, dataSubmissionRepository, rollupRepository, dependencyResolver);
+): DataSubmissionProcessor => {
+  return new DataSubmissionProcessor(blockchain, dataSubmissionRepository, rollupRepository, dependencyResolver);
 }; 

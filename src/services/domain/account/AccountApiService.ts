@@ -1,84 +1,42 @@
-import { logger, logError } from '../../utils/logger';
-import { AvailBlockchainService } from '../core/avail-blockchain';
-import { TransferRepository, TransferWithRelations } from '../../database/repositories/TransferRepository';
-import { ExtrinsicRepository } from '../../database/repositories/ExtrinsicRepository';
-import { ValidatorRepository } from '../../database/repositories/ValidatorRepository';
-import { RewardRepository } from '../../database/repositories/RewardRepository';
+/**
+ * Account API Service
+ * 
+ * Provides API-focused account operations including:
+ * - Account details and balance retrieval
+ * - Transaction history and statistics
+ * - Blockchain integration for real-time data
+ * - Identity management and account discovery
+ * 
+ * This service focuses purely on API logic and data presentation,
+ * separate from account processing and self-healing logic.
+ */
+
+import { logger, logError } from '../../../utils/logger';
+import { AvailBlockchainService } from '../../core/avail-blockchain';
+import { TransferRepository, TransferWithRelations } from '../../../database/repositories/TransferRepository';
+import { ExtrinsicRepository } from '../../../database/repositories/ExtrinsicRepository';
+import { ValidatorRepository } from '../../../database/repositories/ValidatorRepository';
+import { RewardRepository } from '../../../database/repositories/RewardRepository';
 import { Account, Extrinsic, Validator, Reward } from '@prisma/client';
-import { BaseService, ServiceHealth } from '../types/service';
-import { SelfHealingProcessor, ExtractedEntity, ENTITY_TYPES } from '../types/self-healing';
-import { BlockData, ExtrinsicData } from '../types/blockchain';
-import db from '../../utils/database';
-
-// Service interfaces
-export interface AccountBalance {
-  address: string;
-  free: string;
-  reserved: string;
-  frozen: string;
-  total: string;
-  transferable: string;
-  nonce: number;
-}
-
-export interface AccountWithDetails extends Account {
-  validator?: Validator;
-  transferCount: number;
-  extrinsicCount: number;
-  totalTransferred: bigint;
-  totalReceived: bigint;
-}
-
-export interface AccountActivity {
-  transfers: TransferWithRelations[];
-  extrinsics: Extrinsic[];
-  rewards: Reward[];
-  totalActivities: number;
-}
-
-export interface AccountStats {
-  totalTransfers: number;
-  totalExtrinsics: number;
-  totalRewards: number;
-  firstActivity: Date | null;
-  lastActivity: Date | null;
-  totalSent: bigint;
-  totalReceived: bigint;
-}
-
-export interface PaginationOptions {
-  page?: number;
-  limit?: number;
-}
-
-export interface HistoryOptions extends PaginationOptions {
-  type?: 'all' | 'transfers' | 'extrinsics' | 'rewards';
-  startDate?: Date;
-  endDate?: Date;
-}
-
-export interface IAccountService {
-  getAccount(address: string): Promise<AccountWithDetails>;
-  getAccountBalance(address: string): Promise<AccountBalance>;
-  getAccountExtrinsics(address: string, options: PaginationOptions): Promise<{ extrinsics: Extrinsic[]; total: number }>;
-  getAccountTransfers(address: string, options: PaginationOptions): Promise<{ transfers: TransferWithRelations[]; total: number }>;
-  getAccountHistory(address: string, options: HistoryOptions): Promise<AccountActivity>;
-  updateAccountIdentity(address: string): Promise<void>;
-  getAccountStatistics(address: string): Promise<AccountStats>;
-  discoverSampleAddresses(): Promise<string[]>;
-}
+import { BaseService, ServiceHealth } from '../../types/service';
+import db from '../../../utils/database';
+import {
+  AccountBalance,
+  AccountWithDetails,
+  AccountActivity,
+  AccountStats,
+  PaginationOptions,
+  HistoryOptions,
+  IAccountService,
+} from './AccountInterfaces';
 
 /**
- * AccountService - Manages account data and operations
+ * AccountApiService - API-focused account operations
  * 
- * Responsibilities:
- * - Fetch account details and balances
- * - Get account transaction history
- * - Track account activity and statistics
- * - Update account identity information
- * - Provide account discovery for testing
+ * Handles all account-related API endpoints with full blockchain integration.
+ * Provides comprehensive account information, statistics, and history.
  */
-export class AccountService implements BaseService, IAccountService, SelfHealingProcessor {
+export class AccountApiService implements BaseService, IAccountService {
   private blockchain: AvailBlockchainService;
   private transferRepository: TransferRepository;
   private extrinsicRepository: ExtrinsicRepository;
@@ -103,14 +61,14 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
   async start(): Promise<void> {
     if (this.isRunning) return;
     
-    logger.info('AccountService: Starting service', { component: 'account-service' });
+    logger.info('AccountApiService: Starting service', { component: 'account-api-service' });
     this.isRunning = true;
   }
 
   async stop(): Promise<void> {
     if (!this.isRunning) return;
     
-    logger.info('AccountService: Stopping service', { component: 'account-service' });
+    logger.info('AccountApiService: Stopping service', { component: 'account-api-service' });
     this.isRunning = false;
   }
 
@@ -119,7 +77,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
       healthy: this.isRunning,
       lastCheck: new Date(),
       details: {
-        service: 'AccountService',
+        service: 'AccountApiService',
         version: '1.0.0',
       },
     };
@@ -134,8 +92,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
    */
   async getAccount(address: string): Promise<AccountWithDetails> {
     try {
-      logger.debug('AccountService: Getting account details', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Getting account details', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
       });
 
@@ -162,8 +120,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
         totalReceived: transferStats.totalReceived,
       };
 
-      logger.debug('AccountService: Account details retrieved', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Account details retrieved', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
         transferCount,
         extrinsicCount,
@@ -174,7 +132,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getAccount',
         address: address.substring(0, 10) + '...',
       });
@@ -187,8 +145,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
    */
   async getAccountBalance(address: string): Promise<AccountBalance> {
     try {
-      logger.debug('AccountService: Getting account balance', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Getting account balance', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
       });
 
@@ -210,8 +168,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
       // Update account record with latest balance
       await this.updateAccountBalance(address, balance);
 
-      logger.debug('AccountService: Account balance retrieved', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Account balance retrieved', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
         free: balance.free,
         total: balance.total,
@@ -221,7 +179,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getAccountBalance',
         address: address.substring(0, 10) + '...',
       });
@@ -238,8 +196,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
     try {
       const { page = 1, limit = 20 } = options;
 
-      logger.debug('AccountService: Getting account extrinsics', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Getting account extrinsics', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
         page,
         limit,
@@ -247,8 +205,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
       const result = await this.extrinsicRepository.findBySigner(address, { page, limit });
 
-      logger.debug('AccountService: Account extrinsics retrieved', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Account extrinsics retrieved', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
         count: result.extrinsics.length,
         total: result.total,
@@ -258,7 +216,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getAccountExtrinsics',
         address: address.substring(0, 10) + '...',
       });
@@ -273,8 +231,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
     try {
       const { page = 1, limit = 20 } = options;
 
-      logger.debug('AccountService: Getting account transfers', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Getting account transfers', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
         page,
         limit,
@@ -282,8 +240,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
       const result = await this.transferRepository.findByAccount(address, { page, limit });
 
-      logger.debug('AccountService: Account transfers retrieved', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Account transfers retrieved', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
         count: result.transfers.length,
         total: result.total,
@@ -293,7 +251,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getAccountTransfers',
         address: address.substring(0, 10) + '...',
       });
@@ -308,8 +266,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
     try {
       const { page = 1, limit = 50, type = 'all' } = options;
 
-      logger.debug('AccountService: Getting account history', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Getting account history', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
         type,
         page,
@@ -335,8 +293,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
         totalActivities: transfersResult.total + extrinsicsResult.total + rewardsResult.total,
       };
 
-      logger.debug('AccountService: Account history retrieved', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Account history retrieved', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
         transfersCount: activity.transfers.length,
         extrinsicsCount: activity.extrinsics.length,
@@ -348,7 +306,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getAccountHistory',
         address: address.substring(0, 10) + '...',
       });
@@ -361,8 +319,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
    */
   async updateAccountIdentity(address: string): Promise<void> {
     try {
-      logger.debug('AccountService: Updating account identity', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Updating account identity', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
       });
 
@@ -388,8 +346,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
           [identityData.display, JSON.stringify(identityData), address]
         );
 
-        logger.debug('AccountService: Account identity updated', { 
-          component: 'account-service', 
+        logger.debug('AccountApiService: Account identity updated', { 
+          component: 'account-api-service', 
           address: address.substring(0, 10) + '...',
           displayName: identityData.display,
         });
@@ -397,7 +355,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'updateAccountIdentity',
         address: address.substring(0, 10) + '...',
       });
@@ -410,8 +368,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
    */
   async getAccountStatistics(address: string): Promise<AccountStats> {
     try {
-      logger.debug('AccountService: Getting account statistics', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Getting account statistics', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
       });
 
@@ -437,8 +395,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
         totalReceived: transferStats.totalReceived,
       };
 
-      logger.debug('AccountService: Account statistics retrieved', { 
-        component: 'account-service', 
+      logger.debug('AccountApiService: Account statistics retrieved', { 
+        component: 'account-api-service', 
         address: address.substring(0, 10) + '...',
         totalTransfers: stats.totalTransfers,
         totalExtrinsics: stats.totalExtrinsics,
@@ -449,7 +407,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getAccountStatistics',
         address: address.substring(0, 10) + '...',
       });
@@ -462,7 +420,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
    */
   async discoverSampleAddresses(): Promise<string[]> {
     try {
-      logger.debug('AccountService: Discovering sample addresses', { component: 'account-service' });
+      logger.debug('AccountApiService: Discovering sample addresses', { component: 'account-api-service' });
 
       // Get active validator addresses as samples
       const validators = await this.validatorRepository.findActive();
@@ -479,8 +437,8 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
         sampleAddresses.push(...Array.from(addresses).slice(0, 10));
       }
 
-      logger.debug('AccountService: Sample addresses discovered', { 
-        component: 'account-service',
+      logger.debug('AccountApiService: Sample addresses discovered', { 
+        component: 'account-api-service',
         count: sampleAddresses.length,
       });
 
@@ -488,7 +446,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'discoverSampleAddresses',
       });
       return [];
@@ -521,7 +479,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getOrCreateAccount',
         address: address.substring(0, 10) + '...',
       });
@@ -539,7 +497,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
       );
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'updateAccountBalance',
         address: address.substring(0, 10) + '...',
       });
@@ -579,7 +537,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getFallbackBalance',
         address: address.substring(0, 10) + '...',
       });
@@ -620,7 +578,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getTransferStatistics',
         address: address.substring(0, 10) + '...',
       });
@@ -657,7 +615,7 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
 
     } catch (error) {
       logError(error as Error, { 
-        component: 'account-service', 
+        component: 'account-api-service', 
         action: 'getActivityDates',
         address: address.substring(0, 10) + '...',
       });
@@ -668,306 +626,23 @@ export class AccountService implements BaseService, IAccountService, SelfHealing
       };
     }
   }
-
-  // Self-Healing Helper Methods
-  
-  /**
-   * Validate if a string is a valid Avail address
-   * Avail uses Substrate SS58 format
-   */
-  private isValidAvailAddress(address: string): boolean {
-    try {
-      // Basic validation: address should be a string and have reasonable length
-      if (!address || typeof address !== 'string') {
-        return false;
-      }
-      
-      // Avail addresses typically start with '5' and are 47-48 characters long
-      if (address.length < 40 || address.length > 50) {
-        return false;
-      }
-      
-      // Should start with '5' for SS58 format
-      if (!address.startsWith('5')) {
-        return false;
-      }
-      
-      // Basic character validation (base58 characters)
-      const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz]+$/;
-      return base58Regex.test(address);
-      
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Check if an extrinsic is a transfer operation
-   */
-  private isTransferExtrinsic(extrinsic: ExtrinsicData): boolean {
-    return extrinsic.method.section === 'balances' && 
-           ['transfer', 'transferKeepAlive', 'transferAll'].includes(extrinsic.method.method);
-  }
-
-  /**
-   * Extract transfer destination address from transfer extrinsic
-   */
-  private extractTransferDestination(extrinsic: ExtrinsicData): string | null {
-    try {
-      if (!this.isTransferExtrinsic(extrinsic)) {
-        return null;
-      }
-
-      const args = extrinsic.method.args;
-      
-      // Different transfer methods have different argument structures
-      if (extrinsic.method.method === 'transfer' || extrinsic.method.method === 'transferKeepAlive') {
-        // transfer(dest, value) or transferKeepAlive(dest, value)
-        return args.dest || args.destination || null;
-      }
-      
-      if (extrinsic.method.method === 'transferAll') {
-        // transferAll(dest, keepAlive)
-        return args.dest || args.destination || null;
-      }
-
-      return null;
-    } catch (error) {
-      logger.warn('AccountService: Failed to extract transfer destination', {
-        component: 'account-service',
-        extrinsicHash: extrinsic.hash,
-        error: (error as Error).message,
-      });
-      return null;
-    }
-  }
-
-  /**
-   * Extract addresses from extrinsic method arguments
-   * This is a generic method that looks for address-like strings in arguments
-   */
-  private extractAddressesFromArgs(args: Record<string, any>): string[] {
-    const addresses: string[] = [];
-    
-    try {
-      const extractFromValue = (value: any): void => {
-        if (typeof value === 'string' && this.isValidAvailAddress(value)) {
-          addresses.push(value);
-        } else if (Array.isArray(value)) {
-          value.forEach(extractFromValue);
-        } else if (value && typeof value === 'object') {
-          Object.values(value).forEach(extractFromValue);
-        }
-      };
-
-      Object.values(args).forEach(extractFromValue);
-    } catch (error) {
-      // Ignore errors in argument parsing - this is best-effort extraction
-    }
-
-    return addresses;
-  }
-
-  // Self-Healing Processor Methods
-  // Phase 2: Account extraction and processing implementation
-
-  /**
-   * Extract account addresses from block data
-   * 
-   * Extracts addresses from:
-   * - Block validator (block author)
-   * - Extrinsic signers
-   * - Transfer destinations (balances.transfer calls)
-   * - Other extrinsic arguments that contain addresses
-   */
-  async extractFromBlock(blockData: BlockData): Promise<ExtractedEntity[]> {
-    const addresses = new Set<string>();
-    
-    try {
-      logger.debug('AccountService: Extracting addresses from block', { 
-        component: 'account-service',
-        blockNumber: blockData.number,
-        extrinsicCount: blockData.extrinsics.length,
-      });
-
-      // 1. Extract block validator (block author)
-      if (blockData.validator && this.isValidAvailAddress(blockData.validator)) {
-        addresses.add(blockData.validator);
-        logger.debug('AccountService: Added block validator address', {
-          component: 'account-service',
-          blockNumber: blockData.number,
-          validator: blockData.validator.substring(0, 20) + '...',
-        });
-      }
-
-      // 2. Extract from extrinsics
-      blockData.extrinsics.forEach((extrinsic, index) => {
-        try {
-          // Extract extrinsic signer
-          if (extrinsic.signer && this.isValidAvailAddress(extrinsic.signer)) {
-            addresses.add(extrinsic.signer);
-          }
-
-          // Extract transfer destinations
-          if (this.isTransferExtrinsic(extrinsic)) {
-            const destination = this.extractTransferDestination(extrinsic);
-            if (destination && this.isValidAvailAddress(destination)) {
-              addresses.add(destination);
-            }
-          }
-
-          // Extract other addresses from extrinsic arguments
-          const argAddresses = this.extractAddressesFromArgs(extrinsic.method.args);
-          argAddresses.forEach(addr => {
-            if (this.isValidAvailAddress(addr)) {
-              addresses.add(addr);
-            }
-          });
-
-        } catch (error) {
-          logger.warn('AccountService: Failed to extract addresses from extrinsic', {
-            component: 'account-service',
-            blockNumber: blockData.number,
-            extrinsicIndex: index,
-            error: (error as Error).message,
-          });
-          // Continue processing other extrinsics
-        }
-      });
-
-      // Convert to ExtractedEntity array
-      const entities: ExtractedEntity[] = Array.from(addresses).map(address => ({
-        type: ENTITY_TYPES.ACCOUNT,
-        id: address,
-        data: {
-          address,
-          blockNumber: blockData.number,
-          extractedFrom: 'block_processing',
-        },
-        dependencies: [], // Accounts have no dependencies
-      }));
-
-      logger.debug('AccountService: Address extraction complete', {
-        component: 'account-service',
-        blockNumber: blockData.number,
-        addressCount: entities.length,
-      });
-
-      return entities;
-
-    } catch (error) {
-      logger.error('AccountService: Failed to extract addresses from block', {
-        component: 'account-service',
-        blockNumber: blockData.number,
-        error: (error as Error).message,
-      });
-      
-      // Return empty array on error - don't fail the entire block processing
-      return [];
-    }
-  }
-
-  /**
-   * Process extracted account entities
-   * 
-   * For each extracted address, ensure the account exists in the database
-   * Uses the existing getOrCreateAccount method for consistent account creation
-   */
-  async processExtractedEntities(entities: ExtractedEntity[]): Promise<Account[]> {
-    const results: Account[] = [];
-    
-    try {
-      logger.debug('AccountService: Processing extracted account entities', { 
-        component: 'account-service',
-        entityCount: entities.length,
-      });
-
-      for (const entity of entities) {
-        try {
-          // Ensure dependencies are resolved first
-          await this.ensureDependencies(entity);
-          
-          // Process the account entity
-          const account = await this.ensureAccountExists(entity.data.address);
-          results.push(account);
-          
-          logger.debug('AccountService: Account processed successfully', {
-            component: 'account-service',
-            address: entity.data.address.substring(0, 20) + '...',
-            entityType: entity.type,
-            blockNumber: entity.data.blockNumber,
-          });
-
-        } catch (error) {
-          logger.error('AccountService: Failed to process account entity', {
-            component: 'account-service',
-            entityId: entity.id,
-            entityType: entity.type,
-            error: (error as Error).message,
-          });
-          // Continue processing other entities - don't fail the entire batch
-        }
-      }
-
-      logger.debug('AccountService: Account entity processing complete', {
-        component: 'account-service',
-        totalEntities: entities.length,
-        successfullyProcessed: results.length,
-        failed: entities.length - results.length,
-      });
-
-      return results;
-
-    } catch (error) {
-      logger.error('AccountService: Failed to process extracted entities', {
-        component: 'account-service',
-        entityCount: entities.length,
-        error: (error as Error).message,
-      });
-      
-      // Return partial results on error
-      return results;
-    }
-  }
-
-  /**
-   * Ensure account dependencies exist
-   * 
-   * Accounts are the base entity type and have no dependencies.
-   * This method is a no-op but is required by the SelfHealingProcessor interface.
-   */
-  async ensureDependencies(entity: ExtractedEntity): Promise<void> {
-    // No-op: accounts have no dependencies - they are the base entity type
-    logger.debug('AccountService: ensureDependencies called (no dependencies required)', { 
-      component: 'account-service',
-      entityType: entity.type,
-      entityId: entity.id.substring(0, 20) + '...',
-    });
-  }
-
-  /**
-   * Helper method for other services to ensure account exists
-   * This method already exists in the current implementation as getOrCreateAccount
-   * TODO: Phase 2 - Expose this as ensureAccountExists for other services
-   */
-  async ensureAccountExists(address: string): Promise<Account> {
-    return this.getOrCreateAccount(address);
-  }
 }
 
-// Factory function
-export const createAccountService = (
+/**
+ * Factory function to create AccountApiService instances
+ */
+export const createAccountApiService = (
   blockchain: AvailBlockchainService,
   transferRepository: TransferRepository,
   extrinsicRepository: ExtrinsicRepository,
   validatorRepository: ValidatorRepository,
   rewardRepository: RewardRepository,
-): AccountService => {
-  return new AccountService(
+): AccountApiService => {
+  return new AccountApiService(
     blockchain,
     transferRepository,
     extrinsicRepository,
     validatorRepository,
     rewardRepository,
   );
-};
+}; 

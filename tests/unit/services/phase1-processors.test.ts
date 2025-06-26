@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { ValidatorProcessor } from '../../../src/services/domain/ValidatorProcessor';
-import { TransferProcessor } from '../../../src/services/domain/TransferProcessor';
+import { TransferProcessor } from '../../../src/services/domain/transfer/TransferProcessor';
 import { EnhancedProcessorService } from '../../../src/services/domain/EnhancedProcessor';
 import { AvailBlockchainService } from '../../../src/services/core/avail-blockchain';
 import { ValidatorRepository } from '../../../src/database/repositories/ValidatorRepository';
