@@ -135,6 +135,13 @@ export const config = {
         exponentialFactor: 1.5,
         jitterEnabled: false,
       },
+      // Phase 1: Queue Integration - Retry strategy for block domain processing
+      [JobType.PROCESS_BLOCK_DOMAINS]: {
+        baseDelay: 3000,
+        maxDelay: 45000,
+        exponentialFactor: 2,
+        jitterEnabled: true,
+      },
       // Phase 2: Dependency Management Job Retry Strategies - Simplified for TASK-010
       [JobType.DEPENDENCY_DETECTION]: {
         baseDelay: 2000,
@@ -189,6 +196,72 @@ export const config = {
     rateLimiting: env.ENABLE_RATE_LIMITING,
     analytics: env.ENABLE_ANALYTICS,
     metrics: env.ENABLE_METRICS,
+    // Phase 1: Queue Integration - Feature flag for block domain processing
+    useQueueForBlockDomains: false, // Default to existing system for safety
+  },
+
+  // Phase 2: Block Processing Configuration - Dual-Mode Operation
+  blockProcessing: {
+    mode: (process.env.BLOCK_PROCESSING_MODE as 'legacy' | 'queue' | 'dual') || 'queue',
+    dualModeComparisonEnabled: process.env.DUAL_MODE_COMPARISON === 'true' || false,
+    performanceLoggingEnabled: true,
+    statisticsValidationEnabled: true,
+    fallbackToLegacyOnError: true,
+    primaryResult: 'legacy' as 'legacy' | 'queue', // Which result to return in dual mode
+    comparisonThresholds: {
+      processingTimeDifferencePercent: 20,
+      successRateDifferencePercent: 1,
+      errorCountDifference: 5,
+      memoryUsageDifferencePercent: 15,
+    },
+    monitoring: {
+      enabled: true,
+      logComparisons: true,
+      alertOnDifferences: true,
+      collectMetrics: true,
+    },
+  },
+
+  // Phase 3: Enhanced Queue Processing Configuration
+  queueProcessing: {
+    blockDomains: {
+      priorityAssignment: 'auto' as 'auto' | 'manual' | 'disabled', // Auto-calculate priority based on block characteristics
+      concurrency: {
+        simple: 5,    // Simple blocks concurrent processing
+        complex: 2,   // Complex blocks concurrent processing
+        critical: 1,  // Critical blocks sequential processing
+      },
+      optimization: {
+        enableServiceReordering: true,        // Reorder services by performance
+        collectPerformanceMetrics: true,      // Track processing metrics
+        enableBatchOptimization: true,        // Optimize batch processing
+        adaptivePriority: true,               // Dynamically adjust priorities
+        smartRetryLogic: true,                // Use ErrorClassifier for retries
+      },
+      deadLetterQueue: {
+        enableAlternativeProcessing: true,    // Try alternative processing for failed jobs
+        maxAlternativeAttempts: 2,            // Max attempts for alternative processing
+        alertOnPermanentFailures: true,       // Alert on permanent failures
+        retryableErrorTypes: ['network', 'timeout', 'temporary'],
+      },
+      monitoring: {
+        trackCorrelationIds: true,            // Enhanced correlation tracking
+        collectDetailedMetrics: true,         // Detailed performance metrics
+        enableHealthMonitoring: true,         // Queue health monitoring
+        performanceOptimization: true,        // Performance-based optimizations
+        alertThresholds: {
+          queueBacklog: 1000,                 // Alert when queue has >1000 jobs
+          failureRate: 0.05,                  // Alert when failure rate >5%
+          avgProcessingTime: 30000,           // Alert when avg time >30s
+        },
+      },
+      complexityThresholds: {
+        extrinsicsCount: 100,                 // Blocks with >100 extrinsics are complex
+        dataSubmissionSize: 1024 * 1024,     // Blocks with >1MB data submissions are complex
+        validatorChanges: true,               // Blocks with validator changes are critical
+        recentBlockWindow: 100,               // Blocks within last 100 are high priority
+      },
+    },
   },
 
   // TASK-007: Dependency Integration Configuration
@@ -258,8 +331,6 @@ export const config = {
     pingTimeout: 60000,
     pingInterval: 25000,
   },
-
-  // Phase 2: Dependency Management Configuration - Removed (replaced by queue-based approach)
 
   // TASK-008: Monitoring and Operational Tools Configuration - Adam's Implementation
   dependencyMonitoring: {

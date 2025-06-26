@@ -147,4 +147,81 @@ export interface StakingInfo {
   epochProgress: number;
   inflationRate: number;
   minimumStake: string;
+}
+
+// Phase 2: Dual-Mode Block Processing Types
+export type BlockProcessingMode = 'legacy' | 'queue' | 'dual';
+
+export interface PerformanceMetrics {
+  processingTime: number;
+  memoryUsage: NodeJS.MemoryUsage;
+  cpuUsage: NodeJS.CpuUsage;
+  serviceBreakdown: {
+    [serviceName: string]: {
+      extractionTime: number;
+      processingTime: number;
+      entityCount: number;
+      successRate: number;
+    };
+  };
+}
+
+export interface ProcessingResult {
+  success: boolean;
+  blockNumber: number;
+  blockHash: string;
+  duration: number;
+  stats: {
+    blocksProcessed: number;
+    totalErrors: number;
+    errorRate: number;
+    serviceStats: {
+      [serviceName: string]: {
+        successRate: number;
+        total: number;
+        success: number;
+      };
+    };
+  };
+  metrics: PerformanceMetrics;
+  errors?: Error[];
+  mode: BlockProcessingMode;
+}
+
+export interface ComparisonResult {
+  blockNumber: number;
+  legacySuccess: boolean;
+  queueSuccess: boolean;
+  processingTimeDiff: number;
+  statisticsDiff: {
+    serviceSuccessRatesDiff: {
+      [serviceName: string]: number;
+    };
+    totalErrorsDiff: number;
+    blocksProcessedDiff: number;
+  };
+  errorsDiff: string[];
+  significantDifferences: boolean;
+  alertTriggered: boolean;
+}
+
+export interface BlockProcessingOrchestrationConfig {
+  mode: BlockProcessingMode;
+  dualModeComparisonEnabled: boolean;
+  performanceLoggingEnabled: boolean;
+  statisticsValidationEnabled: boolean;
+  fallbackToLegacyOnError: boolean;
+  primaryResult: 'legacy' | 'queue';
+  comparisonThresholds: {
+    processingTimeDifferencePercent: number;
+    successRateDifferencePercent: number;
+    errorCountDifference: number;
+    memoryUsageDifferencePercent: number;
+  };
+  monitoring: {
+    enabled: boolean;
+    logComparisons: boolean;
+    alertOnDifferences: boolean;
+    collectMetrics: boolean;
+  };
 } 

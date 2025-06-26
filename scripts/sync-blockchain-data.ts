@@ -18,9 +18,9 @@ import { initializeCorrelationId } from '../src/utils/correlationId';
 import db from '../src/utils/database';
 import { AvailBlockchainService } from '../src/services/core/avail-blockchain';
 import { createBlockIndexerService } from '../src/services/domain/indexer';
-// Phase 7: Use ServiceFactory instead of individual processors
+// Phase 4: Use ServiceFactory with queue-based processing
 import { ServiceFactory } from '../src/services';
-import { SelfHealingBlockProcessor } from '../src/services/domain/selfHealingProcessor';
+import { BlockProcessingOrchestrator } from '../src/services/domain/blockProcessingOrchestrator';
 import { SyncService } from '../src/services/core/sync';
 import { QueueService } from '../src/services/core/queue';
 
@@ -37,7 +37,7 @@ class StandaloneSyncScript {
   private serviceFactory: ServiceFactory;
   private blockchain: AvailBlockchainService;
   private indexer: ReturnType<typeof createBlockIndexerService>;
-  private processor: SelfHealingBlockProcessor;
+  private processor: BlockProcessingOrchestrator;
   private syncService: SyncService;
   private queueService: QueueService;
   private shouldStop = false;
@@ -59,7 +59,7 @@ class StandaloneSyncScript {
    */
   async initialize(_options?: SyncOptions): Promise<void> {
     try {
-      logger.info('🚀 Initializing sync script with SelfHealingBlockProcessor...');
+      logger.info('🚀 Initializing sync script with queue-based processing...');
 
       // Initialize database connection
       await db.connect();
@@ -71,7 +71,7 @@ class StandaloneSyncScript {
 
       // Get services from factory
       this.blockchain = this.serviceFactory.get('availBlockchain');
-      this.processor = this.serviceFactory.get('selfHealingBlockProcessor');
+      this.processor = this.serviceFactory.get('blockProcessingOrchestrator');
       this.syncService = this.serviceFactory.get('syncService');
       this.queueService = this.serviceFactory.get('queue');
       
@@ -79,8 +79,8 @@ class StandaloneSyncScript {
       this.indexer = createBlockIndexerService(db, this.blockchain);
       await this.indexer.start();
       
-      logger.info('✅ All services initialized (Self-Healing Architecture)');
-      logger.info(`📊 SelfHealingBlockProcessor services: ${this.processor.getRegisteredServices().join(', ')}`);
+      logger.info('✅ All services initialized (Queue-Based Architecture)');
+      logger.info('📊 BlockProcessingOrchestrator ready for queue-based processing');
 
     } catch (error) {
       logger.error('❌ Failed to initialize services:', error);

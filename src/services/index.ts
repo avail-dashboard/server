@@ -16,7 +16,7 @@ export { BlockApiService, createBlockApiService, BlockProcessor, createBlockProc
 export { ExtrinsicService, createExtrinsicService } from './domain/extrinsic';
 export { DataSubmissionApiService, createDataSubmissionApiService, DataSubmissionProcessor, createDataSubmissionProcessor } from './domain/dataSubmission';
 export { BlockIndexerService, createBlockIndexerService } from './domain/indexer';
-// Phase 6 Services (replacing DataProcessorService with SelfHealingBlockProcessor) 
+// Phase 4: Legacy services (deprecated - use BlockProcessingOrchestrator instead)
 export { SelfHealingBlockProcessor, createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
 export { SearchService, createSearchService } from './domain/search';
 // Phase 2 Services - Updated for domain structure  
@@ -35,6 +35,7 @@ export * from './types/blockchain';
 import { createAvailConnectionManager, AvailConnectionManager } from './core/avail-connection-manager';
 import { createAvailBlockchainService, AvailBlockchainService } from './core/avail-blockchain';
 import { createQueueService, QueueService } from './core/queue';
+import { createQueueHealthMonitor } from './core/queue/health-monitor';
 import { createDependencyResolver } from './core/dependency-resolver';
 import config from '../config';
 
@@ -45,7 +46,10 @@ import { createDataSubmissionApiService, createDataSubmissionProcessor } from '.
 import { createSyncService } from './core/sync';
 import { createBlockIndexerService } from './domain/indexer';
 // Phase 6 Services (replacing DataProcessorService)
+// Phase 4: Keep for orchestrator fallback only - primary processing via queue
 import { createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
+// Phase 2: Block Processing Orchestrator
+import { createBlockProcessingOrchestrator } from './domain/blockProcessingOrchestrator';
 import { createSearchService } from './domain/search';
 // Phase 2 Services
 import { createAccountApiService, createAccountProcessor } from './domain/account';
@@ -136,14 +140,19 @@ export class ServiceFactory {
       const availBlockchainService = createAvailBlockchainService(); // Use AvailBlockchainService for proper extrinsics extraction
       const queueService = createQueueService();
       
+      // Phase 3: Create queue health monitor
+      const queueHealthMonitor = createQueueHealthMonitor(queueService);
+
       // Register core services
       this.register('connectionManager', connectionManager);
       this.register('availBlockchain', availBlockchainService);
       this.register('queue', queueService);
+      this.register('queueHealthMonitor', queueHealthMonitor);
 
       // Start core services
       await availBlockchainService.start();
       await queueService.start();
+      await queueHealthMonitor.start();
       
       console.log('✅ Core services initialized successfully');
     } catch (error) {
@@ -336,27 +345,38 @@ export class ServiceFactory {
       // Note: transferProcessor doesn't need start() - it's stateless
       await analyticsService.start();
       
+      // Phase 2: Create Block Processing Orchestrator
+      const blockProcessingOrchestrator = createBlockProcessingOrchestrator(
+        selfHealingBlockProcessor,
+        queueService,
+        config.blockProcessing,
+      );
+
       // Register new sync services
       this.register('syncService', syncService);
       this.register('blockIndexerService', blockIndexerService);
       // Phase 6: Register SelfHealingBlockProcessor instead of DataProcessorService
       this.register('selfHealingBlockProcessor', selfHealingBlockProcessor);
+      // Phase 2: Register Block Processing Orchestrator
+      this.register('blockProcessingOrchestrator', blockProcessingOrchestrator);
       
       // Start sync services
       await syncService.start();
       await blockIndexerService.start();
       
-      // Initialize queue service dependencies (John's Service Integration Architecture)
+      // Initialize queue service dependencies (Phase 4: Queue-First Architecture)
       const queueServiceInstance = this.get<QueueService>('queue');
       queueServiceInstance.initializeDependencies({
-        selfHealingBlockProcessor,
+        // Phase 4: SelfHealingBlockProcessor removed - using orchestrator for processing
         analyticsService,
         blockService: blockApiService,
         serviceFactory: this,
-        // Phase 2 dependencies removed - queue now handles dependencies directly
+        // Phase 4: Queue-based processing - no legacy processor dependencies
       });
       // Phase 6: Start SelfHealingBlockProcessor instead of DataProcessorService
       await selfHealingBlockProcessor.start();
+      // Phase 2: Start Block Processing Orchestrator
+      await blockProcessingOrchestrator.start();
       
       console.log('✅ Domain services initialized successfully');
     } catch (error) {
@@ -394,8 +414,9 @@ export class ServiceFactory {
       
       // Define the shutdown order (reverse of startup order for proper dependency cleanup)
       const shutdownOrder = [
-        // Sync services (started last, should stop first)
-        'selfHealingBlockProcessor',
+        // Sync services (started last, should stop first) - Phase 4: Orchestrator takes priority
+        'blockProcessingOrchestrator',
+        'selfHealingBlockProcessor', // Phase 4: Kept as fallback only
         'blockIndexerService', 
         'syncService',
         
@@ -408,6 +429,7 @@ export class ServiceFactory {
         'accountService',
         
         // Core blockchain and queue services (started first, should stop last)
+        'queueHealthMonitor',
         'queue',
         'availBlockchain',
       ];

@@ -905,6 +905,273 @@ export class QueueService implements QueueServiceInterface {
   async ensureValidator(address: string): Promise<QueueJob> {
     return this.addJob(JobType.ENSURE_VALIDATOR, { address }, { priority: JobPriority.HIGH });
   }
+
+  /**
+   * Convenience method to schedule block domain processing
+   * Phase 1: Queue Integration - New method for block domain processing
+   */
+  async scheduleBlockDomainProcessing(blockData: any): Promise<QueueJob> {
+    return this.addJob(JobType.PROCESS_BLOCK_DOMAINS, { blockData }, {
+      priority: JobPriority.HIGH,
+      attempts: 3,
+    });
+  }
+
+  // ==================== Phase 3: Enhanced Queue Features ====================
+
+  /**
+   * Schedule block domain processing with intelligent priority calculation
+   * Phase 3: Priority-Based Block Processing
+   */
+  async scheduleBlockDomainProcessingWithPriority(
+    blockData: any, 
+    priority?: JobPriority
+  ): Promise<QueueJob> {
+    const startTime = Date.now();
+    
+    logger.debug('🔧 QUEUE: Scheduling block with priority calculation', {
+      component: 'queue-service',
+      operation: 'scheduleWithPriority',
+      blockNumber: blockData.number,
+      manualPriority: priority,
+    });
+
+    let calculatedPriority = priority;
+    
+    // Calculate priority automatically if not provided and auto-calculation is enabled
+    if (!priority) {
+      try {
+        const config = await import('../../../config');
+        if (config.default.queueProcessing.blockDomains.priorityAssignment === 'auto') {
+          // We need to get the CoreProcessors instance to calculate priority
+          // For now, use a simple heuristic based on block characteristics
+          calculatedPriority = this.calculateSimplePriority(blockData);
+          
+          logger.info('🎯 QUEUE: Auto-calculated block priority', {
+            component: 'queue-service',
+            operation: 'priorityCalculation',
+            blockNumber: blockData.number,
+            calculatedPriority,
+            extrinsicsCount: blockData.extrinsics?.length || 0,
+            reason: 'auto_calculation',
+          });
+        } else {
+          calculatedPriority = JobPriority.MEDIUM; // Default
+        }
+      } catch (error) {
+        logger.warn('⚠️ QUEUE: Failed to calculate priority, using default', {
+          component: 'queue-service',
+          operation: 'priorityCalculation',
+          blockNumber: blockData.number,
+          error: (error as Error).message,
+          fallbackPriority: JobPriority.MEDIUM,
+        });
+        calculatedPriority = JobPriority.MEDIUM;
+      }
+    }
+
+    const job = await this.addJob(JobType.PROCESS_BLOCK_DOMAINS, { blockData }, {
+      priority: calculatedPriority,
+      attempts: 3,
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    });
+
+    const duration = Date.now() - startTime;
+    
+    logger.info('✅ QUEUE: Block scheduled with priority', {
+      component: 'queue-service',
+      operation: 'scheduleWithPriority',
+      jobId: job.id,
+      blockNumber: blockData.number,
+      priority: calculatedPriority,
+      schedulingDuration: duration,
+    });
+
+    return job;
+  }
+
+  /**
+   * Simple priority calculation based on block characteristics
+   * This is a fallback when CoreProcessors is not available
+   */
+  private calculateSimplePriority(blockData: any): JobPriority {
+    const extrinsicsCount = blockData.extrinsics?.length || 0;
+    const eventsCount = blockData.events?.length || 0;
+    
+    // Simple heuristics
+    if (extrinsicsCount > 100 || eventsCount > 200) {
+      return JobPriority.CRITICAL;
+    }
+    
+    if (extrinsicsCount > 50 || eventsCount > 100) {
+      return JobPriority.HIGH;
+    }
+    
+    return JobPriority.MEDIUM;
+  }
+
+  /**
+   * Schedule batch of blocks with optimized processing order
+   * Phase 3: Batch Optimization
+   */
+  async scheduleBlockBatch(blocks: any[]): Promise<QueueJob[]> {
+    const startTime = Date.now();
+    
+    logger.info('🔧 QUEUE: Scheduling block batch', {
+      component: 'queue-service',
+      operation: 'scheduleBlockBatch',
+      batchSize: blocks.length,
+      blockRange: blocks.length > 0 ? `${blocks[0].number}-${blocks[blocks.length - 1].number}` : 'empty',
+    });
+
+    try {
+      // Optimize batch processing order
+      const optimizedBlocks = await this.optimizeBatchOrder(blocks);
+      
+      // Schedule all blocks in parallel
+      const jobs = await Promise.all(
+        optimizedBlocks.map(block => this.scheduleBlockDomainProcessingWithPriority(block))
+      );
+
+      const duration = Date.now() - startTime;
+      
+      logger.info('✅ QUEUE: Block batch scheduled successfully', {
+        component: 'queue-service',
+        operation: 'scheduleBlockBatch',
+        batchSize: blocks.length,
+        jobsCreated: jobs.length,
+        batchDuration: duration,
+        jobIds: jobs.map(j => j.id),
+      });
+
+      return jobs;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error('❌ QUEUE: Failed to schedule block batch', {
+        component: 'queue-service',
+        operation: 'scheduleBlockBatch',
+        batchSize: blocks.length,
+        error: (error as Error).message,
+        duration,
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Optimize the order of blocks in a batch for better processing efficiency
+   */
+  private async optimizeBatchOrder(blocks: any[]): Promise<any[]> {
+    const config = await import('../../../config');
+    
+    if (!config.default.queueProcessing.blockDomains.optimization.enableBatchOptimization) {
+      return blocks; // Return original order if optimization disabled
+    }
+
+    logger.debug('🔧 QUEUE: Optimizing batch order', {
+      component: 'queue-service',
+      operation: 'optimizeBatchOrder',
+      originalOrder: blocks.map(b => b.number),
+    });
+
+    // Group blocks by complexity
+    const simpleBlocks = [];
+    const complexBlocks = [];
+    const criticalBlocks = [];
+
+    for (const block of blocks) {
+      const priority = this.calculateSimplePriority(block);
+      
+      if (priority === JobPriority.CRITICAL) {
+        criticalBlocks.push(block);
+      } else if (priority === JobPriority.HIGH) {
+        complexBlocks.push(block);
+      } else {
+        simpleBlocks.push(block);
+      }
+    }
+
+    // Process critical blocks first, then complex, then simple
+    const optimizedOrder = [...criticalBlocks, ...complexBlocks, ...simpleBlocks];
+    
+    logger.debug('✅ QUEUE: Batch order optimized', {
+      component: 'queue-service',
+      operation: 'optimizeBatchOrder',
+      optimizedOrder: optimizedOrder.map(b => b.number),
+      distribution: {
+        critical: criticalBlocks.length,
+        complex: complexBlocks.length,
+        simple: simpleBlocks.length,
+      },
+    });
+
+    return optimizedOrder;
+  }
+
+  /**
+   * Get queue health metrics for monitoring
+   * Phase 3: Health Monitoring
+   */
+  async getQueueHealthMetrics(): Promise<{
+    queueStats: any;
+    processingRate: number;
+    failureRate: number;
+    avgProcessingTime: number;
+    systemLoad: any;
+    alerts: string[];
+  }> {
+    try {
+      const stats = await this.getStats();
+      const queueLength = await this.queue?.count() || 0;
+      
+      // Calculate processing rate (jobs per minute)
+      const totalJobs = stats.completed + stats.failed;
+      const processingRate = totalJobs > 0 ? (stats.completed / totalJobs) * 60 : 0;
+      
+      // Calculate failure rate
+      const failureRate = totalJobs > 0 ? stats.failed / totalJobs : 0;
+      
+      // System load metrics
+      const systemLoad = {
+        memory: process.memoryUsage(),
+        cpuUsage: process.cpuUsage(),
+        queueLength,
+      };
+      
+      // Generate alerts based on thresholds
+      const config = await import('../../../config');
+      const thresholds = config.default.queueProcessing.blockDomains.monitoring.alertThresholds;
+      const alerts: string[] = [];
+      
+      if (queueLength > thresholds.queueBacklog) {
+        alerts.push(`Queue backlog high: ${queueLength} jobs`);
+      }
+      
+      if (failureRate > thresholds.failureRate) {
+        alerts.push(`Failure rate high: ${(failureRate * 100).toFixed(2)}%`);
+      }
+      
+      return {
+        queueStats: stats,
+        processingRate,
+        failureRate,
+        avgProcessingTime: 0, // TODO: Calculate from job history
+        systemLoad,
+        alerts,
+      };
+    } catch (error) {
+      logger.error('❌ QUEUE: Failed to get health metrics', {
+        component: 'queue-service',
+        operation: 'getQueueHealthMetrics',
+        error: (error as Error).message,
+      });
+      
+      throw error;
+    }
+  }
 }
 
 // Factory function for dependency injection

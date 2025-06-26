@@ -1,5 +1,7 @@
 // Queue Job Data Types and Interfaces
 
+import { BlockData } from '../../types/blockchain';
+
 export interface JobProcessorDependencies {
   selfHealingBlockProcessor?: any;
   analyticsService?: any;
@@ -13,6 +15,12 @@ export interface ErrorClassification {
   retryDelay?: number;
   category: 'network' | 'service' | 'data' | 'system';
   alertLevel: 'low' | 'medium' | 'high' | 'critical';
+}
+
+// Phase 1: Queue Integration - Block domain processing job data
+export interface BlockDomainsJobData {
+  blockData: BlockData;
+  correlationId?: string;
 }
 
 // Phase 2: Dependency Job Data Interfaces - Adam's Implementation

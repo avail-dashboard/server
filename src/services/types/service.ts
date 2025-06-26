@@ -147,6 +147,8 @@ export enum JobType {
   SYNC_BLOCK_RANGE = 'sync_block_range',
   PROCESS_BLOCK_DATA = 'process_block_data',
   UPDATE_SYNC_STATE = 'update_sync_state',
+  // Phase 1: Queue Integration - New job type for block domain processing
+  PROCESS_BLOCK_DOMAINS = 'process_block_domains',
   // Phase 2: Simplified Dependency Management Job Types - TASK-010 Implementation
   DEPENDENCY_DETECTION = 'dependency_detection',
   DEPENDENCY_RESOLUTION = 'dependency_resolution',

@@ -3,6 +3,7 @@ import { JobType, JobPriority } from '../../../types/service';
 import { CoreProcessors } from './core-processors';
 import { JobProcessorDependencies } from '../types';
 import { logger } from '../../../../utils/logger';
+import { createDeadLetterProcessor } from './dead-letter-processor';
 
 /**
  * Job Processor Registry
@@ -14,6 +15,7 @@ import { logger } from '../../../../utils/logger';
  */
 export class JobProcessorRegistry {
   private coreProcessors: CoreProcessors;
+  private deadLetterProcessor: any;
   private processors: Map<string, (job: Job) => Promise<any>> = new Map();
 
   constructor(
@@ -28,6 +30,7 @@ export class JobProcessorRegistry {
     });
     
     this.coreProcessors = new CoreProcessors(dependencies, getService);
+    this.deadLetterProcessor = createDeadLetterProcessor(getService);
     this.setupProcessors();
     
     logger.info('✅ PROCESSOR_REGISTRY: Job processor registry initialized', {
@@ -55,6 +58,17 @@ export class JobProcessorRegistry {
 
     this.processors.set(JobType.HEALTH_CHECK, (job: Job) => 
       this.coreProcessors.processHealthCheck(job),
+    );
+
+    // ==================== Phase 1: Queue Integration ====================
+    this.processors.set(JobType.PROCESS_BLOCK_DOMAINS, (job: Job) =>
+      this.coreProcessors.processBlockDomains(job),
+    );
+
+    // ==================== Phase 3: Enhanced Queue Features ====================
+    // Dead Letter Queue processor for failed block processing jobs
+    this.processors.set('FAILED_BLOCK_DOMAINS', (job: Job) =>
+      this.deadLetterProcessor.processFailedBlockDomains(job),
     );
 
     // ==================== TODO Processors (Stubs) ====================
