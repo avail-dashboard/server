@@ -25,7 +25,7 @@ export interface QueuePriorityConfig {
   [JobType.INDEX_VALIDATOR]: number;
   [JobType.INDEX_ACCOUNT]: number;
   [JobType.INDEX_TRANSFER]: number;
-  [JobType.DATA_SUBMISSION_INDEXING]: number;
+  [JobType.INDEX_DATA_SUBMISSION]: number;
   [JobType.DATA_SYNC]: number;
   [JobType.HEALTH_CHECK]: number;
 }
@@ -250,7 +250,7 @@ export class AdvancedQueueManager {
       [JobType.INDEX_VALIDATOR]: 70,
       [JobType.INDEX_ACCOUNT]: 60,
       [JobType.INDEX_TRANSFER]: 50,
-      [JobType.DATA_SUBMISSION_INDEXING]: 40,
+      [JobType.INDEX_DATA_SUBMISSION]: 40,
       [JobType.DATA_SYNC]: 30,
       [JobType.HEALTH_CHECK]: 90,
     };

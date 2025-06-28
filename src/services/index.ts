@@ -157,9 +157,9 @@ export class ServiceFactory {
       this.register('queue', queueService);
       this.register('queueHealthMonitor', queueHealthMonitor);
 
-      // Start core services
+      // Start core services (but NOT queue service yet - wait for dependencies)
       await availBlockchainService.start();
-      await queueService.start();
+      // Queue service will be started after dependencies are initialized in initializeDomainServices()
       await queueHealthMonitor.start();
       
       console.log('✅ Core services initialized successfully');
@@ -387,7 +387,7 @@ export class ServiceFactory {
       await syncService.start();
       await blockIndexerService.start();
       
-      // Initialize queue service dependencies (Phase 4: Queue-First Architecture)
+      // Initialize queue service dependencies BEFORE starting queue (Phase 4: Queue-First Architecture)
       const queueServiceInstance = this.get<QueueService>('queue');
       queueServiceInstance.initializeDependencies({
         // Phase 4: SelfHealingBlockProcessor removed - using orchestrator for processing
@@ -396,6 +396,9 @@ export class ServiceFactory {
         serviceFactory: this,
         // Phase 4: Queue-based processing - no legacy processor dependencies
       });
+      
+      // Now start the queue service with processors properly initialized
+      await queueServiceInstance.start();
       // Phase 6: Start SelfHealingBlockProcessor instead of DataProcessorService
       await selfHealingBlockProcessor.start();
       // Phase 3: Orchestrators removed - independent domain processing via queue
