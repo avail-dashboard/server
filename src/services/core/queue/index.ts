@@ -670,7 +670,7 @@ export class QueueService implements QueueServiceInterface {
         processedOn: new Date(job.processedOn || Date.now()).toISOString(),
         duration: job.finishedOn ? job.finishedOn - job.processedOn! : undefined,
         resultKeys: result ? Object.keys(result) : [],
-        correlationId: job.data._correlationId,
+        correlationId: job.data?._correlationId,
       });
     });
 
@@ -688,7 +688,7 @@ export class QueueService implements QueueServiceInterface {
         failedReason: job.failedReason,
         processedOn: job.processedOn ? new Date(job.processedOn).toISOString() : undefined,
         failedOn: job.finishedOn ? new Date(job.finishedOn).toISOString() : undefined,
-        correlationId: job.data._correlationId,
+        correlationId: job.data?._correlationId,
         willRetry: job.attemptsMade < (job.opts?.attempts || 3),
       });
 
@@ -723,7 +723,7 @@ export class QueueService implements QueueServiceInterface {
         priority: job.opts?.priority,
         processedOn: job.processedOn ? new Date(job.processedOn).toISOString() : undefined,
         stallDuration: job.processedOn ? Date.now() - job.processedOn : undefined,
-        correlationId: job.data._correlationId,
+        correlationId: job.data?._correlationId,
       });
     });
 
@@ -734,7 +734,7 @@ export class QueueService implements QueueServiceInterface {
         jobId: job.id,
         jobType: job.name,
         progress,
-        correlationId: job.data._correlationId,
+        correlationId: job.data?._correlationId,
       });
     });
 
@@ -747,7 +747,7 @@ export class QueueService implements QueueServiceInterface {
         priority: job.opts?.priority,
         attempts: job.attemptsMade,
         startedAt: new Date().toISOString(),
-        correlationId: job.data._correlationId,
+        correlationId: job.data?._correlationId,
       });
     });
 
@@ -759,7 +759,7 @@ export class QueueService implements QueueServiceInterface {
         jobType: job.name,
         priority: job.opts?.priority,
         delay: job.opts?.delay,
-        correlationId: job.data._correlationId,
+        correlationId: job.data?._correlationId,
       });
     });
 
@@ -771,7 +771,7 @@ export class QueueService implements QueueServiceInterface {
         jobType: job.name,
         delay: job.opts?.delay,
         delayedUntil: job.opts?.delay ? new Date(Date.now() + job.opts.delay).toISOString() : undefined,
-        correlationId: job.data._correlationId,
+        correlationId: job.data?._correlationId,
       });
     });
 
@@ -781,7 +781,7 @@ export class QueueService implements QueueServiceInterface {
         event: 'removed',
         jobId: job.id,
         jobType: job.name,
-        correlationId: job.data._correlationId,
+        correlationId: job.data?._correlationId,
       });
     });
 
@@ -920,7 +920,7 @@ export class QueueService implements QueueServiceInterface {
    */
   async scheduleBlockDomainProcessingWithPriority(
     blockData: any, 
-    priority?: JobPriority
+    priority?: JobPriority,
   ): Promise<QueueJob> {
     const startTime = Date.now();
     
@@ -1027,7 +1027,7 @@ export class QueueService implements QueueServiceInterface {
       
       // Schedule all blocks in parallel
       const jobs = await Promise.all(
-        optimizedBlocks.map(block => this.scheduleBlockDomainProcessingWithPriority(block))
+        optimizedBlocks.map(block => this.scheduleBlockDomainProcessingWithPriority(block)),
       );
 
       const duration = Date.now() - startTime;
