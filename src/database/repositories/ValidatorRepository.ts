@@ -1,4 +1,4 @@
-import { Validator, ValidatorStatus, Prisma } from '@prisma/client';
+import { Validator, ValidatorStatus } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 
 export type ValidatorWithRelations = Validator & {
@@ -52,6 +52,17 @@ export class ValidatorRepository extends BaseRepository {
     return this.prisma.validator.findUnique({
       where: { stashAddress },
     });
+  }
+
+  /**
+   * Check if validator exists by stash address
+   */
+  async exists(stashAddress: string): Promise<boolean> {
+    const result = await this.prisma.validator.findFirst({
+      where: { stashAddress },
+      select: { stashAddress: true },
+    });
+    return result !== null;
   }
 
   /**

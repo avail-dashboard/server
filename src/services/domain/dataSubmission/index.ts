@@ -7,6 +7,7 @@
 // Core services
 export { DataSubmissionApiService, createDataSubmissionApiService } from './DataSubmissionApiService';
 export { DataSubmissionProcessor, createDataSubmissionProcessor } from './DataSubmissionProcessor';
+export { AvailDataSubmissionIndexer } from './DataSubmissionIndexer';
 
 // Interfaces and types
 export {

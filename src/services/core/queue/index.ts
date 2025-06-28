@@ -910,16 +910,7 @@ export class QueueService implements QueueServiceInterface {
     return this.addJob(JobType.ENSURE_VALIDATOR, { address }, { priority: JobPriority.HIGH });
   }
 
-  /**
-   * Convenience method to schedule block domain processing
-   * Phase 1: Queue Integration - New method for block domain processing
-   */
-  async scheduleBlockDomainProcessing(blockData: any): Promise<QueueJob> {
-    return this.addJob(JobType.PROCESS_BLOCK_DOMAINS, { blockData }, {
-      priority: JobPriority.HIGH,
-      attempts: 3,
-    });
-  }
+
 
   // ==================== Phase 3: Enhanced Queue Features ====================
 
@@ -974,7 +965,8 @@ export class QueueService implements QueueServiceInterface {
       }
     }
 
-    const job = await this.addJob(JobType.PROCESS_BLOCK_DOMAINS, { blockData }, {
+    // Phase 3: PROCESS_BLOCK_DOMAINS removed - use BLOCK_INDEXING instead
+    const job = await this.addJob(JobType.BLOCK_INDEXING, { blockNumber: blockData.number }, {
       priority: calculatedPriority,
       attempts: 3,
       removeOnComplete: 100,

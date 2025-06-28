@@ -135,13 +135,7 @@ export const config = {
         exponentialFactor: 1.5,
         jitterEnabled: false,
       },
-      // Phase 1: Queue Integration - Retry strategy for block domain processing
-      [JobType.PROCESS_BLOCK_DOMAINS]: {
-        baseDelay: 3000,
-        maxDelay: 45000,
-        exponentialFactor: 2,
-        jitterEnabled: true,
-      },
+
       // Phase 2: Dependency Management Job Retry Strategies - Simplified for TASK-010
       [JobType.DEPENDENCY_DETECTION]: {
         baseDelay: 2000,

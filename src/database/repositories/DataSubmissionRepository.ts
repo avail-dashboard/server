@@ -1,5 +1,6 @@
 import { DataSubmission, Rollup, Prisma } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
+import { logger } from '../../utils/logger';
 
 export type DataSubmissionWithRollup = DataSubmission & {
   rollup: Rollup;
@@ -40,6 +41,31 @@ export class DataSubmissionRepository extends BaseRepository {
     return this.prisma.dataSubmission.findUnique({
       where: { extrinsicHash: hash },
     });
+  }
+
+  /**
+   * Check if data submission exists by ID or extrinsic hash
+   */
+  async exists(submissionId: string): Promise<boolean> {
+    try {
+      const result = await this.prisma.dataSubmission.findFirst({
+        where: { 
+          OR: [
+            { id: parseInt(submissionId, 10) || 0 },
+            { extrinsicHash: submissionId },
+          ],
+        },
+        select: { id: true },
+      });
+      return result !== null;
+    } catch (error) {
+      logger.error('Failed to check data submission existence', {
+        component: 'data-submission-repository',
+        submissionId,
+        error: (error as Error).message,
+      });
+      return false;
+    }
   }
 
   /**

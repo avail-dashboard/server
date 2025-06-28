@@ -60,9 +60,23 @@ export class JobProcessorRegistry {
       this.coreProcessors.processHealthCheck(job),
     );
 
-    // ==================== Phase 1: Queue Integration ====================
-    this.processors.set(JobType.PROCESS_BLOCK_DOMAINS, (job: Job) =>
-      this.coreProcessors.processBlockDomains(job),
+
+
+    // ==================== Phase 2: Domain Indexing Processors ====================
+    this.processors.set(JobType.INDEX_VALIDATOR, (job: Job) =>
+      this.coreProcessors.processValidatorIndexing(job),
+    );
+
+    this.processors.set(JobType.INDEX_ACCOUNT, (job: Job) =>
+      this.coreProcessors.processAccountIndexing(job),
+    );
+
+    this.processors.set(JobType.INDEX_TRANSFER, (job: Job) =>
+      this.coreProcessors.processTransferIndexing(job),
+    );
+
+    this.processors.set(JobType.INDEX_DATA_SUBMISSION, (job: Job) =>
+      this.coreProcessors.processDataSubmissionIndexing(job),
     );
 
     // ==================== Phase 3: Enhanced Queue Features ====================

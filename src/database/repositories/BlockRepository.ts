@@ -22,6 +22,17 @@ export class BlockRepository extends BaseRepository {
   }
 
   /**
+   * Check if block exists by number
+   */
+  async exists(blockNumber: number): Promise<boolean> {
+    const result = await this.prisma.block.findFirst({
+      where: { number: blockNumber },
+      select: { number: true },
+    });
+    return result !== null;
+  }
+
+  /**
    * Find block by hash
    */
   async findByHash(hash: string): Promise<Block | null> {

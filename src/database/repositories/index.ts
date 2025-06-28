@@ -9,6 +9,8 @@ export { TransferRepository } from './TransferRepository';
 export { NominationRepository } from './NominationRepository';
 export { EraRepository } from './EraRepository';
 export { RewardRepository } from './RewardRepository';
+// Phase 3 repositories
+export { AccountRepository } from './AccountRepository';
 // Phase 2 repositories - DependencyRepository removed (replaced by queue job status)
 
 // Repository instances for dependency injection
@@ -22,6 +24,8 @@ import { TransferRepository } from './TransferRepository';
 import { NominationRepository } from './NominationRepository';
 import { EraRepository } from './EraRepository';
 import { RewardRepository } from './RewardRepository';
+// Phase 3 repository instances
+import { AccountRepository } from './AccountRepository';
 // Phase 2 repository instances - DependencyRepository removed
 
 export const blockRepository = new BlockRepository();
@@ -34,6 +38,8 @@ export const transferRepository = new TransferRepository();
 export const nominationRepository = new NominationRepository();
 export const eraRepository = new EraRepository();
 export const rewardRepository = new RewardRepository();
+// Phase 3 repository instances
+export const accountRepository = new AccountRepository();
 // Phase 2 repository instances - dependencyRepository removed
 
 // Type exports
@@ -63,4 +69,6 @@ export type {
 } from './NominationRepository';
 export type { EraCreateInput } from './EraRepository';
 export type { RewardCreateInput } from './RewardRepository';
+// Phase 3 type exports
+export type { AccountCreateInput, IAccountRepository } from './AccountRepository';
 // Phase 2 type exports - DependencyRepository types removed

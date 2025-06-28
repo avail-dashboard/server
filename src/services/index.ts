@@ -48,10 +48,7 @@ import { createBlockIndexerService } from './domain/indexer';
 // Phase 6 Services (replacing DataProcessorService)
 // Phase 4: Keep for orchestrator fallback only - primary processing via queue
 import { createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
-// Phase 2: Block Processing Orchestrator
-import { createBlockProcessingOrchestrator } from './domain/blockProcessingOrchestrator';
-// Phase 3: Domain Processing Orchestrator
-import { createDomainProcessingOrchestrator } from './domain/domainProcessingOrchestrator';
+// Phase 3: Orchestrators removed - using independent domain processing
 import { createSearchService } from './domain/search';
 // Phase 2 Services
 import { createAccountApiService, createAccountProcessor } from './domain/account';
@@ -81,9 +78,18 @@ import {
   nominationRepository,
   rewardRepository,
   eraRepository,
+  // Phase 3 repositories
+  accountRepository,
 } from '../database/repositories';
 
 // Phase 2: Dependency Management Services - Removed (replaced by queue-based approach)
+
+// Phase 2: Domain indexer imports
+import { createBlockIndexer } from './domain/block/BlockIndexer';
+import { createValidatorIndexer } from './domain/validator/ValidatorIndexer';
+import { createAccountIndexer } from './domain/account/AccountIndexer';
+import { createTransferIndexer } from './domain/transfer/TransferIndexer';
+import { AvailDataSubmissionIndexer } from './domain/dataSubmission/DataSubmissionIndexer';
 
 // Service Factory for dependency injection
 export class ServiceFactory {
@@ -347,30 +353,35 @@ export class ServiceFactory {
       // Note: transferProcessor doesn't need start() - it's stateless
       await analyticsService.start();
       
-      // Phase 2: Create Block Processing Orchestrator
-      const blockProcessingOrchestrator = createBlockProcessingOrchestrator(
-        selfHealingBlockProcessor,
-        queueService,
-        config.blockProcessing,
-      );
-
-      // Phase 3: Create Domain Processing Orchestrator
-      const domainProcessingOrchestrator = createDomainProcessingOrchestrator(
-        accountProcessor,
-        validatorProcessor,
-        transferProcessor,
-        dataSubmissionProcessor,
-      );
+      // Phase 2: Create domain indexers
+      const blockIndexer = createBlockIndexer(blockRepository, availBlockchainService);
+      const validatorIndexer = createValidatorIndexer(validatorRepository, availBlockchainService);
+      const accountIndexer = createAccountIndexer(availBlockchainService);
+      const transferIndexer = createTransferIndexer(transferRepository);
+      const dataSubmissionIndexer = new AvailDataSubmissionIndexer();
+      
+      // Register domain indexers
+      this.register('blockIndexer', blockIndexer);
+      this.register('validatorIndexer', validatorIndexer);
+      this.register('accountIndexer', accountIndexer);
+      this.register('transferIndexer', transferIndexer);
+      this.register('dataSubmissionIndexer', dataSubmissionIndexer);
+      
+      // Register repositories for DB-first dependency checking
+      this.register('validatorRepository', validatorRepository);
+      this.register('blockRepository', blockRepository);
+      this.register('transferRepository', transferRepository);
+      // Phase 3: Register AccountRepository for DB-first account checking
+      this.register('accountRepository', accountRepository);
+      
+      // Phase 3: Orchestrators removed - using independent domain processing via queue
 
       // Register new sync services
       this.register('syncService', syncService);
       this.register('blockIndexerService', blockIndexerService);
       // Phase 6: Register SelfHealingBlockProcessor instead of DataProcessorService
       this.register('selfHealingBlockProcessor', selfHealingBlockProcessor);
-      // Phase 2: Register Block Processing Orchestrator
-      this.register('blockProcessingOrchestrator', blockProcessingOrchestrator);
-      // Phase 3: Register Domain Processing Orchestrator
-      this.register('domainProcessingOrchestrator', domainProcessingOrchestrator);
+      // Phase 3: Orchestrators removed - using independent domain processing via queue
       
       // Start sync services
       await syncService.start();
@@ -387,10 +398,7 @@ export class ServiceFactory {
       });
       // Phase 6: Start SelfHealingBlockProcessor instead of DataProcessorService
       await selfHealingBlockProcessor.start();
-      // Phase 2: Start Block Processing Orchestrator
-      await blockProcessingOrchestrator.start();
-      // Phase 3: Start Domain Processing Orchestrator
-      await domainProcessingOrchestrator.start();
+      // Phase 3: Orchestrators removed - independent domain processing via queue
       
       console.log('✅ Domain services initialized successfully');
     } catch (error) {
@@ -428,8 +436,7 @@ export class ServiceFactory {
       
       // Define the shutdown order (reverse of startup order for proper dependency cleanup)
       const shutdownOrder = [
-        // Sync services (started last, should stop first) - Phase 4: Orchestrator takes priority
-        'blockProcessingOrchestrator',
+        // Sync services (started last, should stop first) - Phase 3: Orchestrators removed
         'selfHealingBlockProcessor', // Phase 4: Kept as fallback only
         'blockIndexerService', 
         'syncService',

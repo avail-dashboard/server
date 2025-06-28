@@ -1,7 +1,5 @@
 // Queue Job Data Types and Interfaces
 
-import { BlockData } from '../../types/blockchain';
-
 export interface JobProcessorDependencies {
   selfHealingBlockProcessor?: any;
   analyticsService?: any;
@@ -17,11 +15,7 @@ export interface ErrorClassification {
   alertLevel: 'low' | 'medium' | 'high' | 'critical';
 }
 
-// Phase 1: Queue Integration - Block domain processing job data
-export interface BlockDomainsJobData {
-  blockData: BlockData;
-  correlationId?: string;
-}
+
 
 // Phase 2: Dependency Job Data Interfaces - Adam's Implementation
 export interface DependencyDetectionJobData {
@@ -58,6 +52,29 @@ export interface DataSyncJobData {
 
 export interface BlockIndexingJobData {
   blockNumber: number;
+}
+
+// Phase 2: Domain indexing job data interfaces
+export interface ValidatorIndexingJobData {
+  validatorId: string;
+  _correlationId?: string;
+}
+
+export interface AccountIndexingJobData {
+  accountAddress: string;
+  _correlationId?: string;
+}
+
+export interface TransferIndexingJobData {
+  blockNumber: number;
+  transferIds: string[];
+  _correlationId?: string;
+}
+
+export interface DataSubmissionIndexingJobData {
+  startBlock: number;
+  endBlock: number;
+  _correlationId?: string;
 }
 
 export interface EnsureBlockJobData {

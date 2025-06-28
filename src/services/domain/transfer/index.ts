@@ -7,6 +7,7 @@
 // Core services
 export { TransferApiService, createTransferApiService } from './TransferApiService';
 export { TransferProcessor, createTransferProcessor } from './TransferProcessor';
+export { TransferIndexer, createTransferIndexer } from './TransferIndexer';
 
 // Interfaces and types
 export {
@@ -17,6 +18,11 @@ export {
   PaginationOptions,
   ITransferService,
 } from './TransferInterfaces';
+export {
+  ITransferIndexer,
+  TransferIndexingResult,
+  TransferData,
+} from './TransferIndexer';
 
 // Re-export for backward compatibility during migration
 export { TransferApiService as TransferService } from './TransferApiService';

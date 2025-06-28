@@ -1,6 +1,6 @@
-import { AvailBlockchainService, createAvailBlockchainService } from '../core/avail-blockchain';
-import { dataSubmissionRepository, rollupRepository, blockRepository, DataSubmissionCreateInput } from '../../database';
-import { logger, logError } from '../../utils/logger';
+import { AvailBlockchainService, createAvailBlockchainService } from '../../core/avail-blockchain';
+import { dataSubmissionRepository, rollupRepository, blockRepository, DataSubmissionCreateInput } from '../../../database';
+import { logger, logError } from '../../../utils/logger';
 
 export interface AvailDataSubmission {
   blockNumber: number;
@@ -358,7 +358,8 @@ export class AvailDataSubmissionIndexer {
 
     for (const [appIdStr, appSubmissions] of Object.entries(submissionsByAppId)) {
       const appId = parseInt(appIdStr);
-      const totalDataSize = appSubmissions.reduce((sum, sub) => sum + sub.dataSize, 0);
+      const submissions = appSubmissions as DataSubmissionCreateInput[];
+      const totalDataSize = submissions.reduce((sum: number, sub: DataSubmissionCreateInput) => sum + sub.dataSize, 0);
 
       try {
         await rollupRepository.upsert(
@@ -366,19 +367,19 @@ export class AvailDataSubmissionIndexer {
           {
             appId,
             name: `App ${appId}`,
-            firstSeenBlock: appSubmissions[0].blockNumber,
-            lastActiveBlock: Math.max(...appSubmissions.map(s => s.blockNumber)),
-            totalSubmissions: appSubmissions.length,
+            firstSeenBlock: submissions[0].blockNumber,
+            lastActiveBlock: Math.max(...submissions.map((s: DataSubmissionCreateInput) => s.blockNumber)),
+            totalSubmissions: submissions.length,
             totalDataSize,
             totalFeesPaid: 0,
           },
           {
-            lastActiveBlock: Math.max(...appSubmissions.map(s => s.blockNumber)),
+            lastActiveBlock: Math.max(...submissions.map((s: DataSubmissionCreateInput) => s.blockNumber)),
           },
         );
 
         await rollupRepository.incrementStats(appId, {
-          submissionsIncrement: appSubmissions.length,
+          submissionsIncrement: submissions.length,
           dataSizeIncrement: totalDataSize,
         });
 

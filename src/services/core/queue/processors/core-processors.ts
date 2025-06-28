@@ -6,7 +6,6 @@ import {
   JobProcessorDependencies, 
   BlockIndexingJobData, 
   DataSyncJobData,
-  BlockDomainsJobData,
 } from '../types';
 
 /**
@@ -30,116 +29,41 @@ export class CoreProcessors {
     private getService: <T>(serviceName: string) => Promise<T>,
   ) {}
 
-  /**
-   * PROCESS_BLOCK_DOMAINS processor - Phase 2: Pure Delegation
-   * 
-   * Simplified from 178 lines to ~20 lines
-   * Delegates all domain processing to SelfHealingBlockProcessor
-   */
-  async processBlockDomains(job: Job<BlockDomainsJobData>) {
-    const { blockData, correlationId } = job.data;
-    const startTime = Date.now();
-    
-    logger.info('🔧 PROCESSOR: Delegating block domains processing', {
-      component: 'block-domains-processor',
-      operation: 'processBlockDomains',
-      jobId: job.id,
-      blockNumber: blockData.number,
-      blockHash: blockData.hash,
-      correlationId: correlationId || (job.data as any)._correlationId,
-      timestamp: new Date().toISOString(),
-    });
 
-    try {
-      // Phase 3: Enhanced delegation to domain processing orchestrator
-      const domainOrchestrator = await this.getService<any>('domainProcessingOrchestrator');
-      const result = await domainOrchestrator.processAllDomainsForBlock(blockData, correlationId);
-
-      const duration = Date.now() - startTime;
-
-      logger.info('✅ PROCESSOR: Block domains processing completed via domain orchestrator', {
-        component: 'block-domains-processor',
-        operation: 'processingComplete',
-        jobId: job.id,
-        blockNumber: blockData.number,
-        blockHash: blockData.hash,
-        duration,
-        delegatedTo: 'domainProcessingOrchestrator',
-        strategy: result.strategy,
-        successfulServices: result.successfulServices,
-        totalServices: result.totalServices,
-        overallSuccess: result.overallSuccess,
-        timestamp: new Date().toISOString(),
-      });
-
-      return {
-        success: true,
-        data: {
-          blockNumber: blockData.number,
-          blockHash: blockData.hash,
-          delegatedTo: 'domainProcessingOrchestrator',
-          strategy: result.strategy,
-          successfulServices: result.successfulServices,
-          totalServices: result.totalServices,
-          overallSuccess: result.overallSuccess,
-        },
-        metrics: {
-          duration,
-          processingMethod: 'orchestrated-delegation',
-          serviceResults: result.serviceResults,
-        },
-      };
-
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      const classification = ErrorClassifier.classifyError(error as Error, JobType.PROCESS_BLOCK_DOMAINS);
-      
-      logger.error('❌ PROCESSOR: Block domains processing failed', {
-        component: 'block-domains-processor',
-        operation: 'processingFailed',
-        jobId: job.id,
-        blockNumber: blockData.number,
-        blockHash: blockData.hash,
-        error: (error as Error).message,
-        classification,
-        duration,
-        attempts: job.attemptsMade,
-        maxAttempts: job.opts?.attempts,
-        willRetry: classification.isRetryable && job.attemptsMade < (job.opts?.attempts || 3),
-        correlationId,
-      });
-      
-      throw error;
-    }
-  }
 
   /**
-   * BLOCK_INDEXING processor - Already clean, keeping as-is
+   * BLOCK_INDEXING processor - Phase 2: Updated with DB-first dependency queuing
    */
   async processBlockIndexing(job: Job<BlockIndexingJobData>) {
     const { blockNumber } = job.data;
     const startTime = Date.now();
     
-    logger.debug('Processing block indexing job', { 
+    logger.debug('Processing block indexing job with DB-first dependency queuing', { 
       component: 'queue-service',
       jobId: job.id, 
       blockNumber,
     });
     
     try {
-      // Get block indexer service
-      const blockIndexer = await this.getService<any>('blockIndexerService');
+      // Phase 2: Use new domain indexer instead of service
+      const blockIndexer = await this.getService<any>('blockIndexer');
       
-      // Index the block by number
-      await blockIndexer.indexBlockByNumber(blockNumber);
+      // Index the block and get dependency metadata
+      const result = await blockIndexer.indexBlock(blockNumber);
+      
+      // Phase 2: DB-first dependency checking and queuing
+      if (result.dependentEntities) {
+        await this.processDependencies(result.dependentEntities, blockNumber);
+      }
       
       const duration = Date.now() - startTime;
       
-      logger.debug('Block indexing completed successfully', {
+      logger.debug('Block indexing completed successfully with dependency queuing', {
         component: 'queue-service',
         jobId: job.id,
         blockNumber,
         duration,
+        dependenciesQueued: result.dependentEntities ? Object.keys(result.dependentEntities).length : 0,
       });
       
       return {
@@ -147,6 +71,8 @@ export class CoreProcessors {
         data: {
           blockNumber,
           indexed: true,
+          blockData: result.blockData,
+          dependenciesQueued: result.dependentEntities,
         },
         metrics: {
           duration,
@@ -191,16 +117,59 @@ export class CoreProcessors {
   }
 
   /**
-   * DATA_SYNC processor - Phase 2: Simplified Coordination
+   * Phase 2: DB-first dependency processing
+   */
+  private async processDependencies(dependencies: any, blockNumber: number) {
+    const { validators, accounts, transfers } = dependencies;
+    const queueService = await this.getService<any>('queue');
+    
+    // Check and queue validators
+    if (validators && validators.length > 0) {
+      for (const validatorId of validators) {
+        const validatorRepo = await this.getService<any>('validatorRepository');
+        const exists = await validatorRepo.exists(validatorId);
+        
+        if (!exists) {
+          await queueService.add('INDEX_VALIDATOR', { validatorId });
+          logger.debug('Queued validator indexing', { validatorId, blockNumber });
+        }
+      }
+    }
+    
+    // Check and queue accounts - Phase 3: Now using AccountRepository exists() method
+    if (accounts && accounts.length > 0) {
+      for (const accountAddress of accounts) {
+        const accountRepo = await this.getService<any>('accountRepository');
+        const exists = await accountRepo.exists(accountAddress);
+        
+        if (!exists) {
+          await queueService.add('INDEX_ACCOUNT', { accountAddress });
+          logger.debug('Queued account indexing', { accountAddress, blockNumber });
+        }
+      }
+    }
+    
+    // Queue transfers (always process for new blocks)
+    if (transfers && transfers.length > 0) {
+      await queueService.add('INDEX_TRANSFER', { 
+        blockNumber, 
+        transferIds: transfers,
+      });
+      logger.debug('Queued transfer indexing', { transferCount: transfers.length, blockNumber });
+    }
+  }
+
+  /**
+   * DATA_SYNC processor - Phase 2: Direct Domain Indexing
    * 
-   * Removed direct blockchain calls and complex processing logic
-   * Now focuses on coordination between indexer and queue services
+   * Updated to use direct domain indexing instead of orchestrator pattern
+   * Implements DB-first dependency checking for all domains
    */
   async processDataSync(job: Job<DataSyncJobData>) {
     const { startBlock, endBlock, batchIndex, totalBatches } = job.data;
     const startTime = Date.now();
     
-    logger.debug('Processing data sync job', { 
+    logger.debug('Processing data sync job with direct domain indexing', { 
       component: 'queue-service',
       jobId: job.id, 
       startBlock,
@@ -210,85 +179,30 @@ export class CoreProcessors {
     });
     
     try {
-      // Phase 2: Simple service coordination - no direct blockchain calls
-      const blockIndexer = await this.getService<any>('blockIndexerService');
+      const blockIndexer = await this.getService<any>('blockIndexer');
       const queueService = await this.getService<any>('queue');
       
-      // Phase 3: Enhanced indexing with domain processing preparation
-      const indexingResults = await blockIndexer.indexBlockRangeWithDomainPrep(startBlock, endBlock);
+      // Index blocks and collect dependencies
+      const indexingResults = await blockIndexer.indexBlockRange(startBlock, endBlock);
       
-      // Step 2: Schedule domain processing for each indexed block with enhanced metadata
+      // Schedule domain indexing for all dependencies
       const scheduledJobs = [];
-      for (const indexingResult of indexingResults) {
-        const block = indexingResult.blockData;
-        const metadata = indexingResult.domainProcessingMetadata;
-        
-        try {
-          const job = await queueService.scheduleBlockDomainProcessing(block, {
-            complexity: metadata.processingComplexity,
-            estimatedTime: metadata.estimatedProcessingTime,
-            requiresSequentialProcessing: metadata.requiresSequentialProcessing,
-          });
-          
-          scheduledJobs.push({
-            blockNumber: block.number,
-            jobId: job.id,
-            scheduled: true,
-            complexity: metadata.processingComplexity,
-            estimatedTime: metadata.estimatedProcessingTime,
-          });
-          
-          logger.debug('Block domain processing scheduled with metadata', {
-            component: 'queue-service',
-            jobId: job.id,
-            blockNumber: block.number,
-            complexity: metadata.processingComplexity,
-            estimatedTime: metadata.estimatedProcessingTime,
-            parentJobId: job.id,
-          });
-          
-        } catch (error) {
-          logger.error(`Failed to schedule domain processing for block ${block.number}`, {
-            component: 'queue-service',
-            jobId: job.id,
-            blockNumber: block.number,
-            error: (error as Error).message,
-          });
-          
-          scheduledJobs.push({
-            blockNumber: block.number,
-            scheduled: false,
-            error: (error as Error).message,
-          });
-        }
+      for (const result of indexingResults) {
+        const dependencyJobs = await this.scheduleBlockDependencies(result, queueService);
+        scheduledJobs.push(...dependencyJobs);
       }
       
       const duration = Date.now() - startTime;
       const successCount = scheduledJobs.filter(j => j.scheduled).length;
-      const failureCount = scheduledJobs.length - successCount;
       
-      // Calculate complexity distribution for enhanced reporting
-      const complexityDistribution = scheduledJobs.reduce((acc, job) => {
-        if (job.complexity) {
-          acc[job.complexity] = (acc[job.complexity] || 0) + 1;
-        }
-        return acc;
-      }, {} as Record<string, number>);
-      
-      logger.info('Data sync batch completed with enhanced metadata', {
+      logger.info('Data sync batch completed with direct domain indexing', {
         component: 'queue-service',
         jobId: job.id,
         startBlock,
         endBlock,
-        batchIndex,
-        totalBatches,
-        blocksRequested: endBlock - startBlock + 1,
         blocksIndexed: indexingResults.length,
-        jobsScheduled: successCount,
-        jobsFailed: failureCount,
-        complexityDistribution,
+        domainJobsScheduled: successCount,
         duration,
-        processingRate: indexingResults.length / (duration / 1000),
       });
       
       return {
@@ -296,19 +210,13 @@ export class CoreProcessors {
         data: {
           startBlock,
           endBlock,
-          batchIndex,
-          totalBatches,
-          blocksRequested: endBlock - startBlock + 1,
           blocksIndexed: indexingResults.length,
-          jobsScheduled: successCount,
-          jobsFailed: failureCount,
+          domainJobsScheduled: successCount,
           scheduledJobs,
-          complexityDistribution,
         },
         metrics: {
           duration,
           processingRate: indexingResults.length / (duration / 1000),
-          successRate: successCount / indexingResults.length * 100,
         },
       };
       
@@ -319,9 +227,6 @@ export class CoreProcessors {
       logger.error('Data sync job failed', {
         component: 'queue-service',
         jobId: job.id,
-        startBlock,
-        endBlock,
-        batchIndex,
         error: (error as Error).message,
         classification,
         duration,
@@ -329,6 +234,59 @@ export class CoreProcessors {
       
       throw error;
     }
+  }
+
+  /**
+   * Phase 2: Schedule block dependencies with DB-first checking
+   */
+  private async scheduleBlockDependencies(result: any, queueService: any) {
+    const { validators, accounts, transfers } = result.dependentEntities;
+    const scheduledJobs = [];
+    
+    // Schedule validator indexing with DB check
+    if (validators && validators.length > 0) {
+      for (const validatorId of validators) {
+        const validatorRepo = await this.getService<any>('validatorRepository');
+        const exists = await validatorRepo.exists(validatorId);
+        
+        if (!exists) {
+          try {
+            const job = await queueService.add('INDEX_VALIDATOR', { validatorId });
+            scheduledJobs.push({ type: 'validator', id: validatorId, jobId: job.id, scheduled: true });
+          } catch (error) {
+            scheduledJobs.push({ type: 'validator', id: validatorId, scheduled: false, error: (error as Error).message });
+          }
+        }
+      }
+    }
+    
+    // Schedule account indexing with DB check
+    if (accounts && accounts.length > 0) {
+      for (const accountAddress of accounts) {
+        // For now, we'll queue all accounts since we don't have account repository exists() yet
+        try {
+          const job = await queueService.add('INDEX_ACCOUNT', { accountAddress });
+          scheduledJobs.push({ type: 'account', id: accountAddress, jobId: job.id, scheduled: true });
+        } catch (error) {
+          scheduledJobs.push({ type: 'account', id: accountAddress, scheduled: false, error: (error as Error).message });
+        }
+      }
+    }
+    
+    // Schedule transfer indexing (always for new blocks)
+    if (transfers && transfers.length > 0) {
+      try {
+        const job = await queueService.add('INDEX_TRANSFER', { 
+          blockNumber: result.blockData.number, 
+          transferIds: transfers,
+        });
+        scheduledJobs.push({ type: 'transfer', blockNumber: result.blockData.number, jobId: job.id, scheduled: true });
+      } catch (error) {
+        scheduledJobs.push({ type: 'transfer', blockNumber: result.blockData.number, scheduled: false, error: (error as Error).message });
+      }
+    }
+    
+    return scheduledJobs;
   }
 
   /**
@@ -341,5 +299,252 @@ export class CoreProcessors {
     // const health = await this.getHealth();
     
     return { success: true, message: 'Health check completed' };
+  }
+
+  /**
+   * Phase 2: INDEX_VALIDATOR processor
+   */
+  async processValidatorIndexing(job: Job<any>) {
+    const { validatorId } = job.data;
+    const startTime = Date.now();
+    
+    logger.info('🔧 PROCESSOR: Starting validator indexing', {
+      component: 'validator-indexing-processor',
+      operation: 'processValidatorIndexing',
+      jobId: job.id,
+      validatorId,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const validatorIndexer = await this.getService<any>('validatorIndexer');
+      const result = await validatorIndexer.indexValidator(validatorId);
+      
+      const duration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info('✅ PROCESSOR: Validator indexing completed', {
+          component: 'validator-indexing-processor',
+          operation: 'indexingComplete',
+          jobId: job.id,
+          validatorId,
+          duration,
+          timestamp: new Date().toISOString(),
+        });
+
+        return {
+          success: true,
+          data: {
+            validatorId,
+            indexed: true,
+            validatorData: result.validatorData,
+          },
+          metrics: { duration },
+        };
+      } else {
+        throw new Error(result.error || 'Validator indexing failed');
+      }
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const classification = ErrorClassifier.classifyError(error as Error, JobType.INDEX_VALIDATOR);
+      
+      logger.error('❌ PROCESSOR: Validator indexing failed', {
+        component: 'validator-indexing-processor',
+        operation: 'indexingFailed',
+        jobId: job.id,
+        validatorId,
+        error: (error as Error).message,
+        classification,
+        duration,
+        attempts: job.attemptsMade,
+        maxAttempts: job.opts?.attempts,
+        willRetry: classification.isRetryable && job.attemptsMade < (job.opts?.attempts || 3),
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Phase 2: INDEX_ACCOUNT processor
+   */
+  async processAccountIndexing(job: Job<any>) {
+    const { accountAddress } = job.data;
+    const startTime = Date.now();
+    
+    logger.info('🔧 PROCESSOR: Starting account indexing', {
+      component: 'account-indexing-processor',
+      jobId: job.id,
+      accountAddress,
+    });
+
+    try {
+      const accountIndexer = await this.getService<any>('accountIndexer');
+      const result = await accountIndexer.indexAccount(accountAddress);
+      
+      const duration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info('✅ PROCESSOR: Account indexing completed', {
+          component: 'account-indexing-processor',
+          jobId: job.id,
+          accountAddress,
+          duration,
+        });
+
+        return {
+          success: true,
+          data: {
+            accountAddress,
+            indexed: true,
+            accountData: result.accountData,
+          },
+          metrics: { duration },
+        };
+      } else {
+        throw new Error(result.error || 'Account indexing failed');
+      }
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const classification = ErrorClassifier.classifyError(error as Error, JobType.INDEX_ACCOUNT);
+      
+      logger.error('❌ PROCESSOR: Account indexing failed', {
+        component: 'account-indexing-processor',
+        jobId: job.id,
+        accountAddress,
+        error: (error as Error).message,
+        classification,
+        duration,
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Phase 2: INDEX_TRANSFER processor
+   */
+  async processTransferIndexing(job: Job<any>) {
+    const { blockNumber, transferIds } = job.data;
+    const startTime = Date.now();
+    
+    logger.info('🔧 PROCESSOR: Starting transfer indexing', {
+      component: 'transfer-indexing-processor',
+      jobId: job.id,
+      blockNumber,
+      transferCount: transferIds?.length || 0,
+    });
+
+    try {
+      // Get block data for transfer extraction
+      const blockIndexer = await this.getService<any>('blockIndexer');
+      const blockResult = await blockIndexer.indexBlock(blockNumber);
+      
+      const transferIndexer = await this.getService<any>('transferIndexer');
+      const result = await transferIndexer.indexTransfersForBlock(blockResult.blockData);
+      
+      const duration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info('✅ PROCESSOR: Transfer indexing completed', {
+          component: 'transfer-indexing-processor',
+          jobId: job.id,
+          blockNumber,
+          transfersProcessed: result.transfersProcessed,
+          duration,
+        });
+
+        return {
+          success: true,
+          data: {
+            blockNumber,
+            transfersProcessed: result.transfersProcessed,
+            transfers: result.transfers,
+          },
+          metrics: { duration },
+        };
+      } else {
+        throw new Error(result.error || 'Transfer indexing failed');
+      }
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const classification = ErrorClassifier.classifyError(error as Error, JobType.INDEX_TRANSFER);
+      
+      logger.error('❌ PROCESSOR: Transfer indexing failed', {
+        component: 'transfer-indexing-processor',
+        jobId: job.id,
+        blockNumber,
+        error: (error as Error).message,
+        classification,
+        duration,
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Phase 2: INDEX_DATA_SUBMISSION processor
+   */
+  async processDataSubmissionIndexing(job: Job<any>) {
+    const { startBlock, endBlock } = job.data;
+    const startTime = Date.now();
+    
+    logger.info('🔧 PROCESSOR: Starting data submission indexing', {
+      component: 'data-submission-indexing-processor',
+      jobId: job.id,
+      startBlock,
+      endBlock,
+    });
+
+    try {
+      const dataSubmissionIndexer = await this.getService<any>('dataSubmissionIndexer');
+      const result = await dataSubmissionIndexer.indexBlockRange(startBlock, endBlock);
+      
+      const duration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info('✅ PROCESSOR: Data submission indexing completed', {
+          component: 'data-submission-indexing-processor',
+          jobId: job.id,
+          startBlock,
+          endBlock,
+          submissionsProcessed: result.submissionsProcessed,
+          duration,
+        });
+
+        return {
+          success: true,
+          data: {
+            startBlock,
+            endBlock,
+            submissionsProcessed: result.submissionsProcessed,
+            submissions: result.submissions,
+          },
+          metrics: { duration },
+        };
+      } else {
+        throw new Error(result.error || 'Data submission indexing failed');
+      }
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const classification = ErrorClassifier.classifyError(error as Error, JobType.INDEX_DATA_SUBMISSION);
+      
+      logger.error('❌ PROCESSOR: Data submission indexing failed', {
+        component: 'data-submission-indexing-processor',
+        jobId: job.id,
+        startBlock,
+        endBlock,
+        error: (error as Error).message,
+        classification,
+        duration,
+      });
+      
+      throw error;
+    }
   }
 }

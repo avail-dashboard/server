@@ -46,6 +46,17 @@ export class TransferRepository extends BaseRepository {
   }
 
   /**
+   * Check if transfer exists by ID
+   */
+  async exists(id: string): Promise<boolean> {
+    const result = await this.prisma.transfer.findFirst({
+      where: { id },
+      select: { id: true },
+    });
+    return result !== null;
+  }
+
+  /**
    * Find transfer with full relations
    */
   async findWithRelations(id: string): Promise<TransferWithRelations | null> {
