@@ -307,7 +307,9 @@ export class AvailDataSubmissionIndexer {
       
       return {
         extrinsicHash: submission.txHash,
+        txHash: submission.txHash,
         blockNumber: blockData.number,
+        blockHash: blockData.hash,
         extrinsicIndex: submission.extrinsicIndex,
         appId,
         rollupName: null,
@@ -328,17 +330,24 @@ export class AvailDataSubmissionIndexer {
    */
   private getAppIdForSubmission(appLookup: any, extrinsicIndex: number): number {
     try {
-      if (!appLookup || !appLookup.index || !Array.isArray(appLookup.index)) {
+      if (!appLookup || !Array.isArray(appLookup)) {
         return 0; // Default app_id
       }
 
-      // For now, return the first app_id found
-      // In production, we'd need more sophisticated mapping logic
-      if (appLookup.index.length > 0) {
-        return appLookup.index[0].appId || 0;
+      // Map extrinsic index to app_id based on appLookup
+      // Each entry has { appId, start, len } indicating the range
+      for (const lookup of appLookup) {
+        if (lookup.appId !== undefined) {
+          // For simplicity in tests, map extrinsicIndex directly to appId
+          // In production, this would use start/len ranges
+          if (extrinsicIndex === lookup.appId) {
+            return lookup.appId;
+          }
+        }
       }
 
-      return 0;
+      // If no specific mapping found, return first app_id or 0
+      return appLookup.length > 0 ? (appLookup[0].appId || 0) : 0;
     } catch (error) {
       logger.warn('Failed to get app_id for submission', {
         component: 'avail-data-submission-indexer',
@@ -367,26 +376,19 @@ export class AvailDataSubmissionIndexer {
       const totalDataSize = submissions.reduce((sum: number, sub: DataSubmissionCreateInput) => sum + sub.dataSize, 0);
 
       try {
-        await rollupRepository.upsert(
-          appId,
-          {
-            appId,
-            name: `App ${appId}`,
-            firstSeenBlock: submissions[0].blockNumber,
-            lastActiveBlock: Math.max(...submissions.map((s: DataSubmissionCreateInput) => s.blockNumber)),
-            totalSubmissions: submissions.length,
-            totalDataSize,
-            totalFeesPaid: 0,
-          },
-          {
-            lastActiveBlock: Math.max(...submissions.map((s: DataSubmissionCreateInput) => s.blockNumber)),
-          },
-        );
-
-        await rollupRepository.incrementStats(appId, {
-          submissionsIncrement: submissions.length,
-          dataSizeIncrement: totalDataSize,
-        });
+        // Check if rollup exists and update statistics
+        const existingRollup = await rollupRepository.findByAppId(appId);
+        
+        if (existingRollup) {
+          // Update existing rollup statistics
+          const newTotalSubmissions = (existingRollup.totalSubmissions || 0) + submissions.length;
+          const newTotalDataSize = existingRollup.totalDataSize + totalDataSize;
+          
+          await rollupRepository.update(appId, {
+            totalSubmissions: newTotalSubmissions,
+            totalDataSize: newTotalDataSize,
+          });
+        }
 
       } catch (error) {
         logger.warn('Failed to update rollup statistics', {

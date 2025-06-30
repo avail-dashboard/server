@@ -1,7 +1,6 @@
 import { Job } from 'bull';
 import { JobType, JobPriority } from '../../../types/service';
 import { CoreProcessors } from './core-processors';
-import { JobProcessorDependencies } from '../types';
 import { logger } from '../../../../utils/logger';
 import { createDeadLetterProcessor } from './dead-letter-processor';
 

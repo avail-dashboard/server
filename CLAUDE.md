@@ -37,3 +37,24 @@ In your team, you've 2 developers (Adam/Brian) and a senior developer (John). Yo
   - Reviewing existing code - Question why patterns exist
   - Debugging issues - Look for architectural root causes
   - Planning features - Design simple solutions upfront
+
+## Integration Testing Learnings
+
+**Critical Issues Encountered in Queue Integration Tests:**
+
+1. **Valid Test Data**: Always use real, valid Substrate addresses in tests. Mock addresses like `5D5ZbGH...` contain invalid base58 characters and cause blockchain service validation failures. Use known test addresses like Alice (`5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY`).
+
+2. **Mock Strategy Consistency**: When testing integration between real services (like QueueService) and mocked components (like domain indexers), ensure mock responses align with real API expectations. Mixed real/mock strategies can cause cascade failures.
+
+3. **Async Timing**: Integration tests with real queue processing need proper timing. Use adequate timeouts (1500ms+) for job processing and retries. Short timeouts cause false negatives in async operations.
+
+4. **Database Constraints**: Test setup must establish proper entity relationships to avoid foreign key constraint violations. Ensure validators exist before creating blocks that reference them.
+
+5. **Queue Service Testing**: Real queue integration requires proper Redis setup with separate test database (`db: 1`) and cleanup between tests to avoid interference.
+
+**Best Practices:**
+- Use valid blockchain addresses in all tests
+- Allow sufficient time for async job processing  
+- Establish complete entity relationships in test setup
+- Clean up Redis state between test runs
+- Mock consistently (either full integration or full mocking)
