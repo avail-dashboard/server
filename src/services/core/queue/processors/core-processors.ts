@@ -3,29 +3,27 @@ import { logger } from '../../../../utils/logger';
 import { JobType } from '../../../types/service';
 import { ErrorClassifier } from '../error-classifier';
 import { 
-  JobProcessorDependencies, 
   BlockIndexingJobData, 
   DataSyncJobData,
 } from '../types';
 
 /**
- * Core Job Processors - Phase 2: Simplified Pure Coordinators
+ * Core Job Processors - Phase 3: Simple Independent Processing
  * 
- * These processors handle coordination only:
- * - BLOCK_INDEXING: Individual block storage coordination
- * - DATA_SYNC: Batch synchronization coordination 
+ * Simplified processors with minimal coordination:
+ * - BLOCK_INDEXING: Direct block indexing
+ * - DATA_SYNC: Simple batch block indexing
  * - HEALTH_CHECK: System health validation
- * - PROCESS_BLOCK_DOMAINS: Pure delegation to domain services
+ * - Domain indexers handle their own cross-domain dependencies
  * 
- * Phase 2 Changes:
- * - Removed 315+ lines of complex business logic
- * - Queue processors now delegate to dedicated services
- * - Single responsibility: coordinate job execution
- * - No more direct domain processing or blockchain calls
+ * Phase 3 Changes:
+ * - Removed complex dependency coordination
+ * - Removed batch optimization logic
+ * - Domain indexers are independent and self-contained
+ * - No centralized coordination needed
  */
 export class CoreProcessors {
   constructor(
-    private dependencies: JobProcessorDependencies,
     private getService: <T>(serviceName: string) => Promise<T>,
   ) {}
 
@@ -51,10 +49,8 @@ export class CoreProcessors {
       // Index the block and get dependency metadata
       const result = await blockIndexer.indexBlock(blockNumber);
       
-      // Phase 2: DB-first dependency checking and queuing
-      if (result.dependentEntities) {
-        await this.processDependencies(result.dependentEntities, blockNumber);
-      }
+      // Phase 3: Domain indexers handle their own cross-domain dependencies
+      // No centralized coordination needed - each indexer queues its own dependencies
       
       const duration = Date.now() - startTime;
       
@@ -116,48 +112,6 @@ export class CoreProcessors {
     }
   }
 
-  /**
-   * Phase 2: DB-first dependency processing
-   */
-  private async processDependencies(dependencies: any, blockNumber: number) {
-    const { validators, accounts, transfers } = dependencies;
-    const queueService = await this.getService<any>('queue');
-    
-    // Check and queue validators
-    if (validators && validators.length > 0) {
-      for (const validatorId of validators) {
-        const validatorRepo = await this.getService<any>('validatorRepository');
-        const exists = await validatorRepo.exists(validatorId);
-        
-        if (!exists) {
-          await queueService.add('INDEX_VALIDATOR', { validatorId });
-          logger.debug('Queued validator indexing', { validatorId, blockNumber });
-        }
-      }
-    }
-    
-    // Check and queue accounts - Phase 3: Now using AccountRepository exists() method
-    if (accounts && accounts.length > 0) {
-      for (const accountAddress of accounts) {
-        const accountRepo = await this.getService<any>('accountRepository');
-        const exists = await accountRepo.exists(accountAddress);
-        
-        if (!exists) {
-          await queueService.add('INDEX_ACCOUNT', { accountAddress });
-          logger.debug('Queued account indexing', { accountAddress, blockNumber });
-        }
-      }
-    }
-    
-    // Queue transfers (always process for new blocks)
-    if (transfers && transfers.length > 0) {
-      await queueService.add('INDEX_TRANSFER', { 
-        blockNumber, 
-        transferIds: transfers,
-      });
-      logger.debug('Queued transfer indexing', { transferCount: transfers.length, blockNumber });
-    }
-  }
 
   /**
    * DATA_SYNC processor - Phase 2: Direct Domain Indexing
@@ -180,28 +134,18 @@ export class CoreProcessors {
     
     try {
       const blockIndexer = await this.getService<any>('blockIndexer');
-      const queueService = await this.getService<any>('queue');
       
-      // Index blocks and collect dependencies
+      // Phase 3: Simple block indexing - domain indexers handle their own dependencies
       const indexingResults = await blockIndexer.indexBlockRange(startBlock, endBlock);
       
-      // Schedule domain indexing for all dependencies
-      const scheduledJobs = [];
-      for (const result of indexingResults) {
-        const dependencyJobs = await this.scheduleBlockDependencies(result, queueService);
-        scheduledJobs.push(...dependencyJobs);
-      }
-      
       const duration = Date.now() - startTime;
-      const successCount = scheduledJobs.filter(j => j.scheduled).length;
       
-      logger.info('Data sync batch completed with direct domain indexing', {
+      logger.info('Data sync batch completed with independent domain indexing', {
         component: 'queue-service',
         jobId: job.id,
         startBlock,
         endBlock,
         blocksIndexed: indexingResults.length,
-        domainJobsScheduled: successCount,
         duration,
       });
       
@@ -211,8 +155,6 @@ export class CoreProcessors {
           startBlock,
           endBlock,
           blocksIndexed: indexingResults.length,
-          domainJobsScheduled: successCount,
-          scheduledJobs,
         },
         metrics: {
           duration,
@@ -236,58 +178,6 @@ export class CoreProcessors {
     }
   }
 
-  /**
-   * Phase 2: Schedule block dependencies with DB-first checking
-   */
-  private async scheduleBlockDependencies(result: any, queueService: any) {
-    const { validators, accounts, transfers } = result.dependentEntities;
-    const scheduledJobs = [];
-    
-    // Schedule validator indexing with DB check
-    if (validators && validators.length > 0) {
-      for (const validatorId of validators) {
-        const validatorRepo = await this.getService<any>('validatorRepository');
-        const exists = await validatorRepo.exists(validatorId);
-        
-        if (!exists) {
-          try {
-            const job = await queueService.add('INDEX_VALIDATOR', { validatorId });
-            scheduledJobs.push({ type: 'validator', id: validatorId, jobId: job.id, scheduled: true });
-          } catch (error) {
-            scheduledJobs.push({ type: 'validator', id: validatorId, scheduled: false, error: (error as Error).message });
-          }
-        }
-      }
-    }
-    
-    // Schedule account indexing with DB check
-    if (accounts && accounts.length > 0) {
-      for (const accountAddress of accounts) {
-        // For now, we'll queue all accounts since we don't have account repository exists() yet
-        try {
-          const job = await queueService.add('INDEX_ACCOUNT', { accountAddress });
-          scheduledJobs.push({ type: 'account', id: accountAddress, jobId: job.id, scheduled: true });
-        } catch (error) {
-          scheduledJobs.push({ type: 'account', id: accountAddress, scheduled: false, error: (error as Error).message });
-        }
-      }
-    }
-    
-    // Schedule transfer indexing (always for new blocks)
-    if (transfers && transfers.length > 0) {
-      try {
-        const job = await queueService.add('INDEX_TRANSFER', { 
-          blockNumber: result.blockData.number, 
-          transferIds: transfers,
-        });
-        scheduledJobs.push({ type: 'transfer', blockNumber: result.blockData.number, jobId: job.id, scheduled: true });
-      } catch (error) {
-        scheduledJobs.push({ type: 'transfer', blockNumber: result.blockData.number, scheduled: false, error: (error as Error).message });
-      }
-    }
-    
-    return scheduledJobs;
-  }
 
   /**
    * HEALTH_CHECK processor - Simple system validation

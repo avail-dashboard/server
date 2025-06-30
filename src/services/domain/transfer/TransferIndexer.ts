@@ -31,9 +31,11 @@ export interface TransferData {
 
 export class TransferIndexer implements ITransferIndexer {
   private transferRepository: TransferRepository;
+  private queueService?: any;
 
-  constructor(transferRepository: TransferRepository) {
+  constructor(transferRepository: TransferRepository, queueService?: any) {
     this.transferRepository = transferRepository;
+    this.queueService = queueService;
   }
 
   async indexTransfersForBlock(blockData: BlockData): Promise<TransferIndexingResult> {
@@ -47,6 +49,9 @@ export class TransferIndexer implements ITransferIndexer {
           storedTransfers.push(...result.transfers);
         }
       }
+
+      // Queue cross-domain account indexing jobs for all transfer participants
+      await this.queueAccountDependencies(storedTransfers);
 
       return {
         transfersProcessed: storedTransfers.length,
@@ -155,10 +160,67 @@ export class TransferIndexer implements ITransferIndexer {
 
     return transfers;
   }
+
+  /**
+   * Queue account indexing jobs for transfer participants
+   */
+  private async queueAccountDependencies(transfers: TransferData[]): Promise<void> {
+    if (!this.queueService) {
+      logger.debug('Queue service not available, skipping cross-domain job queuing', {
+        component: 'transfer-indexer',
+        transferCount: transfers.length,
+      });
+      return;
+    }
+
+    try {
+      const accountsToQueue = new Set<string>();
+
+      // Extract all unique account addresses from transfers
+      transfers.forEach(transfer => {
+        accountsToQueue.add(transfer.fromAddress);
+        accountsToQueue.add(transfer.toAddress);
+      });
+
+      // Queue account indexing jobs
+      let queuedCount = 0;
+      for (const accountAddress of accountsToQueue) {
+        try {
+          await this.queueService.addJob('INDEX_ACCOUNT', { accountAddress });
+          queuedCount++;
+          logger.debug('Queued account indexing job from transfer', {
+            component: 'transfer-indexer',
+            accountAddress,
+          });
+        } catch (error) {
+          logger.warn('Failed to queue account indexing job', {
+            component: 'transfer-indexer',
+            accountAddress,
+            error: (error as Error).message,
+          });
+        }
+      }
+
+      logger.info('Cross-domain account jobs queued from transfer indexing', {
+        component: 'transfer-indexer',
+        transfersProcessed: transfers.length,
+        uniqueAccounts: accountsToQueue.size,
+        queuedJobs: queuedCount,
+      });
+
+    } catch (error) {
+      logger.error('Failed to queue cross-domain account dependencies', {
+        component: 'transfer-indexer',
+        transferCount: transfers.length,
+        error: (error as Error).message,
+      });
+    }
+  }
 }
 
 export const createTransferIndexer = (
   transferRepository: TransferRepository,
+  queueService?: any,
 ): TransferIndexer => {
-  return new TransferIndexer(transferRepository);
+  return new TransferIndexer(transferRepository, queueService);
 }; 

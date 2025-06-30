@@ -53,13 +53,16 @@ export interface ValidatorData {
 export class ValidatorIndexer implements IValidatorIndexer {
   private validatorRepository: ValidatorRepository;
   private blockchain: AvailBlockchainService;
+  private queueService?: any;
 
   constructor(
     validatorRepository: ValidatorRepository,
     blockchain: AvailBlockchainService,
+    queueService?: any,
   ) {
     this.validatorRepository = validatorRepository;
     this.blockchain = blockchain;
+    this.queueService = queueService;
   }
 
   /**
@@ -145,6 +148,9 @@ export class ValidatorIndexer implements IValidatorIndexer {
         duration,
       });
 
+      // Queue cross-domain account indexing jobs
+      await this.queueAccountDependencies(validatorData);
+
       return {
         validatorData,
         success: true,
@@ -198,6 +204,71 @@ export class ValidatorIndexer implements IValidatorIndexer {
     });
 
     return results;
+  }
+
+  /**
+   * Queue account indexing jobs for validator dependencies
+   */
+  private async queueAccountDependencies(validatorData: ValidatorData): Promise<void> {
+    if (!this.queueService) {
+      logger.debug('Queue service not available, skipping cross-domain job queuing', {
+        component: 'validator-indexer',
+        validatorId: validatorData.accountId,
+      });
+      return;
+    }
+
+    try {
+      const accountsToQueue = new Set<string>();
+
+      // Add stash address (main validator account)
+      accountsToQueue.add(validatorData.stash);
+
+      // Add controller address if different from stash
+      if (validatorData.controller && validatorData.controller !== validatorData.stash) {
+        accountsToQueue.add(validatorData.controller);
+      }
+
+      // Add all nominator addresses
+      validatorData.nominators.forEach(nominator => {
+        accountsToQueue.add(nominator);
+      });
+
+      // Queue account indexing jobs with DB-first checking
+      let queuedCount = 0;
+      for (const accountAddress of accountsToQueue) {
+        try {
+          await this.queueService.addJob('INDEX_ACCOUNT', { accountAddress });
+          queuedCount++;
+          logger.debug('Queued account indexing job', {
+            component: 'validator-indexer',
+            accountAddress,
+            triggeredBy: validatorData.accountId,
+          });
+        } catch (error) {
+          logger.warn('Failed to queue account indexing job', {
+            component: 'validator-indexer',
+            accountAddress,
+            error: (error as Error).message,
+          });
+        }
+      }
+
+      logger.info('Cross-domain account jobs queued from validator indexing', {
+        component: 'validator-indexer',
+        validatorId: validatorData.accountId,
+        totalAccounts: accountsToQueue.size,
+        queuedJobs: queuedCount,
+        nominators: validatorData.nominators.length,
+      });
+
+    } catch (error) {
+      logger.error('Failed to queue cross-domain dependencies', {
+        component: 'validator-indexer',
+        validatorId: validatorData.accountId,
+        error: (error as Error).message,
+      });
+    }
   }
 
   /**
@@ -295,6 +366,7 @@ export class ValidatorIndexer implements IValidatorIndexer {
 export const createValidatorIndexer = (
   validatorRepository: ValidatorRepository,
   blockchain: AvailBlockchainService,
+  queueService?: any,
 ): ValidatorIndexer => {
-  return new ValidatorIndexer(validatorRepository, blockchain);
+  return new ValidatorIndexer(validatorRepository, blockchain, queueService);
 }; 

@@ -62,9 +62,8 @@ export class QueueService implements QueueServiceInterface {
       availableDependencies: Object.keys(dependencies),
     });
     
-    // Initialize processor registry with dependencies
+    // Initialize processor registry
     this.processorRegistry = new JobProcessorRegistry(
-      dependencies,
       this.getService.bind(this),
       this.addJob.bind(this),
     );
@@ -938,9 +937,8 @@ export class QueueService implements QueueServiceInterface {
       try {
         const config = await import('../../../config');
         if (config.default.queueProcessing.blockDomains.priorityAssignment === 'auto') {
-          // We need to get the CoreProcessors instance to calculate priority
-          // For now, use a simple heuristic based on block characteristics
-          calculatedPriority = this.calculateSimplePriority(blockData);
+          // Phase 3: Simple priority - all blocks treated equally
+          calculatedPriority = JobPriority.MEDIUM;
           
           logger.info('🎯 QUEUE: Auto-calculated block priority', {
             component: 'queue-service',
@@ -965,7 +963,7 @@ export class QueueService implements QueueServiceInterface {
       }
     }
 
-    // Phase 3: PROCESS_BLOCK_DOMAINS removed - use BLOCK_INDEXING instead
+    // Phase 3: Simple block indexing
     const job = await this.addJob(JobType.BLOCK_INDEXING, { blockNumber: blockData.number }, {
       priority: calculatedPriority,
       attempts: 3,
@@ -987,125 +985,8 @@ export class QueueService implements QueueServiceInterface {
     return job;
   }
 
-  /**
-   * Simple priority calculation based on block characteristics
-   * This is a fallback when CoreProcessors is not available
-   */
-  private calculateSimplePriority(blockData: any): JobPriority {
-    const extrinsicsCount = blockData.extrinsics?.length || 0;
-    const eventsCount = blockData.events?.length || 0;
-    
-    // Simple heuristics
-    if (extrinsicsCount > 100 || eventsCount > 200) {
-      return JobPriority.CRITICAL;
-    }
-    
-    if (extrinsicsCount > 50 || eventsCount > 100) {
-      return JobPriority.HIGH;
-    }
-    
-    return JobPriority.MEDIUM;
-  }
 
-  /**
-   * Schedule batch of blocks with optimized processing order
-   * Phase 3: Batch Optimization
-   */
-  async scheduleBlockBatch(blocks: any[]): Promise<QueueJob[]> {
-    const startTime = Date.now();
-    
-    logger.info('🔧 QUEUE: Scheduling block batch', {
-      component: 'queue-service',
-      operation: 'scheduleBlockBatch',
-      batchSize: blocks.length,
-      blockRange: blocks.length > 0 ? `${blocks[0].number}-${blocks[blocks.length - 1].number}` : 'empty',
-    });
 
-    try {
-      // Optimize batch processing order
-      const optimizedBlocks = await this.optimizeBatchOrder(blocks);
-      
-      // Schedule all blocks in parallel
-      const jobs = await Promise.all(
-        optimizedBlocks.map(block => this.scheduleBlockDomainProcessingWithPriority(block)),
-      );
-
-      const duration = Date.now() - startTime;
-      
-      logger.info('✅ QUEUE: Block batch scheduled successfully', {
-        component: 'queue-service',
-        operation: 'scheduleBlockBatch',
-        batchSize: blocks.length,
-        jobsCreated: jobs.length,
-        batchDuration: duration,
-        jobIds: jobs.map(j => j.id),
-      });
-
-      return jobs;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      
-      logger.error('❌ QUEUE: Failed to schedule block batch', {
-        component: 'queue-service',
-        operation: 'scheduleBlockBatch',
-        batchSize: blocks.length,
-        error: (error as Error).message,
-        duration,
-      });
-      
-      throw error;
-    }
-  }
-
-  /**
-   * Optimize the order of blocks in a batch for better processing efficiency
-   */
-  private async optimizeBatchOrder(blocks: any[]): Promise<any[]> {
-    const config = await import('../../../config');
-    
-    if (!config.default.queueProcessing.blockDomains.optimization.enableBatchOptimization) {
-      return blocks; // Return original order if optimization disabled
-    }
-
-    logger.debug('🔧 QUEUE: Optimizing batch order', {
-      component: 'queue-service',
-      operation: 'optimizeBatchOrder',
-      originalOrder: blocks.map(b => b.number),
-    });
-
-    // Group blocks by complexity
-    const simpleBlocks = [];
-    const complexBlocks = [];
-    const criticalBlocks = [];
-
-    for (const block of blocks) {
-      const priority = this.calculateSimplePriority(block);
-      
-      if (priority === JobPriority.CRITICAL) {
-        criticalBlocks.push(block);
-      } else if (priority === JobPriority.HIGH) {
-        complexBlocks.push(block);
-      } else {
-        simpleBlocks.push(block);
-      }
-    }
-
-    // Process critical blocks first, then complex, then simple
-    const optimizedOrder = [...criticalBlocks, ...complexBlocks, ...simpleBlocks];
-    
-    logger.debug('✅ QUEUE: Batch order optimized', {
-      component: 'queue-service',
-      operation: 'optimizeBatchOrder',
-      optimizedOrder: optimizedOrder.map(b => b.number),
-      distribution: {
-        critical: criticalBlocks.length,
-        complex: complexBlocks.length,
-        simple: simpleBlocks.length,
-      },
-    });
-
-    return optimizedOrder;
-  }
 
   /**
    * Get queue health metrics for monitoring

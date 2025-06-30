@@ -18,7 +18,6 @@ import { logger } from '../src/utils/logger';
 import { initializeCorrelationId } from '../src/utils/correlationId';
 import db from '../src/utils/database';
 import { AvailBlockchainService } from '../src/services/core/avail-blockchain';
-import { createBlockIndexerService } from '../src/services/domain/indexer';
 import { ServiceFactory } from '../src/services';
 import { SyncService } from '../src/services/core/sync';
 import { QueueService } from '../src/services/core/queue';
@@ -35,7 +34,6 @@ interface SyncOptions {
 class StandaloneSyncScript {
   private serviceFactory: ServiceFactory;
   private blockchain: AvailBlockchainService;
-  private indexer: ReturnType<typeof createBlockIndexerService>;
   private syncService: SyncService;
   private queueService: QueueService;
   private shouldStop = false;
@@ -70,9 +68,7 @@ class StandaloneSyncScript {
       this.syncService = this.serviceFactory.get('syncService');
       this.queueService = this.serviceFactory.get('queue');
       
-      // Create independent indexer (for job scheduling coordination)
-      this.indexer = createBlockIndexerService(db, this.blockchain);
-      await this.indexer.start();
+      // Phase 3: Queue-based architecture - no independent indexer needed
       
       logger.info('✅ All coordination services initialized (Queue-Based Architecture)');
       logger.info('📊 Sync script ready for pure job scheduling');
@@ -90,10 +86,7 @@ class StandaloneSyncScript {
     try {
       logger.info('🧹 Shutting down services...');
 
-      // Stop independent indexer
-      if (this.indexer) {
-        await this.indexer.stop();
-      }
+      // Phase 3: No independent indexer to stop
       
       // Shutdown ServiceFactory (handles all queue-based services)
       if (this.serviceFactory && this.serviceFactory.isInitialized()) {

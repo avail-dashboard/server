@@ -37,9 +37,11 @@ export interface AccountData {
 
 export class AccountIndexer implements IAccountIndexer {
   private blockchain: AvailBlockchainService;
+  private queueService?: any;
 
-  constructor(blockchain: AvailBlockchainService) {
+  constructor(blockchain: AvailBlockchainService, queueService?: any) {
     this.blockchain = blockchain;
+    this.queueService = queueService;
   }
 
   /**
@@ -74,8 +76,12 @@ export class AccountIndexer implements IAccountIndexer {
         accountAddress,
         balance: accountInfo.balance.free,
         nonce: accountInfo.nonce,
+        isValidator: accountInfo.isValidator,
         duration,
       });
+
+      // Queue cross-domain validator indexing job if account is a validator
+      await this.queueValidatorDependencies(accountInfo);
 
       return {
         accountData: accountInfo,
@@ -130,6 +136,39 @@ export class AccountIndexer implements IAccountIndexer {
     });
 
     return results;
+  }
+
+  /**
+   * Queue validator indexing job if account is a validator
+   */
+  private async queueValidatorDependencies(accountData: AccountData): Promise<void> {
+    if (!this.queueService) {
+      logger.debug('Queue service not available, skipping cross-domain job queuing', {
+        component: 'account-indexer',
+        accountAddress: accountData.address,
+      });
+      return;
+    }
+
+    try {
+      // Only queue validator indexing if account is identified as a validator
+      if (accountData.isValidator) {
+        await this.queueService.addJob('INDEX_VALIDATOR', { validatorId: accountData.address });
+        
+        logger.info('Cross-domain validator job queued from account indexing', {
+          component: 'account-indexer',
+          accountAddress: accountData.address,
+          triggeredJob: 'INDEX_VALIDATOR',
+        });
+      }
+
+    } catch (error) {
+      logger.error('Failed to queue cross-domain validator dependency', {
+        component: 'account-indexer',
+        accountAddress: accountData.address,
+        error: (error as Error).message,
+      });
+    }
   }
 
   /**
@@ -193,6 +232,7 @@ export class AccountIndexer implements IAccountIndexer {
  */
 export const createAccountIndexer = (
   blockchain: AvailBlockchainService,
+  queueService?: any,
 ): AccountIndexer => {
-  return new AccountIndexer(blockchain);
+  return new AccountIndexer(blockchain, queueService);
 }; 

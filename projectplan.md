@@ -74,23 +74,23 @@ Validator Indexer → Makes own blockchain calls → Stores validator data
 ## Implementation Plan
 
 ### Phase 1: Create Domain Indexers
-- [ ] Create `BlockIndexer.ts` in `src/services/domain/block/`
-- [ ] Create `AccountIndexer.ts` in `src/services/domain/account/`
-- [ ] Create `ValidatorIndexer.ts` in `src/services/domain/validator/`
-- [ ] Create `TransferIndexer.ts` in `src/services/domain/transfer/`
-- [ ] Move `availDataSubmissionIndexer.ts` to `src/services/domain/dataSubmission/DataSubmissionIndexer.ts`
+- [x] Create `BlockIndexer.ts` in `src/services/domain/block/`
+- [x] Create `AccountIndexer.ts` in `src/services/domain/account/`
+- [x] Create `ValidatorIndexer.ts` in `src/services/domain/validator/`
+- [x] Create `TransferIndexer.ts` in `src/services/domain/transfer/`
+- [x] Move `availDataSubmissionIndexer.ts` to `src/services/domain/dataSubmission/DataSubmissionIndexer.ts`
 
 ### Phase 2: Update Queue Processors
-- [ ] Modify `core-processors.ts` to call domain indexers directly
-- [ ] Remove orchestrator dependency from PROCESS_BLOCK_DOMAINS
-- [ ] Add new job types for individual domain indexing
-- [ ] Implement cross-domain job queuing
+- [x] Modify `core-processors.ts` to call domain indexers directly
+- [x] Remove orchestrator dependency from PROCESS_BLOCK_DOMAINS
+- [x] Add new job types for individual domain indexing
+- [x] Implement cross-domain job queuing
 
 ### Phase 3: Remove Dependencies
-- [ ] Remove `DomainProcessingOrchestrator`
-- [ ] Remove complex coordination logic
-- [ ] Update service factory to register new indexers
-- [ ] Remove redundant indexer services
+- [x] Remove `DomainProcessingOrchestrator`
+- [x] Remove complex coordination logic
+- [x] Update service factory to register new indexers
+- [x] Remove redundant indexer services
 
 ### Phase 4: Testing & Validation
 - [ ] Test independent domain indexing

@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { AvailDataSubmissionIndexer } from '../src/services/domain/availDataSubmissionIndexer';
+import { AvailDataSubmissionIndexer } from '../src/services/domain/dataSubmission/DataSubmissionIndexer';
 import { logger } from '../src/utils/logger';
 
 interface IndexingOptions {

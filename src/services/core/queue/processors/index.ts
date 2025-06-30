@@ -19,17 +19,15 @@ export class JobProcessorRegistry {
   private processors: Map<string, (job: Job) => Promise<any>> = new Map();
 
   constructor(
-    private dependencies: JobProcessorDependencies,
     private getService: <T>(serviceName: string) => Promise<T>,
     private addJob: <T>(type: string, data: T, options?: any) => Promise<any>,
   ) {
     logger.info('🔧 PROCESSOR_REGISTRY: Initializing job processor registry', {
       component: 'processor-registry',
       operation: 'constructor',
-      availableDependencies: Object.keys(dependencies),
     });
     
-    this.coreProcessors = new CoreProcessors(dependencies, getService);
+    this.coreProcessors = new CoreProcessors(getService);
     this.deadLetterProcessor = createDeadLetterProcessor(getService);
     this.setupProcessors();
     

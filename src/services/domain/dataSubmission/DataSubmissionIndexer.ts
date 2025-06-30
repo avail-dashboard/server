@@ -34,9 +34,11 @@ export interface IndexingStats {
 export class AvailDataSubmissionIndexer {
   private availService: AvailBlockchainService;
   private stats: IndexingStats;
+  private queueService?: any;
 
-  constructor() {
+  constructor(queueService?: any) {
     this.availService = createAvailBlockchainService();
+    this.queueService = queueService;
     this.stats = {
       blocksProcessed: 0,
       dataSubmissionsFound: 0,
@@ -131,6 +133,9 @@ export class AvailDataSubmissionIndexer {
         totalDataSize,
         processingTime: Date.now() - blockStartTime,
       });
+
+      // Queue cross-domain account indexing jobs for submitters
+      await this.queueAccountDependencies(submissionsToCreate);
 
       return {
         indexed: result.count,
@@ -496,6 +501,63 @@ export class AvailDataSubmissionIndexer {
         submissionsCount: submissions.length,
       });
       throw error;
+    }
+  }
+
+  /**
+   * Queue account indexing jobs for data submission submitters
+   */
+  private async queueAccountDependencies(submissions: DataSubmissionCreateInput[]): Promise<void> {
+    if (!this.queueService) {
+      logger.debug('Queue service not available, skipping cross-domain job queuing', {
+        component: 'data-submission-indexer',
+        submissionCount: submissions.length,
+      });
+      return;
+    }
+
+    try {
+      const accountsToQueue = new Set<string>();
+
+      // Extract all unique submitter addresses
+      submissions.forEach(submission => {
+        if (submission.submitter) {
+          accountsToQueue.add(submission.submitter);
+        }
+      });
+
+      // Queue account indexing jobs
+      let queuedCount = 0;
+      for (const accountAddress of accountsToQueue) {
+        try {
+          await this.queueService.addJob('INDEX_ACCOUNT', { accountAddress });
+          queuedCount++;
+          logger.debug('Queued account indexing job from data submission', {
+            component: 'data-submission-indexer',
+            accountAddress,
+          });
+        } catch (error) {
+          logger.warn('Failed to queue account indexing job', {
+            component: 'data-submission-indexer',
+            accountAddress,
+            error: (error as Error).message,
+          });
+        }
+      }
+
+      logger.info('Cross-domain account jobs queued from data submission indexing', {
+        component: 'data-submission-indexer',
+        submissionsProcessed: submissions.length,
+        uniqueSubmitters: accountsToQueue.size,
+        queuedJobs: queuedCount,
+      });
+
+    } catch (error) {
+      logger.error('Failed to queue cross-domain account dependencies', {
+        component: 'data-submission-indexer',
+        submissionCount: submissions.length,
+        error: (error as Error).message,
+      });
     }
   }
 

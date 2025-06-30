@@ -15,7 +15,6 @@ export { SimpleDependencyResolver, createDependencyResolver } from './core/depen
 export { BlockApiService, createBlockApiService, BlockProcessor, createBlockProcessor } from './domain/block';
 export { ExtrinsicService, createExtrinsicService } from './domain/extrinsic';
 export { DataSubmissionApiService, createDataSubmissionApiService, DataSubmissionProcessor, createDataSubmissionProcessor } from './domain/dataSubmission';
-export { BlockIndexerService, createBlockIndexerService } from './domain/indexer';
 // Phase 4: Legacy services (deprecated - use BlockProcessingOrchestrator instead)
 export { SelfHealingBlockProcessor, createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
 export { SearchService, createSearchService } from './domain/search';
@@ -23,6 +22,13 @@ export { SearchService, createSearchService } from './domain/search';
 export { AccountApiService, AccountProcessor, createAccountApiService, createAccountProcessor } from './domain/account';
 export { ValidatorApiService, ValidatorProcessor, createValidatorApiService, createValidatorProcessor } from './domain/validator';
 export { TransferApiService, TransferProcessor, createTransferApiService, createTransferProcessor } from './domain/transfer';
+
+// Phase 3: Domain Indexers - Independent indexing with cross-domain job queuing
+export { BlockIndexer, createBlockIndexer } from './domain/block/BlockIndexer';
+export { AccountIndexer, createAccountIndexer } from './domain/account/AccountIndexer';
+export { ValidatorIndexer, createValidatorIndexer } from './domain/validator/ValidatorIndexer';
+export { TransferIndexer, createTransferIndexer } from './domain/transfer/TransferIndexer';
+export { AvailDataSubmissionIndexer } from './domain/dataSubmission/DataSubmissionIndexer';
 
 // Mappers
 export * from '../mappers';
@@ -44,9 +50,8 @@ import { createBlockApiService, createBlockProcessor } from './domain/block';
 import { createExtrinsicService } from './domain/extrinsic';
 import { createDataSubmissionApiService, createDataSubmissionProcessor } from './domain/dataSubmission';
 import { createSyncService } from './core/sync';
-import { createBlockIndexerService } from './domain/indexer';
 // Phase 6 Services (replacing DataProcessorService)
-// Phase 4: Keep for orchestrator fallback only - primary processing via queue
+// Phase 3: Legacy service - maintained for compatibility
 import { createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
 // Phase 3: Orchestrators removed - using independent domain processing
 import { createSearchService } from './domain/search';
@@ -84,7 +89,7 @@ import {
 
 // Phase 2: Dependency Management Services - Removed (replaced by queue-based approach)
 
-// Phase 2: Domain indexer imports
+// Phase 3: Domain indexer imports
 import { createBlockIndexer } from './domain/block/BlockIndexer';
 import { createValidatorIndexer } from './domain/validator/ValidatorIndexer';
 import { createAccountIndexer } from './domain/account/AccountIndexer';
@@ -202,7 +207,6 @@ export class ServiceFactory {
       
       // Create new sync services
       const syncService = createSyncService(db, availBlockchainService, queueService);
-      const blockIndexerService = createBlockIndexerService(db, availBlockchainService);
       
       // Create search service
       const searchService = createSearchService(
@@ -353,12 +357,12 @@ export class ServiceFactory {
       // Note: transferProcessor doesn't need start() - it's stateless
       await analyticsService.start();
       
-      // Phase 2: Create domain indexers
+      // Phase 3: Create domain indexers with cross-domain job queuing support
       const blockIndexer = createBlockIndexer(blockRepository, availBlockchainService);
-      const validatorIndexer = createValidatorIndexer(validatorRepository, availBlockchainService);
-      const accountIndexer = createAccountIndexer(availBlockchainService);
-      const transferIndexer = createTransferIndexer(transferRepository);
-      const dataSubmissionIndexer = new AvailDataSubmissionIndexer();
+      const validatorIndexer = createValidatorIndexer(validatorRepository, availBlockchainService, queueService);
+      const accountIndexer = createAccountIndexer(availBlockchainService, queueService);
+      const transferIndexer = createTransferIndexer(transferRepository, queueService);
+      const dataSubmissionIndexer = new AvailDataSubmissionIndexer(queueService);
       
       // Register domain indexers
       this.register('blockIndexer', blockIndexer);
@@ -378,19 +382,17 @@ export class ServiceFactory {
 
       // Register new sync services
       this.register('syncService', syncService);
-      this.register('blockIndexerService', blockIndexerService);
       // Phase 6: Register SelfHealingBlockProcessor instead of DataProcessorService
       this.register('selfHealingBlockProcessor', selfHealingBlockProcessor);
       // Phase 3: Orchestrators removed - using independent domain processing via queue
       
       // Start sync services
       await syncService.start();
-      await blockIndexerService.start();
       
       // Initialize queue service dependencies BEFORE starting queue (Phase 4: Queue-First Architecture)
       const queueServiceInstance = this.get<QueueService>('queue');
       queueServiceInstance.initializeDependencies({
-        // Phase 4: SelfHealingBlockProcessor removed - using orchestrator for processing
+        // Phase 3: Independent domain processing via queue
         analyticsService,
         blockService: blockApiService,
         serviceFactory: this,
@@ -441,7 +443,6 @@ export class ServiceFactory {
       const shutdownOrder = [
         // Sync services (started last, should stop first) - Phase 3: Orchestrators removed
         'selfHealingBlockProcessor', // Phase 4: Kept as fallback only
-        'blockIndexerService', 
         'syncService',
         
         // Domain services (Phase 2 & 5 services)
