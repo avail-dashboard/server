@@ -897,6 +897,52 @@ export class QueueService implements QueueServiceInterface {
     return this.addJob(JobType.HEALTH_CHECK, {}, { delay });
   }
 
+  async scheduleDataSync(fromBlock: number, toBlock: number): Promise<void> {
+    const BATCH_SIZE = 50;
+    const totalBlocks = toBlock - fromBlock + 1;
+    const numberOfBatches = Math.ceil(totalBlocks / BATCH_SIZE);
+    
+    this.logger.info('🔧 QUEUE: Scheduling data sync jobs', {
+      component: 'queue-service',
+      operation: 'scheduleDataSync',
+      fromBlock,
+      toBlock,
+      totalBlocks,
+      batchSize: BATCH_SIZE,
+      numberOfBatches,
+    });
+    
+    for (let i = 0; i < numberOfBatches; i++) {
+      const batchStart = fromBlock + (i * BATCH_SIZE);
+      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, toBlock);
+      
+      await this.addJob(JobType.BLOCK_RANGE_INDEXING, {
+        startBlock: batchStart,
+        endBlock: batchEnd,
+        batchIndex: i,
+        totalBatches: numberOfBatches,
+      }, {
+        priority: numberOfBatches - i, // Higher priority for earlier batches
+      });
+      
+      this.logger.debug('🔧 QUEUE: Scheduled batch job', {
+        component: 'queue-service',
+        operation: 'scheduleDataSync',
+        batchIndex: i,
+        startBlock: batchStart,
+        endBlock: batchEnd,
+        priority: numberOfBatches - i,
+      });
+    }
+    
+    this.logger.info('✅ QUEUE: All data sync jobs scheduled', {
+      component: 'queue-service',
+      operation: 'scheduleDataSync',
+      totalBatches: numberOfBatches,
+      totalBlocks,
+    });
+  }
+
   // ENSURE_* convenience methods
   async ensureBlock(blockNumber: number): Promise<QueueJob> {
     return this.addJob(JobType.ENSURE_BLOCK, { blockNumber }, { priority: JobPriority.CRITICAL });

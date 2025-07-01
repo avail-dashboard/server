@@ -2,6 +2,7 @@ import { logger, logError } from '../../../utils/logger';
 import { AvailBlockchainService } from '../../core/avail-blockchain';
 import { BlockRepository } from '../../../database/repositories/BlockRepository';
 import { BlockData } from '../../types/blockchain';
+import { QueueService } from '../../core/queue';
 
 /**
  * BlockIndexer - Fetches block data from blockchain and identifies dependencies
@@ -32,13 +33,16 @@ export interface BlockIndexingResult {
 export class BlockIndexer implements IBlockIndexer {
   private blockRepository: BlockRepository;
   private blockchain: AvailBlockchainService;
+  private queueService?: QueueService;
 
   constructor(
     blockRepository: BlockRepository,
     blockchain: AvailBlockchainService,
+    queueService?: QueueService,
   ) {
     this.blockRepository = blockRepository;
     this.blockchain = blockchain;
+    this.queueService = queueService;
   }
 
   /**
@@ -89,6 +93,11 @@ export class BlockIndexer implements IBlockIndexer {
 
       // Extract dependent entities
       const dependentEntities = this.extractDependentEntities(blockData);
+
+      // Queue processor jobs for dependent entities
+      if (this.queueService) {
+        await this.queueDependentProcessorJobs(dependentEntities, blockData);
+      }
 
       const duration = Date.now() - startTime;
       
@@ -170,6 +179,77 @@ export class BlockIndexer implements IBlockIndexer {
     });
 
     return results;
+  }
+
+  /**
+   * Queue processor jobs for dependent entities
+   */
+  private async queueDependentProcessorJobs(
+    dependentEntities: { validators: string[], accounts: string[], transfers: string[] },
+    blockData: BlockData
+  ): Promise<void> {
+    if (!this.queueService) {
+      return;
+    }
+
+    try {
+      // Queue validator jobs with full block context
+      for (const validatorAddress of dependentEntities.validators) {
+        await this.queueService.addJob('INDEX_VALIDATOR', { 
+          address: validatorAddress,
+          blockNumber: blockData.number,
+          blockData: blockData // Pass full blockchain data to avoid re-fetching
+        });
+      }
+      
+      // Queue account jobs with full block context
+      for (const accountAddress of dependentEntities.accounts) {
+        await this.queueService.addJob('INDEX_ACCOUNT', { 
+          address: accountAddress,
+          blockNumber: blockData.number,
+          blockData: blockData // Pass full blockchain data to avoid re-fetching
+        });
+      }
+      
+      // Queue transfer jobs with full block context
+      for (const transferId of dependentEntities.transfers) {
+        await this.queueService.addJob('INDEX_TRANSFER', { 
+          transferId,
+          blockNumber: blockData.number,
+          blockData: blockData // Pass full blockchain data to avoid re-fetching
+        });
+      }
+      
+      // Queue data submission jobs if block has data availability extrinsics
+      const hasDataSubmissions = blockData.extrinsics.some(ext => 
+        ext.method.section === 'dataAvailability' && 
+        (ext.method.method === 'submitData' || ext.method.method === 'createApplicationKey')
+      );
+      
+      if (hasDataSubmissions) {
+        await this.queueService.addJob('INDEX_DATA_SUBMISSION', { 
+          blockNumber: blockData.number,
+          blockData: blockData // Pass full blockchain data including extrinsics
+        });
+      }
+
+      logger.debug('Queued processor jobs', {
+        component: 'block-indexer',
+        blockNumber: blockData.number,
+        validatorJobs: dependentEntities.validators.length,
+        accountJobs: dependentEntities.accounts.length,
+        transferJobs: dependentEntities.transfers.length,
+        dataSubmissionJobs: hasDataSubmissions ? 1 : 0,
+      });
+
+    } catch (error) {
+      logError(error as Error, {
+        component: 'block-indexer',
+        action: 'queueDependentProcessorJobs',
+        blockNumber: blockData.number,
+      });
+      // Don't throw - we don't want job queuing failures to break block indexing
+    }
   }
 
   /**
@@ -271,6 +351,7 @@ export class BlockIndexer implements IBlockIndexer {
 export const createBlockIndexer = (
   blockRepository: BlockRepository,
   blockchain: AvailBlockchainService,
+  queueService?: QueueService,
 ): BlockIndexer => {
-  return new BlockIndexer(blockRepository, blockchain);
+  return new BlockIndexer(blockRepository, blockchain, queueService);
 }; 
