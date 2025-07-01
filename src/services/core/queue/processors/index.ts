@@ -80,10 +80,10 @@ export class JobProcessorRegistry {
       this.deadLetterProcessor.processFailedBlockDomains(job),
     );
 
-    // ==================== TODO Processors (Stubs) ====================
-    this.processors.set(JobType.EXTRINSIC_PROCESSING, async (_job: Job) => {
-      return { success: true, message: 'Extrinsic processing completed' };
-    });
+    // ==================== Extrinsic Processing ====================
+    this.processors.set(JobType.EXTRINSIC_PROCESSING, (job: Job) =>
+      this.coreProcessors.processExtrinsicIndexing(job),
+    );
 
     this.processors.set(JobType.ANALYTICS_CALCULATION, async (_job: Job) => {
       return { success: true, message: 'Analytics calculation completed' };

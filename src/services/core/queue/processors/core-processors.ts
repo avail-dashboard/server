@@ -195,20 +195,22 @@ export class CoreProcessors {
    * Phase 2: INDEX_VALIDATOR processor
    */
   async processValidatorIndexing(job: Job<any>) {
-    const { validatorId } = job.data;
+    const { validatorId, address, blockData } = job.data;
+    const validatorAddress = validatorId || address;
     const startTime = Date.now();
     
     logger.info('🔧 PROCESSOR: Starting validator indexing', {
       component: 'validator-indexing-processor',
       operation: 'processValidatorIndexing',
       jobId: job.id,
-      validatorId,
+      validatorId: validatorAddress,
+      hasBlockData: !!blockData,
       timestamp: new Date().toISOString(),
     });
 
     try {
       const validatorIndexer = await this.getService<any>('validatorIndexer');
-      const result = await validatorIndexer.indexValidator(validatorId);
+      const result = await validatorIndexer.indexValidator(validatorAddress);
       
       const duration = Date.now() - startTime;
 
@@ -217,7 +219,7 @@ export class CoreProcessors {
           component: 'validator-indexing-processor',
           operation: 'indexingComplete',
           jobId: job.id,
-          validatorId,
+          validatorId: validatorAddress,
           duration,
           timestamp: new Date().toISOString(),
         });
@@ -225,7 +227,7 @@ export class CoreProcessors {
         return {
           success: true,
           data: {
-            validatorId,
+            validatorId: validatorAddress,
             indexed: true,
             validatorData: result.validatorData,
           },
@@ -243,7 +245,7 @@ export class CoreProcessors {
         component: 'validator-indexing-processor',
         operation: 'indexingFailed',
         jobId: job.id,
-        validatorId,
+        validatorId: validatorAddress,
         error: (error as Error).message,
         classification,
         duration,
@@ -437,4 +439,63 @@ export class CoreProcessors {
       throw error;
     }
   }
+
+  /**
+   * EXTRINSIC_PROCESSING processor
+   */
+  async processExtrinsicIndexing(job: Job<any>) {
+    const { blockNumber, blockData } = job.data;
+    const startTime = Date.now();
+    
+    logger.debug('🔧 PROCESSOR: Starting extrinsic processing', {
+      component: 'extrinsic-processing-processor',
+      jobId: job.id,
+      blockNumber,
+    });
+
+    try {
+      // Delegate to domain-specific ExtrinsicIndexer
+      const extrinsicIndexer = await this.getService<any>('extrinsicIndexer');
+      const result = await extrinsicIndexer.indexBlockExtrinsics(blockData);
+      
+      const duration = Date.now() - startTime;
+      
+      if (result.success) {
+        logger.debug('✅ PROCESSOR: Extrinsic processing completed', {
+          component: 'extrinsic-processing-processor',
+          jobId: job.id,
+          blockNumber,
+          processedCount: result.processedCount,
+          duration
+        });
+
+        return {
+          success: true,
+          data: {
+            blockNumber,
+            processedExtrinsics: result.processedCount,
+            extrinsics: result.extrinsics
+          },
+          metrics: { duration }
+        };
+      } else {
+        throw new Error(result.error || 'Extrinsic processing failed');
+      }
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const classification = ErrorClassifier.classifyError(error as Error, JobType.EXTRINSIC_PROCESSING);
+      
+      logger.error('❌ PROCESSOR: Extrinsic processing failed', {
+        component: 'extrinsic-processing-processor',
+        jobId: job.id,
+        blockNumber,
+        error: (error as Error).message,
+        classification,
+        duration
+      });
+      
+      throw error;
+    }
+  }
+
 }

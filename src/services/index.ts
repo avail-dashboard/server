@@ -29,6 +29,7 @@ export { AccountIndexer, createAccountIndexer } from './domain/account/AccountIn
 export { ValidatorIndexer, createValidatorIndexer } from './domain/validator/ValidatorIndexer';
 export { TransferIndexer, createTransferIndexer } from './domain/transfer/TransferIndexer';
 export { AvailDataSubmissionIndexer } from './domain/dataSubmission/DataSubmissionIndexer';
+export { ExtrinsicIndexer, createExtrinsicIndexer } from './domain/extrinsic/ExtrinsicIndexer';
 
 // Mappers
 export * from '../mappers';
@@ -95,6 +96,7 @@ import { createValidatorIndexer } from './domain/validator/ValidatorIndexer';
 import { createAccountIndexer } from './domain/account/AccountIndexer';
 import { createTransferIndexer } from './domain/transfer/TransferIndexer';
 import { AvailDataSubmissionIndexer } from './domain/dataSubmission/DataSubmissionIndexer';
+import { createExtrinsicIndexer } from './domain/extrinsic/ExtrinsicIndexer';
 
 // Service Factory for dependency injection
 export class ServiceFactory {
@@ -363,6 +365,7 @@ export class ServiceFactory {
       const accountIndexer = createAccountIndexer(availBlockchainService, queueService);
       const transferIndexer = createTransferIndexer(transferRepository, queueService);
       const dataSubmissionIndexer = new AvailDataSubmissionIndexer(queueService);
+      const extrinsicIndexer = createExtrinsicIndexer(extrinsicRepository, extrinsicService);
       
       // Register domain indexers
       this.register('blockIndexer', blockIndexer);
@@ -370,6 +373,7 @@ export class ServiceFactory {
       this.register('accountIndexer', accountIndexer);
       this.register('transferIndexer', transferIndexer);
       this.register('dataSubmissionIndexer', dataSubmissionIndexer);
+      this.register('extrinsicIndexer', extrinsicIndexer);
       
       // Register repositories for DB-first dependency checking
       this.register('validatorRepository', validatorRepository);

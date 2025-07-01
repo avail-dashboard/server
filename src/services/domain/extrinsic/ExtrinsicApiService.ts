@@ -1,16 +1,16 @@
-import { logger, logError } from '../../utils/logger';
-import { AvailBlockchainService } from '../core/avail-blockchain';
-import { ExtrinsicRepository } from '../../database/repositories/ExtrinsicRepository';
-import { BlockRepository } from '../../database/repositories/BlockRepository';
-import { Extrinsic } from '../../database';
-import { BlockData, ExtrinsicData } from '../types/blockchain';
+import { logger, logError } from '../../../utils/logger';
+import { AvailBlockchainService } from '../../core/avail-blockchain';
+import { ExtrinsicRepository } from '../../../database/repositories/ExtrinsicRepository';
+import { BlockRepository } from '../../../database/repositories/BlockRepository';
+import { Extrinsic } from '../../../database';
+import { BlockData, ExtrinsicData } from '../../types/blockchain';
 import { 
   PaginatedResponse,
   PaginationParams,
   SortParams,
   ExtrinsicApiResponse,
-} from '../../types/database';
-import { IExtrinsicMapper } from '../../mappers';
+} from '../../../types/database';
+import { IExtrinsicMapper } from '../../../mappers';
 
 export interface ExtrinsicFeeInfo {
   baseFee: number;
