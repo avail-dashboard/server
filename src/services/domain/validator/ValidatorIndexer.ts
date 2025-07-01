@@ -2,6 +2,7 @@ import { logger, logError } from '../../../utils/logger';
 import { AvailBlockchainService } from '../../core/avail-blockchain';
 import { ValidatorRepository } from '../../../database/repositories/ValidatorRepository';
 import { ValidatorInfo } from '../../types/blockchain';
+import { JobType } from '../../types/service';
 
 /**
  * ValidatorIndexer - Fetches validator data from blockchain and stores it
@@ -238,7 +239,7 @@ export class ValidatorIndexer implements IValidatorIndexer {
       let queuedCount = 0;
       for (const accountAddress of accountsToQueue) {
         try {
-          await this.queueService.addJob('INDEX_ACCOUNT', { accountAddress });
+          await this.queueService.addJob(JobType.INDEX_ACCOUNT, { accountAddress });
           queuedCount++;
           logger.debug('Queued account indexing job', {
             component: 'validator-indexer',

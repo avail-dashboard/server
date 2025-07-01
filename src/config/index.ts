@@ -12,6 +12,8 @@ if (envFile !== '.env') {
   dotenvConfig();
 }
 
+console.log('envFile', envFile);
+
 // Configuration schema validation
 const configSchema = Joi.object({
   // Server Configuration

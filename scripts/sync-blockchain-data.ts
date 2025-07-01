@@ -28,7 +28,6 @@ interface SyncOptions {
   toBlock?: number;
   batchSize?: number;
   delayMs?: number;
-  waitForCompletion?: boolean;
 }
 
 class StandaloneSyncScript {
@@ -122,7 +121,6 @@ class StandaloneSyncScript {
       mode: 'incremental',
       batchSize: 50,
       delayMs: 100,
-      waitForCompletion: true,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -143,8 +141,6 @@ class StandaloneSyncScript {
       } else if (arg === '--delay' && args[i + 1]) {
         options.delayMs = parseInt(args[i + 1]);
         i++;
-      } else if (arg === '--no-wait') {
-        options.waitForCompletion = false;
       }
     }
 
@@ -212,7 +208,7 @@ class StandaloneSyncScript {
   /**
    * Schedule sync jobs through queue system - Pure Job Scheduler
    */
-  async syncBlockRange(from: number, to: number, batchSize: number, options: SyncOptions): Promise<void> {
+  async syncBlockRange(from: number, to: number, _batchSize: number, _options: SyncOptions): Promise<void> {
     const totalBlocks = to - from + 1;
     const startTime = Date.now();
 
@@ -224,55 +220,12 @@ class StandaloneSyncScript {
 
       logger.info(`✅ Scheduled sync jobs for blocks ${from} to ${to}`);
 
-      // Monitor job completion if requested
-      if (options.waitForCompletion) {
-        await this.monitorBatchCompletion(from, to);
-      }
-
       const elapsed = (Date.now() - startTime) / 1000;
       logger.info(`✅ Queue-based sync completed! Range ${from}-${to} processed in ${elapsed.toFixed(1)}s`);
 
     } catch (error) {
       logger.error(`❌ Error scheduling sync jobs for range ${from}-${to}:`, error);
       throw error;
-    }
-  }
-
-  /**
-   * Monitor batch completion through queue system
-   */
-  private async monitorBatchCompletion(from: number, to: number): Promise<void> {
-    const startTime = Date.now();
-    const totalBlocks = to - from + 1;
-    
-    logger.info(`📊 Monitoring queue progress for blocks ${from} to ${to}...`);
-    
-    while (!this.shouldStop) {
-      try {
-        // Get queue stats
-        const queueStats = await this.queueService.getStats();
-        
-        // Calculate progress estimate based on queue completion
-        const completed = queueStats.completed;
-        const estimatedBatches = Math.ceil(totalBlocks / this.BATCH_SIZE);
-        const progress = estimatedBatches > 0 ? Math.min((completed / estimatedBatches) * 100, 100) : 100;
-        const elapsed = (Date.now() - startTime) / 1000;
-        
-        logger.info(`📊 Queue Progress: ${progress.toFixed(1)}% | Queue: ${queueStats.waiting} waiting, ${queueStats.active} active, ${queueStats.completed} completed, ${queueStats.failed} failed | Elapsed: ${elapsed.toFixed(0)}s`);
-        
-        // Check if completed (no active or waiting jobs)
-        if (queueStats.waiting === 0 && queueStats.active === 0 && queueStats.completed > 0) {
-          logger.info('✅ Queue processing completed - no more jobs waiting or active');
-          break;
-        }
-        
-        // Wait before next check
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        
-      } catch (error) {
-        logger.error('Error monitoring queue progress:', error);
-        await new Promise(resolve => setTimeout(resolve, 10000));
-      }
     }
   }
 

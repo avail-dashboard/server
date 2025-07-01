@@ -3,6 +3,7 @@ import { AvailBlockchainService } from '../../core/avail-blockchain';
 import { BlockRepository } from '../../../database/repositories/BlockRepository';
 import { BlockData } from '../../types/blockchain';
 import { QueueService } from '../../core/queue';
+import { JobType } from '../../types/service';
 
 /**
  * BlockIndexer - Fetches block data from blockchain and identifies dependencies
@@ -71,7 +72,7 @@ export class BlockIndexer implements IBlockIndexer {
         timestamp: blockData.timestamp ? new Date(blockData.timestamp) : new Date(),
         extrinsicsCount: blockData.extrinsics?.length || 0,
         eventsCount: blockData.events?.length || 0,
-        validatorAddress: blockData.validator || null,
+        validatorAddress: null, // Always null initially - updated when validator is indexed
         validatorName: null, // Will be populated when validator is indexed
         specVersion: null,
         totalFees: null,
@@ -186,7 +187,7 @@ export class BlockIndexer implements IBlockIndexer {
    */
   private async queueDependentProcessorJobs(
     dependentEntities: { validators: string[], accounts: string[], transfers: string[] },
-    blockData: BlockData
+    blockData: BlockData,
   ): Promise<void> {
     if (!this.queueService) {
       return;
@@ -195,41 +196,49 @@ export class BlockIndexer implements IBlockIndexer {
     try {
       // Queue validator jobs with full block context
       for (const validatorAddress of dependentEntities.validators) {
-        await this.queueService.addJob('INDEX_VALIDATOR', { 
+        await this.queueService.addJob(JobType.INDEX_VALIDATOR, { 
           address: validatorAddress,
           blockNumber: blockData.number,
-          blockData: blockData // Pass full blockchain data to avoid re-fetching
+          blockData: blockData, // Pass full blockchain data to avoid re-fetching
         });
       }
       
       // Queue account jobs with full block context
       for (const accountAddress of dependentEntities.accounts) {
-        await this.queueService.addJob('INDEX_ACCOUNT', { 
-          address: accountAddress,
+        await this.queueService.addJob(JobType.INDEX_ACCOUNT, { 
+          accountAddress: accountAddress,
           blockNumber: blockData.number,
-          blockData: blockData // Pass full blockchain data to avoid re-fetching
+          blockData: blockData, // Pass full blockchain data to avoid re-fetching
         });
       }
       
       // Queue transfer jobs with full block context
       for (const transferId of dependentEntities.transfers) {
-        await this.queueService.addJob('INDEX_TRANSFER', { 
+        await this.queueService.addJob(JobType.INDEX_TRANSFER, { 
           transferId,
           blockNumber: blockData.number,
-          blockData: blockData // Pass full blockchain data to avoid re-fetching
+          blockData: blockData, // Pass full blockchain data to avoid re-fetching
         });
       }
       
+      // Queue extrinsic processing job for this block
+      if (blockData.extrinsics && blockData.extrinsics.length > 0) {
+        await this.queueService.addJob(JobType.EXTRINSIC_PROCESSING, {
+          blockNumber: blockData.number,
+          blockData: blockData,
+        });
+      }
+
       // Queue data submission jobs if block has data availability extrinsics
       const hasDataSubmissions = blockData.extrinsics.some(ext => 
         ext.method.section === 'dataAvailability' && 
-        (ext.method.method === 'submitData' || ext.method.method === 'createApplicationKey')
+        (ext.method.method === 'submitData' || ext.method.method === 'createApplicationKey'),
       );
       
       if (hasDataSubmissions) {
-        await this.queueService.addJob('INDEX_DATA_SUBMISSION', { 
+        await this.queueService.addJob(JobType.INDEX_DATA_SUBMISSION, { 
           blockNumber: blockData.number,
-          blockData: blockData // Pass full blockchain data including extrinsics
+          blockData: blockData, // Pass full blockchain data including extrinsics
         });
       }
 
@@ -318,8 +327,12 @@ export class BlockIndexer implements IBlockIndexer {
           // Extract accounts from transfer events
           if (event.data && Array.isArray(event.data)) {
             const [from, to] = event.data;
-            if (from) accounts.add(from.toString());
-            if (to) accounts.add(to.toString());
+            if (from) {
+              accounts.add(from.toString());
+            }
+            if (to) {
+              accounts.add(to.toString());
+            }
           }
         }
         

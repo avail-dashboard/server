@@ -1,6 +1,7 @@
 import { logger, logError } from '../../../utils/logger';
 import { TransferRepository } from '../../../database/repositories/TransferRepository';
 import { BlockData } from '../../types/blockchain';
+import { JobType } from '../../types/service';
 
 export interface ITransferIndexer {
   indexTransfersForBlock(blockData: BlockData): Promise<TransferIndexingResult>;
@@ -186,7 +187,7 @@ export class TransferIndexer implements ITransferIndexer {
       let queuedCount = 0;
       for (const accountAddress of accountsToQueue) {
         try {
-          await this.queueService.addJob('INDEX_ACCOUNT', { accountAddress });
+          await this.queueService.addJob(JobType.INDEX_ACCOUNT, { accountAddress });
           queuedCount++;
           logger.debug('Queued account indexing job from transfer', {
             component: 'transfer-indexer',

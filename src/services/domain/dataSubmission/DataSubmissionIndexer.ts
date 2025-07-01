@@ -1,6 +1,7 @@
 import { AvailBlockchainService, createAvailBlockchainService } from '../../core/avail-blockchain';
 import { dataSubmissionRepository, rollupRepository, blockRepository, DataSubmissionCreateInput } from '../../../database';
 import { logger, logError } from '../../../utils/logger';
+import { JobType } from '../../types/service';
 
 export interface AvailDataSubmission {
   blockNumber: number;
@@ -532,7 +533,7 @@ export class AvailDataSubmissionIndexer {
       let queuedCount = 0;
       for (const accountAddress of accountsToQueue) {
         try {
-          await this.queueService.addJob('INDEX_ACCOUNT', { accountAddress });
+          await this.queueService.addJob(JobType.INDEX_ACCOUNT, { accountAddress });
           queuedCount++;
           logger.debug('Queued account indexing job from data submission', {
             component: 'data-submission-indexer',

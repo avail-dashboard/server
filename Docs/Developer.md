@@ -60,3 +60,9 @@ Use AvailBlockchainService for proper extrinsics extraction, not BlockchainServi
 ## Task Assignment Conflicts
 Developer gets stuck with conflicting or unclear task assignments showing overlapping scope between parent and delegated tasks.
 ✅ Solution: Create simple task guides with exact file locations and specific code to replace, clear delegation boundaries
+
+## Blockchain Function Call Strategy
+Repetitive blockchain function calls are acceptable during indexing operations. Performance optimization through caching will be implemented at the blockchain service layer later.
+✅ Current approach: Direct blockchain calls for each entity (validator, account, etc.)
+✅ Future optimization: Add caching layer to AvailBlockchainService
+⚠️ Don't optimize prematurely: Focus on complete data indexing first, then add caching
