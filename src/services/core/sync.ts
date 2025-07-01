@@ -526,7 +526,7 @@ export class SyncService implements BaseService, ISyncService {
         const batchStart = startBlock + (i * this.BATCH_SIZE);
         const batchEnd = Math.min(batchStart + this.BATCH_SIZE - 1, endBlock);
         
-        await this.queue.addJob(JobType.DATA_SYNC, {
+        await this.queue.addJob(JobType.BLOCK_RANGE_INDEXING, {
           startBlock: batchStart,
           endBlock: batchEnd,
           batchIndex: i,

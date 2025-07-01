@@ -884,8 +884,13 @@ export class QueueService implements QueueServiceInterface {
     return this.addJob(JobType.BLOCK_INDEXING, { blockNumber }, { priority });
   }
 
-  async scheduleDataSync(fromBlock: number, toBlock: number): Promise<QueueJob> {
-    return this.addJob(JobType.DATA_SYNC, { fromBlock, toBlock });
+  async scheduleBlockRangeIndexing(fromBlock: number, toBlock: number): Promise<QueueJob> {
+    return this.addJob(JobType.BLOCK_RANGE_INDEXING, { 
+      startBlock: fromBlock, 
+      endBlock: toBlock, 
+      batchIndex: 0, 
+      totalBatches: 1,
+    });
   }
 
   async scheduleHealthCheck(delay = 0): Promise<QueueJob> {

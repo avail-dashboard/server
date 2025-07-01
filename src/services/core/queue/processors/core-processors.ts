@@ -4,7 +4,7 @@ import { JobType } from '../../../types/service';
 import { ErrorClassifier } from '../error-classifier';
 import { 
   BlockIndexingJobData, 
-  DataSyncJobData,
+  BlockRangeIndexingJobData,
 } from '../types';
 
 /**
@@ -12,7 +12,7 @@ import {
  * 
  * Simplified processors with minimal coordination:
  * - BLOCK_INDEXING: Direct block indexing
- * - DATA_SYNC: Simple batch block indexing
+ * - BLOCK_RANGE_INDEXING: Simple batch block indexing
  * - HEALTH_CHECK: System health validation
  * - Domain indexers handle their own cross-domain dependencies
  * 
@@ -114,12 +114,12 @@ export class CoreProcessors {
 
 
   /**
-   * DATA_SYNC processor - Phase 2: Direct Domain Indexing
+   * BLOCK_RANGE_INDEXING processor - Phase 2: Direct Domain Indexing
    * 
    * Updated to use direct domain indexing instead of orchestrator pattern
    * Implements DB-first dependency checking for all domains
    */
-  async processDataSync(job: Job<DataSyncJobData>) {
+  async processBlockRangeIndexing(job: Job<BlockRangeIndexingJobData>) {
     const { startBlock, endBlock, batchIndex, totalBatches } = job.data;
     const startTime = Date.now();
     
@@ -163,7 +163,7 @@ export class CoreProcessors {
       };
       
     } catch (error) {
-      const classification = ErrorClassifier.classifyError(error as Error, JobType.DATA_SYNC);
+      const classification = ErrorClassifier.classifyError(error as Error, JobType.BLOCK_RANGE_INDEXING);
       const duration = Date.now() - startTime;
       
       logger.error('Data sync job failed', {

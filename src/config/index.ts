@@ -117,7 +117,7 @@ export const config = {
         exponentialFactor: 2,
         jitterEnabled: true,
       },
-      [JobType.DATA_SYNC]: {
+      [JobType.BLOCK_RANGE_INDEXING]: {
         baseDelay: 1000,
         maxDelay: 15000,
         exponentialFactor: 1.8,

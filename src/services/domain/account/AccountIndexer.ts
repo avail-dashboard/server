@@ -1,5 +1,6 @@
 import { logger, logError } from '../../../utils/logger';
 import { AvailBlockchainService } from '../../core/avail-blockchain';
+import { JobType } from '../../types/service';
 
 /**
  * AccountIndexer - Fetches account data from blockchain and stores it
@@ -153,12 +154,12 @@ export class AccountIndexer implements IAccountIndexer {
     try {
       // Only queue validator indexing if account is identified as a validator
       if (accountData.isValidator) {
-        await this.queueService.addJob('INDEX_VALIDATOR', { validatorId: accountData.address });
+        await this.queueService.addJob(JobType.INDEX_VALIDATOR, { validatorId: accountData.address });
         
         logger.info('Cross-domain validator job queued from account indexing', {
           component: 'account-indexer',
           accountAddress: accountData.address,
-          triggeredJob: 'INDEX_VALIDATOR',
+          triggeredJob: JobType.INDEX_VALIDATOR,
         });
       }
 
@@ -194,7 +195,7 @@ export class AccountIndexer implements IAccountIndexer {
       let identityName = undefined;
       if (identity.isSome) {
         const identityData = identity.unwrap().info;
-        if (identityData.display?.isRaw) {
+        if (identityData && identityData.display && identityData.display.isRaw) {
           identityName = identityData.display.asRaw.toUtf8();
         }
       }

@@ -142,7 +142,7 @@ export enum JobType {
   EXTRINSIC_PROCESSING = 'extrinsic_processing',
   ANALYTICS_CALCULATION = 'analytics_calculation',
   ROLLUP_STATISTICS = 'rollup_statistics',
-  DATA_SYNC = 'data_sync',
+  BLOCK_RANGE_INDEXING = 'block_range_indexing',
   HEALTH_CHECK = 'health_check',
   SYNC_BLOCK_RANGE = 'sync_block_range',
   PROCESS_BLOCK_DATA = 'process_block_data',

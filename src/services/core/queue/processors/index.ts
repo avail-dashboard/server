@@ -45,19 +45,17 @@ export class JobProcessorRegistry {
     });
 
     // ==================== Core Processors ====================
-    this.processors.set(JobType.BLOCK_INDEXING, (job: Job) => 
+    this.processors.set(JobType.BLOCK_INDEXING, (job: Job) =>
       this.coreProcessors.processBlockIndexing(job),
     );
 
-    this.processors.set(JobType.DATA_SYNC, (job: Job) => 
-      this.coreProcessors.processDataSync(job),
+    this.processors.set(JobType.BLOCK_RANGE_INDEXING, (job: Job) =>
+      this.coreProcessors.processBlockRangeIndexing(job),
     );
 
     this.processors.set(JobType.HEALTH_CHECK, (job: Job) => 
       this.coreProcessors.processHealthCheck(job),
     );
-
-
 
     // ==================== Phase 2: Domain Indexing Processors ====================
     this.processors.set(JobType.INDEX_VALIDATOR, (job: Job) =>

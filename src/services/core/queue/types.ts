@@ -43,7 +43,7 @@ export interface DependencyBatchResolutionJobData {
 }
 
 // Core Job Data Interfaces
-export interface DataSyncJobData {
+export interface BlockRangeIndexingJobData {
   startBlock: number;
   endBlock: number;
   batchIndex: number;
