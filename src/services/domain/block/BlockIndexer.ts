@@ -194,38 +194,38 @@ export class BlockIndexer implements IBlockIndexer {
     }
 
     try {
-      // Queue validator jobs with full block context
+      // Queue validator jobs with consistent structure
       for (const validatorAddress of dependentEntities.validators) {
         await this.queueService.addJob(JobType.INDEX_VALIDATOR, { 
-          address: validatorAddress,
+          validatorAddress,
           blockNumber: blockData.number,
-          blockData: blockData, // Pass full blockchain data to avoid re-fetching
+          blockHash: blockData.hash,
         });
       }
       
-      // Queue account jobs with full block context
+      // Queue account jobs with consistent structure
       for (const accountAddress of dependentEntities.accounts) {
         await this.queueService.addJob(JobType.INDEX_ACCOUNT, { 
-          accountAddress: accountAddress,
+          accountAddress,
           blockNumber: blockData.number,
-          blockData: blockData, // Pass full blockchain data to avoid re-fetching
+          blockHash: blockData.hash,
         });
       }
       
-      // Queue transfer jobs with full block context
+      // Queue transfer jobs with consistent structure
       for (const transferId of dependentEntities.transfers) {
         await this.queueService.addJob(JobType.INDEX_TRANSFER, { 
           transferId,
           blockNumber: blockData.number,
-          blockData: blockData, // Pass full blockchain data to avoid re-fetching
+          blockHash: blockData.hash,
         });
       }
       
-      // Queue extrinsic processing job for this block
+      // Queue extrinsic processing job with consistent structure
       if (blockData.extrinsics && blockData.extrinsics.length > 0) {
         await this.queueService.addJob(JobType.EXTRINSIC_PROCESSING, {
           blockNumber: blockData.number,
-          blockData: blockData,
+          blockHash: blockData.hash,
         });
       }
 
@@ -238,7 +238,7 @@ export class BlockIndexer implements IBlockIndexer {
       if (hasDataSubmissions) {
         await this.queueService.addJob(JobType.INDEX_DATA_SUBMISSION, { 
           blockNumber: blockData.number,
-          blockData: blockData, // Pass full blockchain data including extrinsics
+          blockHash: blockData.hash,
         });
       }
 

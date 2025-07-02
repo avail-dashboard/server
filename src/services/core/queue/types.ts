@@ -54,26 +54,40 @@ export interface BlockIndexingJobData {
   blockNumber: number;
 }
 
-// Phase 2: Domain indexing job data interfaces
-export interface ValidatorIndexingJobData {
-  validatorId: string;
+// Base job data interface - all jobs inherit from this
+export interface BaseJobData {
+  blockNumber?: number;
+  blockHash?: string;
   _correlationId?: string;
 }
 
-export interface AccountIndexingJobData {
+// Specific entity job data interfaces
+export interface ValidatorIndexingJobData extends BaseJobData {
+  validatorAddress: string; // Consistent naming: {entity}Address
+}
+
+export interface AccountIndexingJobData extends BaseJobData {
   accountAddress: string;
-  _correlationId?: string;
 }
 
-export interface TransferIndexingJobData {
-  blockNumber: number;
-  transferIds: string[];
-  _correlationId?: string;
+export interface TransferIndexingJobData extends BaseJobData {
+  transferId?: string; // For specific transfer processing
+  blockNumber: number; // Always required for transfers
 }
 
-export interface DataSubmissionIndexingJobData {
+export interface DataSubmissionIndexingJobData extends BaseJobData {
+  blockNumber: number; // Process single block at a time for consistency
+}
+
+export interface ExtrinsicIndexingJobData extends BaseJobData {
+  blockNumber: number; // Process single block's extrinsics
+}
+
+// Block range processing should be separate job type
+export interface BlockRangeProcessingJobData {
   startBlock: number;
   endBlock: number;
+  batchSize?: number;
   _correlationId?: string;
 }
 

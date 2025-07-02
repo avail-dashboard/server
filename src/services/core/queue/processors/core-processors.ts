@@ -195,16 +195,16 @@ export class CoreProcessors {
    * Phase 2: INDEX_VALIDATOR processor
    */
   async processValidatorIndexing(job: Job<any>) {
-    const { validatorId, address, blockData } = job.data;
-    const validatorAddress = validatorId || address;
+    const { validatorAddress, blockNumber, blockHash } = job.data;
     const startTime = Date.now();
     
     logger.info('🔧 PROCESSOR: Starting validator indexing', {
       component: 'validator-indexing-processor',
       operation: 'processValidatorIndexing',
       jobId: job.id,
-      validatorId: validatorAddress,
-      hasBlockData: !!blockData,
+      validatorAddress,
+      blockNumber,
+      blockHash,
       timestamp: new Date().toISOString(),
     });
 
@@ -219,7 +219,7 @@ export class CoreProcessors {
           component: 'validator-indexing-processor',
           operation: 'indexingComplete',
           jobId: job.id,
-          validatorId: validatorAddress,
+          validatorAddress,
           duration,
           timestamp: new Date().toISOString(),
         });
@@ -227,7 +227,7 @@ export class CoreProcessors {
         return {
           success: true,
           data: {
-            validatorId: validatorAddress,
+            validatorAddress,
             indexed: true,
             validatorData: result.validatorData,
           },
@@ -245,7 +245,7 @@ export class CoreProcessors {
         component: 'validator-indexing-processor',
         operation: 'indexingFailed',
         jobId: job.id,
-        validatorId: validatorAddress,
+        validatorAddress,
         error: (error as Error).message,
         classification,
         duration,
@@ -319,23 +319,27 @@ export class CoreProcessors {
    * Phase 2: INDEX_TRANSFER processor
    */
   async processTransferIndexing(job: Job<any>) {
-    const { blockNumber, transferIds } = job.data;
+    const { blockNumber, blockHash, transferId, transferIds } = job.data;
     const startTime = Date.now();
     
     logger.info('🔧 PROCESSOR: Starting transfer indexing', {
       component: 'transfer-indexing-processor',
       jobId: job.id,
       blockNumber,
+      blockHash,
+      transferId,
       transferCount: transferIds?.length || 0,
     });
 
     try {
-      // Get block data for transfer extraction
-      const blockIndexer = await this.getService<any>('blockIndexer');
-      const blockResult = await blockIndexer.indexBlock(blockNumber);
+      // Get block data directly from blockchain service instead of re-indexing
+      const availBlockchain = await this.getService<any>('availBlockchain');
+      const blockData = blockHash ? 
+        await availBlockchain.getBlock(blockHash) : 
+        await availBlockchain.getBlock(blockNumber);
       
       const transferIndexer = await this.getService<any>('transferIndexer');
-      const result = await transferIndexer.indexTransfersForBlock(blockResult.blockData);
+      const result = await transferIndexer.indexTransfersForBlock(blockData);
       
       const duration = Date.now() - startTime;
 
@@ -382,19 +386,19 @@ export class CoreProcessors {
    * Phase 2: INDEX_DATA_SUBMISSION processor
    */
   async processDataSubmissionIndexing(job: Job<any>) {
-    const { startBlock, endBlock } = job.data;
+    const { blockNumber, blockHash } = job.data;
     const startTime = Date.now();
     
     logger.info('🔧 PROCESSOR: Starting data submission indexing', {
       component: 'data-submission-indexing-processor',
       jobId: job.id,
-      startBlock,
-      endBlock,
+      blockNumber,
+      blockHash,
     });
 
     try {
       const dataSubmissionIndexer = await this.getService<any>('dataSubmissionIndexer');
-      const result = await dataSubmissionIndexer.indexBlockRange(startBlock, endBlock);
+      const result = await dataSubmissionIndexer.indexBlockRange(blockNumber, blockNumber);
       
       const duration = Date.now() - startTime;
 
@@ -402,8 +406,7 @@ export class CoreProcessors {
         logger.info('✅ PROCESSOR: Data submission indexing completed', {
           component: 'data-submission-indexing-processor',
           jobId: job.id,
-          startBlock,
-          endBlock,
+          blockNumber,
           submissionsProcessed: result.submissionsProcessed,
           duration,
         });
@@ -411,8 +414,7 @@ export class CoreProcessors {
         return {
           success: true,
           data: {
-            startBlock,
-            endBlock,
+            blockNumber,
             submissionsProcessed: result.submissionsProcessed,
             submissions: result.submissions,
           },
@@ -429,8 +431,7 @@ export class CoreProcessors {
       logger.error('❌ PROCESSOR: Data submission indexing failed', {
         component: 'data-submission-indexing-processor',
         jobId: job.id,
-        startBlock,
-        endBlock,
+        blockNumber,
         error: (error as Error).message,
         classification,
         duration,
@@ -444,16 +445,23 @@ export class CoreProcessors {
    * EXTRINSIC_PROCESSING processor
    */
   async processExtrinsicIndexing(job: Job<any>) {
-    const { blockNumber, blockData } = job.data;
+    const { blockNumber, blockHash } = job.data;
     const startTime = Date.now();
     
     logger.debug('🔧 PROCESSOR: Starting extrinsic processing', {
       component: 'extrinsic-processing-processor',
       jobId: job.id,
       blockNumber,
+      blockHash,
     });
 
     try {
+      // Get block data from blockchain service instead of expecting it in job payload
+      const availBlockchain = await this.getService<any>('availBlockchain');
+      const blockData = blockHash ? 
+        await availBlockchain.getBlock(blockHash) : 
+        await availBlockchain.getBlock(blockNumber);
+      
       // Delegate to domain-specific ExtrinsicIndexer
       const extrinsicIndexer = await this.getService<any>('extrinsicIndexer');
       const result = await extrinsicIndexer.indexBlockExtrinsics(blockData);
