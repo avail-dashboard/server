@@ -359,6 +359,9 @@ export class QueueService implements QueueServiceInterface {
         _correlationId: correlationId,
       };
 
+      // Create unique job ID for deduplication
+      const jobId = this.createJobId(type, data);
+
       // Get job-specific retry strategy
       const retryStrategy = config.queue.retryStrategies[type as keyof typeof config.queue.retryStrategies];
       
@@ -384,6 +387,7 @@ export class QueueService implements QueueServiceInterface {
         },
         removeOnComplete: config.queue.defaultJobOptions.removeOnComplete,
         removeOnFail: config.queue.defaultJobOptions.removeOnFail,
+        jobId, // Add unique job ID for deduplication
       };
 
       const job = await this.queue.add(type, jobData, jobOptions);
@@ -1099,6 +1103,36 @@ export class QueueService implements QueueServiceInterface {
       
       throw error;
     }
+  }
+
+  /**
+   * Create unique job ID for deduplication based on job type and key data
+   */
+  private createJobId(type: string, data: any): string {
+    let keyValue = '';
+    
+    // Extract key identifying data based on job type
+    switch (type) {
+    case 'index_validator':
+      keyValue = data.validatorId || data.address || '';
+      break;
+    case 'index_account':
+      keyValue = data.accountAddress || data.address || '';
+      break;
+    case 'index_transfer':
+      keyValue = data.transferId || `${data.blockNumber}-${data.transferIds?.join(',')}` || '';
+      break;
+    case 'index_data_submission':
+      keyValue = `${data.startBlock}-${data.endBlock}` || '';
+      break;
+    case 'block_range_indexing':
+      keyValue = `${data.startBlock}-${data.endBlock}` || '';
+      break;
+    default:
+      keyValue = JSON.stringify(data);
+    }
+    
+    return `${type}:${keyValue}`;
   }
 }
 

@@ -277,6 +277,8 @@ export class TransferProcessor implements SelfHealingProcessor {
       const transfer = await this.transferRepository.create({
         id: `${transferData.extrinsicHash}-${transferData.extrinsicIndex}`,
         extrinsicHash: transferData.extrinsicHash,
+        blockHash: transferData.blockHash || null,
+        blockTimestamp: transferData.timestamp,
         fromAddress: transferData.fromAddress,
         toAddress: transferData.toAddress,
         amount: BigInt(transferData.amount),

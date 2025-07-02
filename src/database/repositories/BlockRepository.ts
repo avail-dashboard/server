@@ -93,20 +93,11 @@ export class BlockRepository extends BaseRepository {
   }
 
   /**
-   * Get block with related data
+   * Get block with related data (simplified - no relations)
    */
-  async findWithRelations(blockNumber: number): Promise<BlockWithExtrinsics | null> {
+  async findWithRelations(blockNumber: number): Promise<Block | null> {
     return this.prisma.block.findUnique({
       where: { number: blockNumber },
-      include: {
-        extrinsics: {
-          select: {
-            id: true,
-            hash: true,
-            success: true,
-          },
-        },
-      },
     });
   }
 

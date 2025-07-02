@@ -158,7 +158,12 @@ export class AvailDataSubmissionIndexer {
   /**
    * Index data submissions for a range of blocks
    */
-  async indexBlockRange(startBlock: number, endBlock: number, batchSize: number = 10): Promise<IndexingStats> {
+  async indexBlockRange(startBlock: number, endBlock: number, batchSize: number = 10): Promise<{
+    success: boolean;
+    stats: IndexingStats;
+    submissionsProcessed: number;
+    error?: string;
+  }> {
     logger.info('Starting data submission indexing for block range', {
       component: 'avail-data-submission-indexer',
       startBlock,
@@ -176,8 +181,9 @@ export class AvailDataSubmissionIndexer {
       averageBlockTime: 0,
     };
 
-    // Process blocks in batches
-    for (let currentBlock = startBlock; currentBlock <= endBlock; currentBlock += batchSize) {
+    try {
+      // Process blocks in batches
+      for (let currentBlock = startBlock; currentBlock <= endBlock; currentBlock += batchSize) {
       const batchEnd = Math.min(currentBlock + batchSize - 1, endBlock);
       const batch = Array.from(
         { length: batchEnd - currentBlock + 1 }, 
@@ -218,23 +224,52 @@ export class AvailDataSubmissionIndexer {
         totalDataSize: this.stats.totalDataSize,
         errors: this.stats.errors,
       });
+      }
+
+      this.stats.endTime = new Date();
+
+      logger.info('Block range indexing completed', {
+        component: 'avail-data-submission-indexer',
+        ...this.stats,
+        duration: this.stats.endTime.getTime() - this.stats.startTime.getTime(),
+      });
+
+      return {
+        success: true,
+        stats: { ...this.stats },
+        submissionsProcessed: this.stats.dataSubmissionsFound,
+      };
+
+    } catch (error) {
+      this.stats.endTime = new Date();
+      this.stats.errors++;
+
+      logger.error('Block range indexing failed', {
+        component: 'avail-data-submission-indexer',
+        startBlock,
+        endBlock,
+        error: (error as Error).message,
+        ...this.stats,
+      });
+
+      return {
+        success: false,
+        stats: { ...this.stats },
+        submissionsProcessed: this.stats.dataSubmissionsFound,
+        error: (error as Error).message,
+      };
     }
-
-    this.stats.endTime = new Date();
-
-    logger.info('Block range indexing completed', {
-      component: 'avail-data-submission-indexer',
-      ...this.stats,
-      duration: this.stats.endTime.getTime() - this.stats.startTime.getTime(),
-    });
-
-    return { ...this.stats };
   }
 
   /**
    * Index recent blocks (live indexing)
    */
-  async indexRecentBlocks(numberOfBlocks: number = 100): Promise<IndexingStats> {
+  async indexRecentBlocks(numberOfBlocks: number = 100): Promise<{
+    success: boolean;
+    stats: IndexingStats;
+    submissionsProcessed: number;
+    error?: string;
+  }> {
     logger.info('Indexing recent blocks', {
       component: 'avail-data-submission-indexer',
       numberOfBlocks,

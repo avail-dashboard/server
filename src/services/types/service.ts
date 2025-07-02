@@ -153,6 +153,8 @@ export enum JobType {
   INDEX_ACCOUNT = 'index_account',
   INDEX_TRANSFER = 'index_transfer',
   INDEX_DATA_SUBMISSION = 'index_data_submission',
+  INDEX_EVENT = 'index_event',
+  INDEX_ERA = 'index_era',
   // Phase 2: Simplified Dependency Management Job Types - TASK-010 Implementation
   DEPENDENCY_DETECTION = 'dependency_detection',
   DEPENDENCY_RESOLUTION = 'dependency_resolution',

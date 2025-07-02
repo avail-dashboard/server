@@ -75,6 +75,8 @@ export class TransferIndexer implements ITransferIndexer {
         id: transferData.id,
         extrinsicHash: transferData.txHash || `block-${transferData.blockHash}`,
         blockNumber: transferData.blockNumber,
+        blockHash: transferData.blockHash || null,
+        blockTimestamp: transferData.timestamp,
         extrinsicIndex: transferData.extrinsicIndex,
         fromAddress: transferData.fromAddress,
         toAddress: transferData.toAddress,

@@ -92,3 +92,14 @@ export interface EnsureRollupJobData {
 export interface EnsureValidatorJobData {
   address: string;
 }
+
+export interface EventIndexingJobData {
+  blockNumber: number;
+  eventIds: string[];
+  _correlationId?: string;
+}
+
+export interface EraIndexingJobData {
+  eraIndex: number;
+  _correlationId?: string;
+}

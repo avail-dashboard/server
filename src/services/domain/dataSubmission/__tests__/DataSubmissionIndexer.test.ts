@@ -340,11 +340,13 @@ describe('AvailDataSubmissionIndexer', () => {
 
     it('should successfully index a range of blocks', async () => {
       // Act
-      const stats = await dataSubmissionIndexer.indexBlockRange(1000, 1002, 2);
+      const result = await dataSubmissionIndexer.indexBlockRange(1000, 1002, 2);
 
       // Assert
-      expect(stats.blocksProcessed).toBe(3);
-      expect(stats.dataSubmissionsFound).toBe(6); // 2 submissions per block * 3 blocks
+      expect(result.success).toBe(true);
+      expect(result.stats.blocksProcessed).toBe(3);
+      expect(result.stats.dataSubmissionsFound).toBe(6); // 2 submissions per block * 3 blocks
+      expect(result.submissionsProcessed).toBe(6);
       expect(mockAvailService.getBlockWithDataSubmissions).toHaveBeenCalledTimes(3);
     });
 
@@ -368,11 +370,12 @@ describe('AvailDataSubmissionIndexer', () => {
         .mockResolvedValueOnce(mockBlockWithSubmissions); // Block 1002 succeeds
 
       // Act
-      const stats = await dataSubmissionIndexer.indexBlockRange(1000, 1002, 1);
+      const result = await dataSubmissionIndexer.indexBlockRange(1000, 1002, 1);
 
       // Assert
-      expect(stats.blocksProcessed).toBe(2); // Only successful blocks counted
-      expect(stats.errors).toBe(1); // One error recorded
+      expect(result.success).toBe(true);
+      expect(result.stats.blocksProcessed).toBe(2); // Only successful blocks counted
+      expect(result.stats.errors).toBe(1); // One error recorded
     });
   });
 

@@ -1,22 +1,9 @@
 import { Validator, ValidatorStatus } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 
-export type ValidatorWithRelations = Validator & {
-  stashAccount: {
-    address: string;
-    identityName: string | null;
-  };
-  nominations: Array<{
-    id: string;
-    nominatorAddress: string;
-    amount: bigint;
-    active: boolean;
-  }>;
-  blocks: Array<{
-    number: number;
-    timestamp: Date;
-  }>;
-};
+// Note: ValidatorWithRelations type is kept for backward compatibility
+// but methods now return simplified Validator objects without relations
+export type ValidatorWithRelations = Validator;
 
 export type ValidatorCreateInput = {
   stashAddress: string;
@@ -66,36 +53,11 @@ export class ValidatorRepository extends BaseRepository {
   }
 
   /**
-   * Find validator with full relations
+   * Find validator without relations (simplified)
    */
   async findWithRelations(stashAddress: string): Promise<ValidatorWithRelations | null> {
     return this.prisma.validator.findUnique({
       where: { stashAddress },
-      include: {
-        stashAccount: {
-          select: {
-            address: true,
-            identityName: true,
-          },
-        },
-        nominations: {
-          select: {
-            id: true,
-            nominatorAddress: true,
-            amount: true,
-            active: true,
-          },
-          where: { active: true },
-        },
-        blocks: {
-          select: {
-            number: true,
-            timestamp: true,
-          },
-          orderBy: { number: 'desc' },
-          take: 10,
-        },
-      },
     });
   }
 

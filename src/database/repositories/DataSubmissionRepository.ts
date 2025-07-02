@@ -2,9 +2,7 @@ import { DataSubmission, Rollup, Prisma } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 import { logger } from '../../utils/logger';
 
-export type DataSubmissionWithRollup = DataSubmission & {
-  rollup: Rollup;
-};
+export type DataSubmissionWithRollup = DataSubmission;
 
 export type DataSubmissionCreateInput = {
   extrinsicHash: string;
@@ -103,7 +101,6 @@ export class DataSubmissionRepository extends BaseRepository {
         skip,
         take: limit,
         orderBy: { timestamp: 'desc' },
-        include: { rollup: true },
       }),
       this.prisma.dataSubmission.count({
         where: { appId },
@@ -148,7 +145,6 @@ export class DataSubmissionRepository extends BaseRepository {
         skip,
         take: limit,
         orderBy: { timestamp: orderBy },
-        include: { rollup: true },
       }),
       this.prisma.dataSubmission.count({ where }),
     ]);

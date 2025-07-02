@@ -33,16 +33,6 @@ export class NominationRepository extends BaseRepository {
   async findByNominator(nominatorAddress: string): Promise<any[]> {
     return this.prisma.nomination.findMany({
       where: { nominatorAddress },
-      include: {
-        validator: {
-          select: {
-            stashAddress: true,
-            identityName: true,
-            commission: true,
-            status: true,
-          },
-        },
-      },
     });
   }
 
@@ -61,14 +51,6 @@ export class NominationRepository extends BaseRepository {
         where: { validatorAddress },
         skip,
         take: limit,
-        include: {
-          nominator: {
-            select: {
-              address: true,
-              identityName: true,
-            },
-          },
-        },
         orderBy: { amount: 'desc' },
       }),
       this.prisma.nomination.count({
@@ -193,10 +175,6 @@ export class NominationRepository extends BaseRepository {
       where: {
         era,
         active: true,
-      },
-      include: {
-        validator: true,
-        nominator: true,
       },
     });
   }

@@ -1,24 +1,9 @@
 import { Transfer, TransferStatus } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 
-export type TransferWithRelations = Transfer & {
-  fromAccount: {
-    address: string;
-    identityName: string | null;
-  };
-  toAccount: {
-    address: string;
-    identityName: string | null;
-  };
-  block: {
-    number: number;
-    timestamp: Date;
-  };
-  extrinsic: {
-    hash: string;
-    success: boolean | null;
-  };
-};
+// Note: TransferWithRelations is simplified due to removed relations
+// but kept for backward compatibility
+export type TransferWithRelations = Transfer;
 
 export type TransferCreateInput = Omit<Transfer, 'createdAt'>;
 
@@ -57,37 +42,11 @@ export class TransferRepository extends BaseRepository {
   }
 
   /**
-   * Find transfer with full relations
+   * Find transfer by ID (simplified without relations)
    */
-  async findWithRelations(id: string): Promise<TransferWithRelations | null> {
+  async findWithoutRelations(id: string): Promise<Transfer | null> {
     return this.prisma.transfer.findUnique({
       where: { id },
-      include: {
-        fromAccount: {
-          select: {
-            address: true,
-            identityName: true,
-          },
-        },
-        toAccount: {
-          select: {
-            address: true,
-            identityName: true,
-          },
-        },
-        block: {
-          select: {
-            number: true,
-            timestamp: true,
-          },
-        },
-        extrinsic: {
-          select: {
-            hash: true,
-            success: true,
-          },
-        },
-      },
     });
   }
 
@@ -179,7 +138,7 @@ export class TransferRepository extends BaseRepository {
     page?: number;
     limit?: number;
     type?: 'sent' | 'received' | 'all';
-  } = {}): Promise<{ transfers: TransferWithRelations[]; total: number }> {
+  } = {}): Promise<{ transfers: Transfer[]; total: number }> {
     const { page = 1, limit = 20, type = 'all' } = params;
     const skip = (page - 1) * limit;
 
@@ -202,32 +161,6 @@ export class TransferRepository extends BaseRepository {
         skip,
         take: limit,
         orderBy: { timestamp: 'desc' },
-        include: {
-          fromAccount: {
-            select: {
-              address: true,
-              identityName: true,
-            },
-          },
-          toAccount: {
-            select: {
-              address: true,
-              identityName: true,
-            },
-          },
-          block: {
-            select: {
-              number: true,
-              timestamp: true,
-            },
-          },
-          extrinsic: {
-            select: {
-              hash: true,
-              success: true,
-            },
-          },
-        },
       }),
       this.prisma.transfer.count({ where: whereClause }),
     ]);

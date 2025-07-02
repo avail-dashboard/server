@@ -61,21 +61,6 @@ export class RewardRepository extends BaseRepository {
         skip,
         take: limit,
         orderBy: { timestamp: 'desc' },
-        include: {
-          validator: {
-            select: {
-              stashAddress: true,
-              identityName: true,
-            },
-          },
-          eraInfo: {
-            select: {
-              number: true,
-              startBlock: true,
-              endBlock: true,
-            },
-          },
-        },
       }),
       this.prisma.reward.count({ where: whereClause }),
     ]);
@@ -195,22 +180,6 @@ export class RewardRepository extends BaseRepository {
         skip,
         take: limit,
         orderBy: { [orderBy]: orderDirection },
-        include: {
-          validator: {
-            select: {
-              stashAddress: true,
-              identityName: true,
-              commission: true,
-            },
-          },
-          eraInfo: {
-            select: {
-              number: true,
-              startBlock: true,
-              endBlock: true,
-            },
-          },
-        },
       }),
       this.prisma.reward.count({ where: whereClause }),
     ]);

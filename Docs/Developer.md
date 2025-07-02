@@ -40,6 +40,10 @@ data_submissions_app_id_fkey violations: Ensure rollup records exist before inse
 Prisma returns camelCase fields but TypeScript interfaces expect snake_case, causing "Cannot read properties of undefined (reading 'toISOString')" errors.
 Solution: Update mappers to handle both naming conventions: `field: obj.camelCase || obj.snake_case || defaultValue` with null safety for timestamps.
 
+## Prisma Include Relation Errors After Schema Simplification
+Removing @relation decorators and foreign key constraints breaks include statements in repository methods.
+Solution: Remove all include statements from repository methods. Update TypeScript types to be aliases of base entities for backward compatibility.
+
 It can take up to 30 seconds for the server to start, as it waits for all the services to start. So wait for making requests to server
 
 ## Block Hash Extraction Critical Issue

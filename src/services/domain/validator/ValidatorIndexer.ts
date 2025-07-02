@@ -295,18 +295,31 @@ export class ValidatorIndexer implements IValidatorIndexer {
       // Parse validator preferences
       const prefs = validatorPrefs.toJSON() as any;
       
-      // Parse identity information
+      // Parse identity information with proper null safety
       let identityInfo = undefined;
       if (identity.isSome) {
-        const identityData = identity.unwrap().info;
-        identityInfo = {
-          display: identityData.display?.isRaw ? identityData.display.asRaw.toUtf8() : undefined,
-          legal: identityData.legal?.isRaw ? identityData.legal.asRaw.toUtf8() : undefined,
-          web: identityData.web?.isRaw ? identityData.web.asRaw.toUtf8() : undefined,
-          riot: identityData.riot?.isRaw ? identityData.riot.asRaw.toUtf8() : undefined,
-          email: identityData.email?.isRaw ? identityData.email.asRaw.toUtf8() : undefined,
-          twitter: identityData.twitter?.isRaw ? identityData.twitter.asRaw.toUtf8() : undefined,
-        };
+        try {
+          const identityUnwrapped = identity.unwrap();
+          const identityData = identityUnwrapped?.info;
+          
+          if (identityData) {
+            identityInfo = {
+              display: identityData.display?.isRaw ? identityData.display.asRaw.toUtf8() : undefined,
+              legal: identityData.legal?.isRaw ? identityData.legal.asRaw.toUtf8() : undefined,
+              web: identityData.web?.isRaw ? identityData.web.asRaw.toUtf8() : undefined,
+              riot: identityData.riot?.isRaw ? identityData.riot.asRaw.toUtf8() : undefined,
+              email: identityData.email?.isRaw ? identityData.email.asRaw.toUtf8() : undefined,
+              twitter: identityData.twitter?.isRaw ? identityData.twitter.asRaw.toUtf8() : undefined,
+            };
+          }
+        } catch (identityError) {
+          logger.warn('Failed to parse validator identity, continuing without identity info', {
+            component: 'validator-indexer',
+            validatorId,
+            error: (identityError as Error).message,
+          });
+          identityInfo = undefined;
+        }
       }
 
       // Find exposure for this validator in current era

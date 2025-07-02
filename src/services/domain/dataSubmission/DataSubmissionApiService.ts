@@ -81,10 +81,15 @@ export class DataSubmissionApiService implements IDataSubmissionService {
       );
 
       // Enhance submissions with rollup details
-      const enhancedSubmissions: DataSubmissionWithDetails[] = submissions.map(submission => ({
-        ...submission,
-        rollup: submission.rollup || undefined,
-      }));
+      const enhancedSubmissions: DataSubmissionWithDetails[] = await Promise.all(
+        submissions.map(async (submission) => {
+          const rollup = await this.rollupRepository.findByAppId(submission.appId);
+          return {
+            ...submission,
+            rollup: rollup || undefined,
+          };
+        })
+      );
 
       const totalPages = Math.ceil(total / limit);
       const result: DataSubmissionList = {
@@ -258,11 +263,16 @@ export class DataSubmissionApiService implements IDataSubmissionService {
         { page, limit }
       );
 
-      // submissions already include rollup relationship from findByAppId
-      const enhancedSubmissions: DataSubmissionWithDetails[] = submissions.map(submission => ({
-        ...submission,
-        rollup: submission.rollup || undefined,
-      }));
+      // Enhance submissions with rollup details
+      const enhancedSubmissions: DataSubmissionWithDetails[] = await Promise.all(
+        submissions.map(async (submission) => {
+          const rollup = await this.rollupRepository.findByAppId(submission.appId);
+          return {
+            ...submission,
+            rollup: rollup || undefined,
+          };
+        })
+      );
 
       const totalPages = Math.ceil(total / limit);
       const result: DataSubmissionList = {

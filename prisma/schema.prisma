@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Simplified Prisma schema - ALL foreign key constraints removed
+// Relations kept as string references for application-level handling
 
 generator client {
   provider = "prisma-client-js"
@@ -19,23 +19,19 @@ model Block {
   timestamp            DateTime
   extrinsicsCount      Int              @default(0) @map("extrinsics_count")
   eventsCount          Int              @default(0) @map("events_count")
-  // Phase 1 enhancements
+  
+  // Validator info (no FK constraint)
   validatorAddress     String?          @map("validator_address") @db.VarChar(64)
   validatorName        String?          @map("validator_name") @db.VarChar(255)
+  
+  // Block metadata
   specVersion          Int?             @map("spec_version")
   totalFees            BigInt?          @map("total_fees")
   transferCount        Int?             @map("transfer_count")
   dataSubmissionsSize  BigInt?          @map("data_submissions_size")
   createdAt            DateTime         @default(now()) @map("created_at")
   
-  // Relations
-  extrinsics           Extrinsic[]
-  events               Event[]
-  dataSubmissions      DataSubmission[]
-  transfers            Transfer[]
-  rewards              Reward[]
-  validator            Validator?       @relation(fields: [validatorAddress], references: [stashAddress])
-  
+  // Indexes for performance (FK indexes removed)
   @@index([timestamp], name: "idx_blocks_timestamp")
   @@index([hash], name: "idx_blocks_hash")
   @@index([validatorAddress], name: "idx_blocks_validator")
@@ -45,7 +41,12 @@ model Block {
 model Extrinsic {
   id               Int      @id @default(autoincrement())
   hash             String   @unique @db.VarChar(66)
+  
+  // Block reference (no FK constraint)
   blockNumber      Int      @map("block_number")
+  blockHash        String?  @map("block_hash") @db.VarChar(66)  // Denormalized
+  blockTimestamp   DateTime? @map("block_timestamp")            // Denormalized
+  
   extrinsicIndex   Int?     @map("extrinsic_index")
   module           String?  @db.VarChar(50)
   call             String?  @db.VarChar(50)
@@ -53,7 +54,8 @@ model Extrinsic {
   timestamp        DateTime?
   signer           String?  @db.VarChar(64)
   fee              Int?
-  // Phase 1 enhancements
+  
+  // Extrinsic details
   nonce            Int?
   lifetime         Json?    // { birth: number, death: number, immortal: boolean }
   parameters       Json?    // Complete extrinsic arguments
@@ -61,15 +63,10 @@ model Extrinsic {
   tip              BigInt?
   actualFee        BigInt?  @map("actual_fee") // Calculated from events
   transferCount    Int?     @map("transfer_count") // Number of transfers in this extrinsic
-  // Phase 1 critical missing fields
   methodObject     Json?    @map("method_object") // Complete method object
   methodArgs       Json?    @map("method_args") // Method arguments separately
   extrinsicOrder   Int?     @map("extrinsic_order") // Order within block
   createdAt        DateTime @default(now()) @map("created_at")
-  
-  // Relations
-  block            Block    @relation(fields: [blockNumber], references: [number])
-  transfers        Transfer[]
   
   @@index([blockNumber], name: "idx_extrinsics_block")
   @@index([hash], name: "idx_extrinsics_hash")
@@ -83,10 +80,13 @@ model Account {
   address              String   @id @db.VarChar(64)
   balance              Int?
   nonce                Int?
-  // Phase 1 enhancements
+  
+  // Account balances
   currentBalance       BigInt?  @map("current_balance")
   reservedBalance      BigInt?  @map("reserved_balance")
   frozenBalance        BigInt?  @map("frozen_balance")
+  
+  // Account metadata
   accountType          AccountType @default(regular) @map("account_type")
   identityName         String?  @map("identity_name") @db.VarChar(255)
   identityInfo         Json?    @map("identity_info")
@@ -95,15 +95,6 @@ model Account {
   transactionCount     Int?     @default(0) @map("transaction_count")
   transferCount        Int?     @default(0) @map("transfer_count")
   lastUpdated          DateTime @default(now()) @map("last_updated")
-  
-  // Relations
-  validatorStash       Validator? @relation("ValidatorStash")
-  validatorController  Validator? @relation("ValidatorController") 
-  validatorReward      Validator? @relation("ValidatorReward")
-  nominations          Nomination[]
-  transfersFrom        Transfer[] @relation("TransferFrom")
-  transfersTo          Transfer[] @relation("TransferTo")
-  rewards              Reward[]
   
   @@index([balance], name: "idx_accounts_balance")
   @@index([currentBalance], name: "idx_accounts_current_balance")
@@ -114,22 +105,25 @@ model Account {
 
 model Event {
   id             Int      @id @default(autoincrement())
+  
+  // Block reference (no FK constraint)
   blockNumber    Int      @map("block_number")
+  blockHash      String?  @map("block_hash") @db.VarChar(66)     // Denormalized
+  blockTimestamp DateTime? @map("block_timestamp")               // Denormalized
+  
   extrinsicIndex Int?     @map("extrinsic_index")
   eventIndex     Int?     @map("event_index")
   module         String?  @db.VarChar(50)
   eventName      String?  @map("event_name") @db.VarChar(50)
   data           Json?
   timestamp      DateTime?
-  // Phase 1 enhancements
+  
+  // Event details
   phase          Json?    // Event phase object
   phaseType      String?  @map("phase_type") @db.VarChar(50) // ApplyExtrinsic, Finalization, Initialization
   methodObject   Json?    @map("method_object") // Complete method object when available
   eventOrder     Int?     @map("event_order") // Order within block
   createdAt      DateTime @default(now()) @map("created_at")
-  
-  // Relations
-  block          Block     @relation(fields: [blockNumber], references: [number])
   
   @@index([blockNumber], name: "idx_events_block")
   @@index([module], name: "idx_events_module")
@@ -175,23 +169,28 @@ model SyncState {
 model DataSubmission {
   id             Int      @id @default(autoincrement())
   extrinsicHash  String   @unique @map("extrinsic_hash") @db.VarChar(66)
+  
+  // Block reference (no FK constraint)
   blockNumber    Int      @map("block_number")
+  blockHash      String?  @map("block_hash") @db.VarChar(66)     // Denormalized
+  blockTimestamp DateTime? @map("block_timestamp")               // Denormalized
+  
   extrinsicIndex Int?     @map("extrinsic_index")
+  
+  // App/Rollup reference (no FK constraint)
   appId          Int      @map("app_id")
-  rollupName     String?  @map("rollup_name") @db.VarChar(255)
+  rollupName     String?  @map("rollup_name") @db.VarChar(255)   // Denormalized
+  
+  // Data submission details
   dataSize       Int      @map("data_size")
   dataHash       String   @map("data_hash") @db.VarChar(66)
-  submitter      String   @db.VarChar(64)
+  submitter      String   @db.VarChar(64)                        // No FK constraint
   timestamp      DateTime
   success        Boolean  @default(true)
   blobData       Bytes?   @map("blob_data")
   kateCommitment String?  @map("kate_commitment") @db.Text
   proof          Json?
   createdAt      DateTime @default(now()) @map("created_at")
-  
-  // Relations
-  block          Block    @relation(fields: [blockNumber], references: [number])
-  rollup         Rollup   @relation(fields: [appId], references: [appId])
   
   @@index([blockNumber], name: "idx_data_submissions_block")
   @@index([appId], name: "idx_data_submissions_app_id")
@@ -215,40 +214,35 @@ model Rollup {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
   
-  // Relations
-  dataSubmissions   DataSubmission[]
-  
   @@index([name], name: "idx_rollups_name")
   @@index([lastActiveBlock], name: "idx_rollups_last_active")
   @@map("rollups")
 }
 
-// ===== PHASE 1 NEW ENTITIES =====
-
 model Validator {
   stashAddress        String      @id @map("stash_address") @db.VarChar(64)
+  
+  // Account references (no FK constraints)
   controllerAddress   String?     @unique @map("controller_address") @db.VarChar(64)
   rewardAddress       String?     @unique @map("reward_address") @db.VarChar(64)
+  
+  // Validator details
   commission          Int         // Stored as Perbill (parts per billion)
   selfBonded          BigInt      @map("self_bonded")
   totalBonded         BigInt      @map("total_bonded")
   nominatorCount      Int         @default(0) @map("nominator_count")
   status              ValidatorStatus @default(inactive)
   sessionKeys         Json?       @map("session_keys") // All session keys
+  
+  // Identity (denormalized)
   identityName        String?     @map("identity_name") @db.VarChar(255)
   identityInfo        Json?       @map("identity_info")
+  
+  // Performance tracking
   blocksProduced      Int         @default(0) @map("blocks_produced")
   lastBlockProduced   Int?        @map("last_block_produced")
   createdAt           DateTime    @default(now()) @map("created_at")
   updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at")
-  
-  // Relations
-  stashAccount        Account     @relation("ValidatorStash", fields: [stashAddress], references: [address])
-  controllerAccount   Account?    @relation("ValidatorController", fields: [controllerAddress], references: [address])
-  rewardAccount       Account?    @relation("ValidatorReward", fields: [rewardAddress], references: [address])
-  nominations         Nomination[]
-  rewards             Reward[]
-  blocks              Block[]
   
   @@index([status], name: "idx_validators_status")
   @@index([totalBonded], name: "idx_validators_total_bonded")
@@ -259,23 +253,28 @@ model Validator {
 
 model Transfer {
   id              String      @id // format: "{extrinsic_hash}-{index}"
+  
+  // Extrinsic reference (no FK constraint)
   extrinsicHash   String      @map("extrinsic_hash") @db.VarChar(66)
+  
+  // Block reference (no FK constraint)
   blockNumber     Int         @map("block_number")
+  blockHash       String?     @map("block_hash") @db.VarChar(66)      // Denormalized
+  blockTimestamp  DateTime?   @map("block_timestamp")                 // Denormalized
+  
   extrinsicIndex  Int         @map("extrinsic_index")
+  
+  // Account references (no FK constraints)
   fromAddress     String      @map("from_address") @db.VarChar(64)
   toAddress       String      @map("to_address") @db.VarChar(64)
+  
+  // Transfer details
   amount          BigInt
   tokenType       String      @default("AVAIL") @map("token_type") @db.VarChar(10)
   fees            BigInt
   status          TransferStatus @default(success)
   timestamp       DateTime
   createdAt       DateTime    @default(now()) @map("created_at")
-  
-  // Relations
-  block           Block       @relation(fields: [blockNumber], references: [number])
-  extrinsic       Extrinsic   @relation(fields: [extrinsicHash], references: [hash])
-  fromAccount     Account     @relation("TransferFrom", fields: [fromAddress], references: [address])
-  toAccount       Account     @relation("TransferTo", fields: [toAddress], references: [address])
   
   @@index([blockNumber], name: "idx_transfers_block")
   @@index([extrinsicHash], name: "idx_transfers_extrinsic")
@@ -288,17 +287,16 @@ model Transfer {
 
 model Nomination {
   id                String      @id // format: "{nominator}-{validator}"
+  
+  // Account and Validator references (no FK constraints)
   nominatorAddress  String      @map("nominator_address") @db.VarChar(64)
   validatorAddress  String      @map("validator_address") @db.VarChar(64)
+  
   amount            BigInt
   era               Int?
   active            Boolean     @default(true)
   createdAt         DateTime    @default(now()) @map("created_at")
   updatedAt         DateTime    @default(now()) @updatedAt @map("updated_at")
-  
-  // Relations
-  nominator         Account     @relation(fields: [nominatorAddress], references: [address])
-  validator         Validator   @relation(fields: [validatorAddress], references: [stashAddress])
   
   @@index([nominatorAddress], name: "idx_nominations_nominator")
   @@index([validatorAddress], name: "idx_nominations_validator")
@@ -316,9 +314,6 @@ model Era {
   active          Boolean     @default(true)
   createdAt       DateTime    @default(now()) @map("created_at")
   
-  // Relations
-  rewards         Reward[]
-  
   @@index([startBlock], name: "idx_eras_start_block")
   @@index([active], name: "idx_eras_active")
   @@map("eras")
@@ -326,20 +321,27 @@ model Era {
 
 model Reward {
   id                String      @id // format: "{address}-{era}-{type}"
+  
+  // Account reference (no FK constraint)
   address           String      @db.VarChar(64)
+  
+  // Validator reference (no FK constraint)
   validatorAddress  String?     @map("validator_address") @db.VarChar(64)
+  
   amount            BigInt
+  
+  // Era reference (no FK constraint)
   era               Int
+  
   rewardType        RewardType  @map("reward_type")
+  
+  // Block reference (no FK constraint)
   blockNumber       Int         @map("block_number")
+  blockHash         String?     @map("block_hash") @db.VarChar(66)      // Denormalized
+  blockTimestamp    DateTime?   @map("block_timestamp")                 // Denormalized
+  
   timestamp         DateTime
   createdAt         DateTime    @default(now()) @map("created_at")
-  
-  // Relations
-  account           Account     @relation(fields: [address], references: [address])
-  validator         Validator?  @relation(fields: [validatorAddress], references: [stashAddress])
-  eraInfo           Era         @relation(fields: [era], references: [number])
-  block             Block       @relation(fields: [blockNumber], references: [number])
   
   @@index([address], name: "idx_rewards_address")
   @@index([validatorAddress], name: "idx_rewards_validator")
@@ -348,10 +350,6 @@ model Reward {
   @@index([blockNumber], name: "idx_rewards_block")
   @@map("rewards")
 }
-
-// ===== PHASE 2 DEPENDENCY TRACKING - REMOVED =====
-// Complex dependency tracking replaced by queue-based approach
-// Queue job status provides equivalent functionality with better performance
 
 // ===== ENUMS =====
 
