@@ -287,14 +287,17 @@ export const config = {
 
   // Caching Configuration
   cache: {
+    redis: {
+      enabled: true,
+      keyPrefix: 'avail:',
+    },
     ttl: {
-      blocks: 5, // Latest blocks - 5 seconds
-      blockByNumber: 3600, // Block by number - 1 hour
-      blockByHash: 3600, // Block by hash - 1 hour
-      chainStats: 30, // Chain stats - 30 seconds
-      accountBalance: 30, // Account balance - 30 seconds
-      validators: 300, // Validators list - 5 minutes
-      tokenPrice: 60, // Token price - 1 minute
+      validatorIdentity: 300,    // 5 minutes
+      runtimeMetadata: 1800,     // 30 minutes  
+      chainConstants: 3600,      // 1 hour
+      oldBlocks: 86400,          // 24 hours
+      eraData: 1800,             // 30 minutes
+      sessionData: 900,          // 15 minutes
     },
   },
 

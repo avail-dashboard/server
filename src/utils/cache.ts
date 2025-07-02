@@ -218,6 +218,14 @@ export const CacheKeys = {
   blockByNumber: (number: bigint) => `blocks:number:${number}`,
   blockByHash: (hash: string) => `blocks:hash:${hash}`,
   blockExtrinsics: (number: bigint) => `blocks:${number}:extrinsics`,
+  
+  // Blockchain cache keys for stable data (simple Redis cache plan)
+  validatorIdentity: (address: string) => `validator:identity:${address}`,
+  runtimeMetadata: () => 'runtime:metadata',
+  chainConstants: () => 'chain:constants',
+  oldBlock: (number: number) => `block:old:${number}`,
+  eraData: (era: number) => `era:${era}`,
+  sessionData: (session: number) => `session:${session}`,
 
   // Extrinsics
   latestExtrinsics: () => 'extrinsics:latest',
@@ -253,6 +261,16 @@ export const CacheKeys = {
 
   // Rate Limiting
   rateLimit: (ip: string) => `rate_limit:${ip}`,
+};
+
+// Cache TTL constants (in seconds) - Simple Redis Cache Plan
+export const CACHE_TTL = {
+  VALIDATOR_IDENTITY: 300,    // 5 minutes
+  RUNTIME_METADATA: 1800,     // 30 minutes
+  CHAIN_CONSTANTS: 3600,      // 1 hour
+  OLD_BLOCKS: 86400,          // 24 hours
+  ERA_DATA: 1800,             // 30 minutes
+  SESSION_DATA: 900,          // 15 minutes
 };
 
 // Create cache service instance
