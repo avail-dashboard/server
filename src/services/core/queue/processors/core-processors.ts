@@ -416,7 +416,7 @@ export class CoreProcessors {
           data: {
             blockNumber,
             submissionsProcessed: result.submissionsProcessed,
-            submissions: result.submissions,
+            stats: result.stats,
           },
           metrics: { duration },
         };

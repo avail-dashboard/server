@@ -177,6 +177,9 @@ export class QueueService implements QueueServiceInterface {
         operation: 'createRedisConnection',
         redisUrl: config.redis.url,
         queueDb: config.redis.queueDb,
+        // Explicitly log the host and port being used
+        host: config.redis.url.split('://')[1]?.split(':')[0] || 'localhost',
+        port: parseInt(config.redis.url.split(':')[2]?.split('/')[0] || '6379', 10),
       });
       
       this.redis = new Redis(config.redis.url, {

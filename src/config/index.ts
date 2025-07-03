@@ -2,15 +2,13 @@ import { config as dotenvConfig } from 'dotenv';
 import Joi from 'joi';
 import path from 'path';
 import { JobType } from '../services/types/service';
+import availTypesBundle from './avail-types';
 
 // Load environment variables
 // Use ENV_FILE environment variable to specify which env file to load
 const envFile = process.env.ENV_FILE || '.env';
-dotenvConfig({ path: path.resolve(process.cwd(), envFile) });
-// Always load .env as fallback without overriding existing vars
-if (envFile !== '.env') {
-  dotenvConfig();
-}
+dotenvConfig({ path: path.resolve(process.cwd(), envFile), override: true });
+
 
 console.log('envFile', envFile);
 
@@ -183,6 +181,8 @@ export const config = {
       maxRetryDelay: 30000,
       connectionPoolSize: 5,
     },
+    // Custom types bundle for Avail-specific types
+    typesBundle: availTypesBundle.types,
   },
 
   // Feature Flags

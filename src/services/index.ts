@@ -166,8 +166,7 @@ export class ServiceFactory {
 
       // Start core services (but NOT queue service yet - wait for dependencies)
       await availBlockchainService.start();
-      // Queue service will be started after dependencies are initialized in initializeDomainServices()
-      await queueHealthMonitor.start();
+      // Queue service and health monitor will be started after dependencies are initialized in initializeDomainServices()
       
       console.log('✅ Core services initialized successfully');
     } catch (error) {
@@ -364,7 +363,7 @@ export class ServiceFactory {
       const validatorIndexer = createValidatorIndexer(validatorRepository, availBlockchainService, queueService);
       const accountIndexer = createAccountIndexer(availBlockchainService, accountRepository, queueService);
       const transferIndexer = createTransferIndexer(transferRepository, queueService);
-      const dataSubmissionIndexer = new AvailDataSubmissionIndexer(queueService);
+      const dataSubmissionIndexer = new AvailDataSubmissionIndexer(queueService, availBlockchainService);
       const extrinsicIndexer = createExtrinsicIndexer(extrinsicRepository, extrinsicService);
       
       // Register domain indexers
@@ -405,6 +404,11 @@ export class ServiceFactory {
       
       // Now start the queue service with processors properly initialized
       await queueServiceInstance.start();
+      
+      // Start queue health monitor after queue service is started
+      const queueHealthMonitor = this.get<any>('queueHealthMonitor');
+      await queueHealthMonitor.start();
+      
       // Phase 6: Start SelfHealingBlockProcessor instead of DataProcessorService
       await selfHealingBlockProcessor.start();
       // Phase 3: Orchestrators removed - independent domain processing via queue

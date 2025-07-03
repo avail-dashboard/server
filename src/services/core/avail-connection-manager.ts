@@ -1,5 +1,6 @@
+import { initialize } from "avail-js-sdk/chain";
+import { ApiPromise } from "@polkadot/api";
 import { logger } from '../../utils/logger';
-import { initialize } from 'avail-js-sdk';
 import {
   ConnectionProvider,
   CircuitBreakerState,
@@ -8,7 +9,7 @@ import {
 } from '../types/service';
 
 export interface AvailConnection {
-  api: any;
+  api: ApiPromise;
   url: string;
   isConnected: boolean;
   lastActivity: Date;
@@ -69,6 +70,12 @@ export class AvailConnectionManager {
     // Create connection promises with individual timeouts
     const connectionPromises = this.providers.map(async (provider) => {
       try {
+        logger.debug('AvailConnectionManager: Attempting connection', {
+          component: 'avail-connection-manager',
+          provider: provider.provider,
+          url: provider.url,
+        });
+        
         const connection = await Promise.race([
           this.createAvailConnection(provider),
           new Promise<never>((_, reject) => 
@@ -76,8 +83,20 @@ export class AvailConnectionManager {
           ),
         ]);
         
+        logger.debug('AvailConnectionManager: Connection created successfully', {
+          component: 'avail-connection-manager',
+          provider: provider.provider,
+          url: provider.url,
+        });
+        
         return { provider, connection, success: true };
       } catch (error) {
+        logger.error('AvailConnectionManager: Connection creation failed', {
+          component: 'avail-connection-manager',
+          provider: provider.provider,
+          url: provider.url,
+          error: (error as Error).message,
+        });
         return { provider, error, success: false };
       }
     });
@@ -88,7 +107,7 @@ export class AvailConnectionManager {
     // Process results
     for (const result of results) {
       if (result.status === 'fulfilled') {
-        const { provider, connection, success } = result.value;
+        const { provider, connection, success, error } = result.value;
         
         if (success && connection) {
           this.connections.set(provider.url, connection);
@@ -108,6 +127,7 @@ export class AvailConnectionManager {
             action: 'initializeConnection',
             provider: provider.provider,
             url: provider.url,
+            error: error.message,
           });
         }
       }
@@ -231,7 +251,8 @@ export class AvailConnectionManager {
         logger.error('AvailConnectionManager: Connection disconnect failed', { 
           component: 'avail-connection-manager', 
           action: 'disconnect',
-          url: connection.url, 
+          url: connection.url,
+          error: error.message,
         });
       }
     });
@@ -312,6 +333,7 @@ export class AvailConnectionManager {
           component: 'avail-connection-manager',
           action: 'establishPrimaryConnection',
           url,
+          error: error.message,
         });
       }
     }

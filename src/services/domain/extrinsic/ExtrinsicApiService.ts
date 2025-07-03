@@ -234,37 +234,43 @@ export class ExtrinsicService implements IExtrinsicService {
       const actualFee = extrinsicData.actualFee ? new Decimal(String(extrinsicData.actualFee)) : null;
 
       // Create comprehensive extrinsic record with all available fields (using createIfNotExists to handle duplicates)
-      const { extrinsic: extrinsicRecord, created } = await this.extrinsicRepository.createIfNotExists({
-        hash: extrinsicData.hash,
-        blockNumber: blockData.number,
-        blockHash: blockData.hash,
-        blockTimestamp: new Date(blockData.timestamp),
-        extrinsicIndex: index,
-        module: extrinsicData.method.section,
-        call: extrinsicData.method.method,
-        success: extrinsicData.success,
-        timestamp: new Date(blockData.timestamp),
-        signer: extrinsicData.signer,
-        fee: feeInfo.totalFee ? new Decimal(String(feeInfo.totalFee)) : null,
-        nonce: extrinsicData.nonce,
-        lifetime: extrinsicData.lifetime,
-        parameters: extrinsicData.method.args,
-        signatureInfo: extrinsicData.signature,
-        tip,
-        actualFee,
-        transferCount: extrinsicData.transferCount || 0,
-        methodObject: {
-          section: extrinsicData.method.section,
-          method: extrinsicData.method.method,
-          isSigned: extrinsicData.isSigned,
-          paysFee: extrinsicData.paysFee,
-          length: extrinsicData.length,
-          weight: extrinsicData.weight,
-          class: extrinsicData.class,
-        },
-        methodArgs: extrinsicData.method.args,
-        extrinsicOrder: index,
-      });
+      let extrinsicRecord = await this.extrinsicRepository.findByHash(extrinsicData.hash);
+      let created = false;
+
+      if (!extrinsicRecord) {
+        extrinsicRecord = await this.extrinsicRepository.create({
+          hash: extrinsicData.hash,
+          blockNumber: blockData.number,
+          blockHash: blockData.hash,
+          blockTimestamp: new Date(blockData.timestamp),
+          extrinsicIndex: index,
+          module: extrinsicData.method.section,
+          call: extrinsicData.method.method,
+          success: extrinsicData.success,
+          timestamp: new Date(blockData.timestamp),
+          signer: extrinsicData.signer,
+          fee: feeInfo.totalFee ? new Decimal(String(feeInfo.totalFee)) : null,
+          nonce: extrinsicData.nonce,
+          lifetime: extrinsicData.lifetime,
+          parameters: extrinsicData.method.args,
+          signatureInfo: extrinsicData.signature,
+          tip,
+          actualFee,
+          transferCount: extrinsicData.transferCount || 0,
+          methodObject: {
+            section: extrinsicData.method.section,
+            method: extrinsicData.method.method,
+            isSigned: extrinsicData.isSigned,
+            paysFee: extrinsicData.paysFee,
+            length: extrinsicData.length,
+            weight: extrinsicData.weight,
+            class: extrinsicData.class,
+          },
+          methodArgs: extrinsicData.method.args,
+          extrinsicOrder: index,
+        });
+        created = true;
+      }
 
       logger.debug(`${created ? 'Created new' : 'Found existing'} extrinsic with complete data`, {
         component: 'extrinsic-service',

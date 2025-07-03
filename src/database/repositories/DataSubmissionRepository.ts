@@ -7,6 +7,8 @@ export type DataSubmissionWithRollup = DataSubmission;
 export type DataSubmissionCreateInput = {
   extrinsicHash: string;
   blockNumber: number;
+  blockHash?: string | null;
+  blockTimestamp?: Date | null;
   extrinsicIndex?: number | null;
   appId: number;
   rollupName?: string | null;

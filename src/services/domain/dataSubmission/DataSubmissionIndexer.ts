@@ -37,8 +37,8 @@ export class AvailDataSubmissionIndexer {
   private stats: IndexingStats;
   private queueService?: any;
 
-  constructor(queueService?: any) {
-    this.availService = createAvailBlockchainService();
+  constructor(queueService?: any, availBlockchainService?: any) {
+    this.availService = availBlockchainService || createAvailBlockchainService();
     this.queueService = queueService;
     this.stats = {
       blocksProcessed: 0,
@@ -111,7 +111,27 @@ export class AvailDataSubmissionIndexer {
       await this.ensureRollupsExist(submissionsToCreate);
       
       // Store in database (rollups exist now, so foreign key constraint is satisfied)
+      logger.info('Creating data submissions in database', {
+        component: 'avail-data-submission-indexer',
+        blockNumber,
+        submissionCount: submissionsToCreate.length,
+        submissions: submissionsToCreate.map(s => ({
+          extrinsicIndex: s.extrinsicIndex,
+          appId: s.appId,
+          submitter: s.submitter,
+          dataSize: s.dataSize,
+          extrinsicHash: s.extrinsicHash,
+        })),
+      });
+      
       const result = await dataSubmissionRepository.createMany(submissionsToCreate);
+      
+      logger.info('Data submissions created in database', {
+        component: 'avail-data-submission-indexer',
+        blockNumber,
+        created: result.count,
+        expected: submissionsToCreate.length,
+      });
       
       // Update rollup statistics
       await this.updateRollupStatistics(submissionsToCreate);
@@ -146,10 +166,11 @@ export class AvailDataSubmissionIndexer {
 
     } catch (error) {
       this.stats.errors++;
-      logError(error as Error, {
+      logger.error('DataSubmissionIndexer: Failed to index block', {
         component: 'avail-data-submission-indexer',
         action: 'indexBlock',
         blockNumber,
+        error: (error as Error).message,
       });
       throw error;
     }
@@ -184,54 +205,75 @@ export class AvailDataSubmissionIndexer {
     try {
       // Process blocks in batches
       for (let currentBlock = startBlock; currentBlock <= endBlock; currentBlock += batchSize) {
-      const batchEnd = Math.min(currentBlock + batchSize - 1, endBlock);
-      const batch = Array.from(
-        { length: batchEnd - currentBlock + 1 }, 
-        (_, i) => currentBlock + i,
-      );
+        const batchEnd = Math.min(currentBlock + batchSize - 1, endBlock);
+        const batch = Array.from(
+          { length: batchEnd - currentBlock + 1 }, 
+          (_, i) => currentBlock + i,
+        );
 
-      logger.info('Processing batch', {
-        component: 'avail-data-submission-indexer',
-        batchStart: currentBlock,
-        batchEnd,
-        batchSize: batch.length,
-        progress: `${this.stats.blocksProcessed}/${endBlock - startBlock + 1}`,
-      });
+        logger.info('Processing batch', {
+          component: 'avail-data-submission-indexer',
+          batchStart: currentBlock,
+          batchEnd,
+          batchSize: batch.length,
+          progress: `${this.stats.blocksProcessed}/${endBlock - startBlock + 1}`,
+        });
 
-      // Process batch in parallel
-      const batchPromises = batch.map(async (blockNumber) => {
-        try {
-          return await this.indexBlock(blockNumber);
-        } catch (error) {
-          logger.warn('Failed to index block in batch', {
-            component: 'avail-data-submission-indexer',
-            blockNumber,
-            error: (error as Error).message,
-          });
-          return { indexed: 0, skipped: 0, totalDataSize: 0 };
+        // Process batch in parallel
+        const batchPromises = batch.map(async (blockNumber) => {
+          try {
+            return await this.indexBlock(blockNumber);
+          } catch (error) {
+            this.stats.errors++;
+            logger.error('Failed to index block in batch', {
+              component: 'avail-data-submission-indexer',
+              blockNumber,
+              error: (error as Error).message,
+            });
+            return { indexed: 0, skipped: 0, totalDataSize: 0, failed: true };
+          }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+      
+        // Check if too many blocks failed in this batch
+        const failedInBatch = batchResults.filter(result => (result as any).failed).length;
+        const totalInBatch = batchResults.length;
+        const failureRateInBatch = failedInBatch / totalInBatch;
+      
+        // If more than 50% of blocks in the batch failed, fail the entire job
+        if (failureRateInBatch > 0.5) {
+          throw new Error(`Batch failure rate too high: ${Math.round(failureRateInBatch * 100)}% of blocks failed (${failedInBatch}/${totalInBatch})`);
         }
-      });
 
-      await Promise.all(batchPromises);
-
-      // Log progress every batch
-      const progressPercent = Math.round((this.stats.blocksProcessed / (endBlock - startBlock + 1)) * 100);
-      logger.info('Batch completed', {
-        component: 'avail-data-submission-indexer',
-        progress: `${progressPercent}%`,
-        blocksProcessed: this.stats.blocksProcessed,
-        dataSubmissionsFound: this.stats.dataSubmissionsFound,
-        totalDataSize: this.stats.totalDataSize,
-        errors: this.stats.errors,
-      });
+        // Log progress every batch
+        const progressPercent = Math.round((this.stats.blocksProcessed / (endBlock - startBlock + 1)) * 100);
+        logger.info('Batch completed', {
+          component: 'avail-data-submission-indexer',
+          progress: `${progressPercent}%`,
+          blocksProcessed: this.stats.blocksProcessed,
+          dataSubmissionsFound: this.stats.dataSubmissionsFound,
+          totalDataSize: this.stats.totalDataSize,
+          errors: this.stats.errors,
+        });
       }
 
       this.stats.endTime = new Date();
+
+      // Check overall failure rate
+      const totalBlocks = endBlock - startBlock + 1;
+      const overallFailureRate = this.stats.errors / totalBlocks;
+      
+      // If more than 30% of blocks failed overall, consider it a failed job
+      if (overallFailureRate > 0.3) {
+        throw new Error(`Overall failure rate too high: ${Math.round(overallFailureRate * 100)}% of blocks failed (${this.stats.errors}/${totalBlocks})`);
+      }
 
       logger.info('Block range indexing completed', {
         component: 'avail-data-submission-indexer',
         ...this.stats,
         duration: this.stats.endTime.getTime() - this.stats.startTime.getTime(),
+        overallFailureRate: Math.round(overallFailureRate * 100),
       });
 
       return {
@@ -343,16 +385,16 @@ export class AvailDataSubmissionIndexer {
       
       return {
         extrinsicHash: submission.txHash,
-        txHash: submission.txHash,
         blockNumber: blockData.number,
         blockHash: blockData.hash,
+        blockTimestamp: blockData.timestamp ? new Date(blockData.timestamp) : null,
         extrinsicIndex: submission.extrinsicIndex,
         appId,
         rollupName: null,
         dataSize: submission.dataSize || 0,
         dataHash,
-        submitter: submission.submitter || 'unknown',
-        timestamp: new Date(),
+        submitter: submission.submitter || '5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM', // Default to Alice account if no submitter
+        timestamp: blockData.timestamp ? new Date(blockData.timestamp) : new Date(),
         success: submission.success,
         blobData: null, // Would need to extract from extrinsic args
         kateCommitment: null,
@@ -598,6 +640,8 @@ export class AvailDataSubmissionIndexer {
       });
     }
   }
+
+  
 
   /**
    * Disconnect from services
