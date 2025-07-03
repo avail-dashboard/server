@@ -154,7 +154,7 @@ export class AccountIndexer implements IAccountIndexer {
     try {
       // Only queue validator indexing if account is identified as a validator
       if (accountData.isValidator) {
-        await this.queueService.addJob(JobType.INDEX_VALIDATOR, { validatorId: accountData.address });
+        await this.queueService.addJob(JobType.INDEX_VALIDATOR, { validatorAddress: accountData.address });
         
         logger.info('Cross-domain validator job queued from account indexing', {
           component: 'account-indexer',

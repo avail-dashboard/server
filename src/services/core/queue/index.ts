@@ -1106,29 +1106,51 @@ export class QueueService implements QueueServiceInterface {
   }
 
   /**
-   * Create unique job ID for deduplication based on job type and key data
+   * Create unique job ID for deduplication based on job type and standardized data interfaces
+   * 
+   * Uses the defined TypeScript interfaces from types.ts to ensure consistent field access:
+   * - ValidatorIndexingJobData: { validatorAddress }
+   * - AccountIndexingJobData: { accountAddress }
+   * - TransferIndexingJobData: { transferId?, blockNumber }
+   * - DataSubmissionIndexingJobData: { blockNumber }
+   * - ExtrinsicIndexingJobData: { blockNumber }
+   * - BlockRangeIndexingJobData: { startBlock, endBlock }
    */
   private createJobId(type: string, data: any): string {
     let keyValue = '';
     
-    // Extract key identifying data based on job type
+    // Extract key identifying data based on standardized job type interfaces
     switch (type) {
     case 'index_validator':
-      keyValue = data.validatorId || data.address || '';
+      // ValidatorIndexingJobData interface: { validatorAddress }
+      keyValue = data.validatorAddress || '';
       break;
     case 'index_account':
-      keyValue = data.accountAddress || data.address || '';
+      // AccountIndexingJobData interface: { accountAddress }
+      keyValue = data.accountAddress || '';
       break;
     case 'index_transfer':
-      keyValue = data.transferId || `${data.blockNumber}-${data.transferIds?.join(',')}` || '';
+      // TransferIndexingJobData interface: { transferId?, blockNumber }
+      keyValue = data.transferId || data.blockNumber?.toString() || '';
       break;
     case 'index_data_submission':
-      keyValue = `${data.startBlock}-${data.endBlock}` || '';
+      // DataSubmissionIndexingJobData interface: { blockNumber }
+      keyValue = data.blockNumber?.toString() || '';
       break;
     case 'block_range_indexing':
-      keyValue = `${data.startBlock}-${data.endBlock}` || '';
+      // BlockRangeIndexingJobData interface: { startBlock, endBlock }
+      keyValue = `${data.startBlock}-${data.endBlock}`;
+      break;
+    case 'extrinsic_processing':
+      // ExtrinsicIndexingJobData interface: { blockNumber }
+      keyValue = data.blockNumber?.toString() || '';
+      break;
+    case 'block_indexing':
+      // BlockIndexingJobData interface: { blockNumber }
+      keyValue = data.blockNumber?.toString() || '';
       break;
     default:
+      // Fallback for unknown job types
       keyValue = JSON.stringify(data);
     }
     

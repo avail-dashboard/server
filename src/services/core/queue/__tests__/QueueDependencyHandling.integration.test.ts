@@ -392,7 +392,7 @@ describe('Queue-Based Dependency Handling Integration', () => {
       // Act
       // Create jobs with dependencies
       await queueService.addJob(JobType.INDEX_ACCOUNT, { accountAddress: '5D5ZbGH...' }, { priority: JobPriority.HIGH });
-      await queueService.addJob(JobType.INDEX_VALIDATOR, { validatorId: '5D5ZbGH...' }, { priority: JobPriority.MEDIUM });
+      await queueService.addJob(JobType.INDEX_VALIDATOR, { validatorAddress: '5D5ZbGH...' }, { priority: JobPriority.MEDIUM });
 
       // Wait for processing
       await new Promise(resolve => setTimeout(resolve, 500));

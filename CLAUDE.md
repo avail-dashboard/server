@@ -15,6 +15,8 @@
 
 12. when told "delegate-task" followed by the task and developer name, refer Team/SENIOR-DEVELOPER-GUIDE.md
 
+13. Please use `gemini -p prompt` with tasks you trust it can do, -y to accept all actions.
+
 https://github.com/availproject/avail - for avail sdk & taking major design choices
 https://github.com/polkadot-js/api - for polkadot-js/api codebase for getting an idea of how other substrate based blockchains work
 https://deepwiki.com/availproject/avail - for avail deepwiki, this might be old dated

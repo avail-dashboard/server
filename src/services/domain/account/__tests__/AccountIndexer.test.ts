@@ -176,7 +176,7 @@ describe('AccountIndexer', () => {
       // Assert
       expect(result.success).toBe(true);
       expect(mockQueueService.addJob).toHaveBeenCalledWith('INDEX_VALIDATOR', {
-        validatorId: '5ACCOUNT123...',
+        validatorAddress: '5ACCOUNT123...',
       });
       expect(mockQueueService.addJob).toHaveBeenCalledTimes(1);
     });
@@ -396,7 +396,7 @@ describe('AccountIndexer', () => {
       // Assert
       expect(mockQueueService.addJob).toHaveBeenCalledWith(
         'INDEX_VALIDATOR',
-        { validatorId: '5ACCOUNT123...' }
+        { validatorAddress: '5ACCOUNT123...' }
       );
       expect(mockQueueService.addJob).toHaveBeenCalledTimes(1);
       
@@ -450,7 +450,7 @@ describe('AccountIndexer', () => {
       expect(result.accountData).toBeDefined();
       expect(mockQueueService.addJob).toHaveBeenCalledWith(
         'INDEX_VALIDATOR',
-        { validatorId: '5ACCOUNT123...' }
+        { validatorAddress: '5ACCOUNT123...' }
       );
     });
   });

@@ -42,6 +42,8 @@ CREATE TABLE "extrinsics" (
     "id" SERIAL NOT NULL,
     "hash" VARCHAR(66) NOT NULL,
     "block_number" INTEGER NOT NULL,
+    "block_hash" VARCHAR(66),
+    "block_timestamp" TIMESTAMP(3),
     "extrinsic_index" INTEGER,
     "module" VARCHAR(50),
     "call" VARCHAR(50),
@@ -69,9 +71,9 @@ CREATE TABLE "accounts" (
     "address" VARCHAR(64) NOT NULL,
     "balance" INTEGER,
     "nonce" INTEGER,
-    "current_balance" BIGINT,
-    "reserved_balance" BIGINT,
-    "frozen_balance" BIGINT,
+    "current_balance" TEXT,
+    "reserved_balance" TEXT,
+    "frozen_balance" TEXT,
     "account_type" "AccountType" NOT NULL DEFAULT 'regular',
     "identity_name" VARCHAR(255),
     "identity_info" JSONB,
@@ -88,6 +90,8 @@ CREATE TABLE "accounts" (
 CREATE TABLE "events" (
     "id" SERIAL NOT NULL,
     "block_number" INTEGER NOT NULL,
+    "block_hash" VARCHAR(66),
+    "block_timestamp" TIMESTAMP(3),
     "extrinsic_index" INTEGER,
     "event_index" INTEGER,
     "module" VARCHAR(50),
@@ -140,6 +144,8 @@ CREATE TABLE "data_submissions" (
     "id" SERIAL NOT NULL,
     "extrinsic_hash" VARCHAR(66) NOT NULL,
     "block_number" INTEGER NOT NULL,
+    "block_hash" VARCHAR(66),
+    "block_timestamp" TIMESTAMP(3),
     "extrinsic_index" INTEGER,
     "app_id" INTEGER NOT NULL,
     "rollup_name" VARCHAR(255),
@@ -200,6 +206,8 @@ CREATE TABLE "transfers" (
     "id" TEXT NOT NULL,
     "extrinsic_hash" VARCHAR(66) NOT NULL,
     "block_number" INTEGER NOT NULL,
+    "block_hash" VARCHAR(66),
+    "block_timestamp" TIMESTAMP(3),
     "extrinsic_index" INTEGER NOT NULL,
     "from_address" VARCHAR(64) NOT NULL,
     "to_address" VARCHAR(64) NOT NULL,
@@ -249,6 +257,8 @@ CREATE TABLE "rewards" (
     "era" INTEGER NOT NULL,
     "reward_type" "RewardType" NOT NULL,
     "block_number" INTEGER NOT NULL,
+    "block_hash" VARCHAR(66),
+    "block_timestamp" TIMESTAMP(3),
     "timestamp" TIMESTAMP(3) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -413,57 +423,3 @@ CREATE INDEX "idx_rewards_type" ON "rewards"("reward_type");
 
 -- CreateIndex
 CREATE INDEX "idx_rewards_block" ON "rewards"("block_number");
-
--- AddForeignKey
-ALTER TABLE "blocks" ADD CONSTRAINT "blocks_validator_address_fkey" FOREIGN KEY ("validator_address") REFERENCES "validators"("stash_address") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "extrinsics" ADD CONSTRAINT "extrinsics_block_number_fkey" FOREIGN KEY ("block_number") REFERENCES "blocks"("number") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "events" ADD CONSTRAINT "events_block_number_fkey" FOREIGN KEY ("block_number") REFERENCES "blocks"("number") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "data_submissions" ADD CONSTRAINT "data_submissions_block_number_fkey" FOREIGN KEY ("block_number") REFERENCES "blocks"("number") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "data_submissions" ADD CONSTRAINT "data_submissions_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "rollups"("app_id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "validators" ADD CONSTRAINT "validators_stash_address_fkey" FOREIGN KEY ("stash_address") REFERENCES "accounts"("address") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "validators" ADD CONSTRAINT "validators_controller_address_fkey" FOREIGN KEY ("controller_address") REFERENCES "accounts"("address") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "validators" ADD CONSTRAINT "validators_reward_address_fkey" FOREIGN KEY ("reward_address") REFERENCES "accounts"("address") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "transfers" ADD CONSTRAINT "transfers_block_number_fkey" FOREIGN KEY ("block_number") REFERENCES "blocks"("number") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "transfers" ADD CONSTRAINT "transfers_extrinsic_hash_fkey" FOREIGN KEY ("extrinsic_hash") REFERENCES "extrinsics"("hash") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "transfers" ADD CONSTRAINT "transfers_from_address_fkey" FOREIGN KEY ("from_address") REFERENCES "accounts"("address") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "transfers" ADD CONSTRAINT "transfers_to_address_fkey" FOREIGN KEY ("to_address") REFERENCES "accounts"("address") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "nominations" ADD CONSTRAINT "nominations_nominator_address_fkey" FOREIGN KEY ("nominator_address") REFERENCES "accounts"("address") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "nominations" ADD CONSTRAINT "nominations_validator_address_fkey" FOREIGN KEY ("validator_address") REFERENCES "validators"("stash_address") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "rewards" ADD CONSTRAINT "rewards_address_fkey" FOREIGN KEY ("address") REFERENCES "accounts"("address") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "rewards" ADD CONSTRAINT "rewards_validator_address_fkey" FOREIGN KEY ("validator_address") REFERENCES "validators"("stash_address") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "rewards" ADD CONSTRAINT "rewards_era_fkey" FOREIGN KEY ("era") REFERENCES "eras"("number") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "rewards" ADD CONSTRAINT "rewards_block_number_fkey" FOREIGN KEY ("block_number") REFERENCES "blocks"("number") ON DELETE RESTRICT ON UPDATE CASCADE;

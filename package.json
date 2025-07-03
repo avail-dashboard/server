@@ -5,38 +5,45 @@
   "main": "dist/index.js",
   "scripts": {
     "setup": "node setup-dev.js",
+
     "dev": "ENV_FILE=.env.local tsx watch src/index.ts < /dev/null",
     "dev:prod": "ENV_FILE=.env.production tsx watch src/index.ts < /dev/null",
     "build": "tsc",
     "start": "ENV_FILE=.env.production node dist/index.js",
+
     "test": "ENV_FILE=.env.test jest",
     "test:watch": "ENV_FILE=.env.test jest --watch",
     "test:coverage": "ENV_FILE=.env.test jest --coverage",
     "test:unit": "ENV_FILE=.env.test jest tests/unit",
     "test:integration": "ENV_FILE=.env.test jest tests/integration",
-    "test:e2e": "ENV_FILE=.env.test jest tests/e2e",
+    "test:e2e": "npm run db:test:reset && ENV_FILE=.env.test jest tests/e2e",
     "test:ci": "ENV_FILE=.env.test jest --coverage --watchAll=false --passWithNoTests",
     "test:all": "npm run build && npm run lint && npm test",
     "test:critical": "npm run build && npm run lint && npm run test:unit && npm run test:e2e",
     "test:api": "ENV_FILE=.env.test jest tests/integration/routes",
+
     "test:camelcase": "ENV_FILE=.env.test jest tests/unit/utils/caseConverter.test.ts",
     "test:camelcase-routes": "ENV_FILE=.env.test NODE_ENV=test jest tests/integration/routes/api.test.ts",
     "test:camelcase-all": "npm run test:camelcase && npm run test:camelcase-routes",
+
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "lint:check": "eslint src/**/*.ts --max-warnings 0",
     "format": "prettier --write src/**/*.ts",
     "validate:workflows": "node .github/validate-workflows.js",
+
     "sync:full": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode full",
     "sync:incremental": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode incremental",
     "sync:live": "ENV_FILE=.env.production tsx scripts/sync-blockchain-data.ts --mode live",
     "sync:range": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode range",
     "sync:test": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode range --from 1000000 --to 1000010 --batch-size 5",
-    "test:phase1:integration": "ENV_FILE=.env.test jest tests/integration/phase1-integration.test.ts",
+
     "db:init": "npm run prisma:migrate:deploy && npm run prisma:generate",
     "db:reset": "npm run prisma:migrate:reset && npm run prisma:generate",
     "db:seed": "ENV_FILE=.env.local tsx scripts/seed-database.ts",
     "db:check": "ENV_FILE=.env.local tsx scripts/check-schema.ts",
+    "db:inspect": "ENV_FILE=.env.local tsx scripts/inspect-db.ts",
+
     "prisma:generate": "dotenv -e .env.local -- prisma generate",
     "prisma:migrate:dev": "dotenv -e .env.local -- prisma migrate dev",
     "prisma:migrate:deploy": "dotenv -e .env.local -- prisma migrate deploy",
@@ -44,6 +51,7 @@
     "prisma:push": "dotenv -e .env.local -- prisma db push",
     "prisma:pull": "dotenv -e .env.local -- prisma db pull",
     "prisma:studio": "dotenv -e .env.local -- prisma studio",
+
     "pre-commit": "npm run test:critical",
     "prepare": "husky install"
   },
