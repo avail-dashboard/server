@@ -80,7 +80,8 @@ router.get('/hash/:hash',
       const transfer = await transferService.getTransferByHash(hash);
 
       if (!transfer) {
-        return res.status(404).json(formatErrorResponse('Transfer not found', 'TRANSFER_NOT_FOUND', 404));
+        res.status(404).json(formatErrorResponse('Transfer not found', 'TRANSFER_NOT_FOUND', 404));
+        return;
       }
 
       res.json(formatSingleResponse(transfer, {
@@ -103,7 +104,8 @@ router.get('/block/:blockNumber',
       const blockNumber = parseInt(req.params.blockNumber);
 
       if (isNaN(blockNumber)) {
-        return res.status(400).json(formatErrorResponse('Invalid block number', 'INVALID_BLOCK_NUMBER', 400));
+        res.status(400).json(formatErrorResponse('Invalid block number', 'INVALID_BLOCK_NUMBER', 400));
+        return;
       }
 
       // Parse pagination options
@@ -138,7 +140,8 @@ router.get('/account/:address',
 
       // Basic address validation
       if (!address || address.length < 10) {
-        return res.status(400).json(formatErrorResponse('Invalid address format', 'INVALID_ADDRESS', 400));
+        res.status(400).json(formatErrorResponse('Invalid address format', 'INVALID_ADDRESS', 400));
+        return;
       }
 
       // Parse pagination options
@@ -174,7 +177,8 @@ router.get('/:id',
       const transfer = await transferService.getTransfer(transferId);
 
       if (!transfer) {
-        return res.status(404).json(formatErrorResponse('Transfer not found', 'TRANSFER_NOT_FOUND', 404));
+        res.status(404).json(formatErrorResponse('Transfer not found', 'TRANSFER_NOT_FOUND', 404));
+        return;
       }
 
       res.json(formatSingleResponse(transfer, {

@@ -2,6 +2,7 @@ import { logger, logError } from '../../../utils/logger';
 import { TransferRepository } from '../../../database/repositories/TransferRepository';
 import { BlockData } from '../../types/blockchain';
 import { JobType } from '../../types/service';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export interface ITransferIndexer {
   indexTransfersForBlock(blockData: BlockData): Promise<TransferIndexingResult>;
@@ -80,9 +81,9 @@ export class TransferIndexer implements ITransferIndexer {
         extrinsicIndex: transferData.extrinsicIndex,
         fromAddress: transferData.fromAddress,
         toAddress: transferData.toAddress,
-        amount: parseInt(transferData.amount),
+        amount: new Decimal(transferData.amount),
         tokenType: 'AVAIL',
-        fees: parseInt(transferData.fee || '0'),
+        fees: new Decimal(transferData.fee || '0'),
         status: transferData.success ? 'success' as const : 'failed' as const,
         timestamp: transferData.timestamp,
       };

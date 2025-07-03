@@ -18,6 +18,7 @@ import { ExtrinsicRepository } from '../../../database/repositories/ExtrinsicRep
 import { ValidatorRepository } from '../../../database/repositories/ValidatorRepository';
 import { RewardRepository } from '../../../database/repositories/RewardRepository';
 import { Account, Extrinsic, Validator, Reward } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { BaseService, ServiceHealth } from '../../types/service';
 import db from '../../../utils/database';
 import {
@@ -116,8 +117,8 @@ export class AccountApiService implements BaseService, IAccountService {
         validator: validator || undefined,
         transferCount,
         extrinsicCount,
-        totalTransferred: transferStats.totalSent,
-        totalReceived: transferStats.totalReceived,
+        totalTransferred: new Decimal(transferStats.totalSent),
+        totalReceived: new Decimal(transferStats.totalReceived),
       };
 
       logger.debug('AccountApiService: Account details retrieved', { 
@@ -391,8 +392,8 @@ export class AccountApiService implements BaseService, IAccountService {
         totalRewards: rewardCount,
         firstActivity: activityDates.first,
         lastActivity: activityDates.last,
-        totalSent: transferStats.totalSent,
-        totalReceived: transferStats.totalReceived,
+        totalSent: new Decimal(transferStats.totalSent),
+        totalReceived: new Decimal(transferStats.totalReceived),
       };
 
       logger.debug('AccountApiService: Account statistics retrieved', { 

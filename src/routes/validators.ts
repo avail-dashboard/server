@@ -59,7 +59,8 @@ router.get('/:address',
 
       // Validate address format
       if (!address || address.length < 40) {
-        return res.status(400).json(formatErrorResponse('Invalid validator address format', 'INVALID_ADDRESS', 400));
+        res.status(400).json(formatErrorResponse('Invalid validator address format', 'INVALID_ADDRESS', 400));
+        return;
       }
 
       const serviceFactory = ServiceFactory.getInstance();

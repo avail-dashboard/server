@@ -231,15 +231,15 @@ export class RewardRepository extends BaseRepository {
     const rewardsByTypeMap: Record<string, { amount: number; count: number }> = {};
     rewardsByType.forEach(item => {
       rewardsByTypeMap[item.rewardType] = {
-        amount: item._sum.amount || 0,
+        amount: Number(item._sum.amount || 0),
         count: item._count,
       };
     });
 
     return {
-      totalRewards: aggregates._sum.amount || 0,
+      totalRewards: Number(aggregates._sum.amount || 0),
       rewardCount: aggregates._count,
-      averageReward: aggregates._avg.amount || 0,
+      averageReward: Number(aggregates._avg.amount || 0),
       rewardsByType: rewardsByTypeMap,
     };
   }
@@ -268,12 +268,12 @@ export class RewardRepository extends BaseRepository {
     ]);
 
     const breakdown = typeBreakdown.reduce((acc, item) => {
-      acc[item.rewardType] = item._sum.amount || 0;
+      acc[item.rewardType] = Number(item._sum.amount || 0);
       return acc;
     }, {} as Record<string, number>);
 
     return {
-      totalDistributed: aggregates._sum.amount || 0,
+      totalDistributed: Number(aggregates._sum.amount || 0),
       validatorRewards: breakdown.validator || 0,
       nominatorRewards: breakdown.nominator || 0,
       slashAmount: breakdown.slash || 0,

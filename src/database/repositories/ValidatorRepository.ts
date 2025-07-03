@@ -1,4 +1,5 @@
 import { Validator, ValidatorStatus } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { BaseRepository } from './BaseRepository';
 
 // Note: ValidatorWithRelations type is kept for backward compatibility
@@ -10,8 +11,8 @@ export type ValidatorCreateInput = {
   controllerAddress?: string | null;
   rewardAddress?: string | null;
   commission: number;
-  selfBonded: number;
-  totalBonded: number;
+  selfBonded: Decimal;
+  totalBonded: Decimal;
   nominatorCount?: number;
   status?: ValidatorStatus;
   sessionKeys?: any;
@@ -243,7 +244,7 @@ export class ValidatorRepository extends BaseRepository {
     return {
       totalValidators: total,
       activeValidators: active,
-      totalStaked: staking._sum.totalBonded || 0,
+      totalStaked: Number(staking._sum.totalBonded || 0),
       averageCommission: commission._avg.commission || 0,
     };
   }

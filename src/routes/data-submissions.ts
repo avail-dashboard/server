@@ -113,17 +113,18 @@ router.get('/:submissionId',
     try {
       const { submissionId } = req.params;
 
-      // Parse submission ID (format: blockNumber-extrinsicIndex)
-      const parts = submissionId.split('-');
-      if (parts.length !== 2) {
-        return res.status(400).json(formatErrorResponse('Invalid submission ID format. Expected: blockNumber-extrinsicIndex', 'INVALID_PARAMETERS', 400));
+      if (!submissionId || !submissionId.includes('-')) {
+        res.status(400).json(formatErrorResponse('Invalid submission ID format. Expected: blockNumber-extrinsicIndex', 'INVALID_PARAMETERS', 400));
+        return;
       }
 
-      const blockNumber = parseInt(parts[0], 10);
-      const extrinsicIndex = parseInt(parts[1], 10);
+      const [blockNumberStr, extrinsicIndexStr] = submissionId.split('-');
+      const blockNumber = parseInt(blockNumberStr);
+      const extrinsicIndex = parseInt(extrinsicIndexStr);
 
       if (isNaN(blockNumber) || isNaN(extrinsicIndex)) {
-        return res.status(400).json(formatErrorResponse('Invalid submission ID format. Block number and extrinsic index must be numbers.', 'INVALID_PARAMETERS', 400));
+        res.status(400).json(formatErrorResponse('Invalid submission ID format. Block number and extrinsic index must be numbers.', 'INVALID_PARAMETERS', 400));
+        return;
       }
 
       const dataSubmissionService = serviceFactory.get<IDataSubmissionService>('dataSubmissionApiService');
@@ -131,7 +132,8 @@ router.get('/:submissionId',
       const submission = blockResult.data.find((sub: any) => sub.extrinsicIndex === extrinsicIndex);
 
       if (!submission) {
-        return res.status(404).json(formatErrorResponse('Data submission not found', 'NOT_FOUND', 404));
+        res.status(404).json(formatErrorResponse('Data submission not found', 'NOT_FOUND', 404));
+        return;
       }
 
       res.json(formatSingleResponse(submission));

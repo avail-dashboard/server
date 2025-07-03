@@ -151,16 +151,17 @@ router.get('/rollups/:appId',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const appId = parseInt(req.params.appId);
+      const appId = req.params.appId;
       const period = req.query.period as string || '24h';
 
-      if (isNaN(appId)) {
-        return res.status(400).json(formatErrorResponse('Invalid app ID format', 'INVALID_APP_ID', 400));
+      if (!appId || isNaN(parseInt(appId))) {
+        res.status(400).json(formatErrorResponse('Invalid app ID format', 'INVALID_APP_ID', 400));
+        return;
       }
 
       // TODO: Implement specific rollup analytics
       const rollupDetails = {
-        app_id: appId,
+        app_id: parseInt(appId),
         name: `App ${appId}`, // TODO: Get from rollup registry
         statistics: {
           total_submissions: 0,
@@ -187,7 +188,7 @@ router.get('/rollups/:appId',
       res.json(formatSingleResponse(rollupDetails, {
         source: 'rpc',
         period,
-        app_id: appId.toString(),
+        app_id: appId,
         note: 'Specific rollup analytics implementation in progress',
       }));
     } catch (error) {

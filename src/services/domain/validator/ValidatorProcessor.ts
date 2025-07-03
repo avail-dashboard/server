@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { logger, logError } from '../../../utils/logger';
 import { ValidatorRepository } from '../../../database/repositories/ValidatorRepository';
 import { SelfHealingProcessor, ExtractedEntity, ENTITY_TYPES, DependencyResolver } from '../../types/self-healing';
@@ -269,8 +270,8 @@ export class ValidatorProcessor implements SelfHealingProcessor {
         validator = await this.validatorRepository.create({
           stashAddress,
           commission: 0, // Default commission
-          selfBonded: 0,
-          totalBonded: 0,
+          selfBonded: new Decimal(0),
+          totalBonded: new Decimal(0),
           nominatorCount: 0,
           status: 'active',
           blocksProduced: 1,

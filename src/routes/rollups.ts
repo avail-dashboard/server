@@ -137,30 +137,33 @@ router.get('/:appId',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const appId = parseInt(req.params.appId);
+      const appId = req.params.appId;
 
-      if (isNaN(appId)) {
-        return res.status(400).json({
+      if (!appId || isNaN(parseInt(appId))) {
+        res.status(400).json({
           success: false,
           error: {
             code: 'INVALID_APP_ID',
-            message: 'Invalid app ID format',
+            message: 'Invalid app ID format. Must be a number.',
           },
         });
+        return;
       }
+
+      const appIdNum = parseInt(appId);
 
       // TODO: Implement database query for specific rollup
       // For now, return placeholder data
       const rollupDetails = {
-        app_id: appId,
-        name: `Rollup ${appId}`,
-        description: `Detailed information for rollup ${appId}`,
+        app_id: appIdNum,
+        name: `Rollup ${appIdNum}`,
+        description: `Detailed information for rollup ${appIdNum}`,
         first_seen: '2024-01-01T00:00:00Z',
         last_active: new Date().toISOString(),
         total_submissions: 1250,
         total_data_size: 52428800, // 50MB
         total_fees_paid: '1500000000000000000', // 1.5 AVAIL
-        website: `https://rollup${appId}.com`,
+        website: `https://rollup${appIdNum}.com`,
         logo_url: null,
         statistics: {
           submissions_24h: 45,
@@ -193,45 +196,44 @@ router.get('/:appId/submissions',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const appId = parseInt(req.params.appId);
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 50;
+      const appId = req.params.appId;
 
-      if (isNaN(appId)) {
-        return res.status(400).json({
+      if (!appId || isNaN(parseInt(appId))) {
+        res.status(400).json({
           success: false,
           error: {
             code: 'INVALID_APP_ID',
-            message: 'Invalid app ID format',
+            message: 'Invalid app ID format. Must be a number.',
           },
         });
+        return;
       }
+
+      const appIdNum = parseInt(appId);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
 
       // TODO: Implement database query for rollup submissions
       // For now, return placeholder data
-      const submissions = [
-        {
-          extrinsic_id: 'hash123',
-          block_number: 1000000,
-          extrinsic_index: 2,
-          signer: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-          timestamp: new Date().toISOString(),
-          data_size: 1024,
-          data_hash: '0x1234567890abcdef',
-          kate_commitment: '0xabcdef1234567890',
-          success: true,
+      const submissions = {
+        data: Array.from({ length: Math.min(limit, 10) }, (_, i) => ({
+          id: `${appIdNum}-${page}-${i + 1}`,
+          rollup_id: appIdNum,
+          block_number: 1000000 + i,
+          extrinsic_index: i,
+          data_size: 1024 * (i + 1),
+          fee_paid: '100000000000000000', // 0.1 AVAIL
+          timestamp: new Date(Date.now() - i * 60000).toISOString(),
+        })),
+        pagination: {
+          page,
+          limit,
+          total: 1250,
+          total_pages: Math.ceil(1250 / limit),
         },
-      ];
-
-      const submissionsData = {
-        submissions,
-        total_count: submissions.length,
       };
 
-      res.json(formatSingleResponse(submissionsData, {
-        page,
-        limit,
-        total: submissions.length,
+      res.json(formatSingleResponse(submissions, {
         source: 'rpc',
       }));
     } catch (error) {
@@ -252,43 +254,42 @@ router.get('/:appId/blobs',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const appId = parseInt(req.params.appId);
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
+      const appId = req.params.appId;
 
-      if (isNaN(appId)) {
-        return res.status(400).json({
+      if (!appId || isNaN(parseInt(appId))) {
+        res.status(400).json({
           success: false,
           error: {
             code: 'INVALID_APP_ID',
-            message: 'Invalid app ID format',
+            message: 'Invalid app ID format. Must be a number.',
           },
         });
+        return;
       }
 
-      // TODO: Implement blob data retrieval
-      const blobs = [
-        {
-          blob_id: 'blob_123',
-          signer: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-          timestamp: new Date().toISOString(),
-          share_commitments: ['0xcommit1', '0xcommit2'],
-          size: 2048,
-          data_hash: '0x1234567890abcdef',
-          kate_commitment: '0xabcdef1234567890',
-          downloadable: true,
-        },
-      ];
+      const appIdNum = parseInt(appId);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
 
-      const blobsData = {
-        blobs,
-        total_count: blobs.length,
+      // TODO: Implement blob data retrieval
+      const blobs = {
+        data: Array.from({ length: Math.min(limit, 5) }, (_, i) => ({
+          id: `blob-${appIdNum}-${page}-${i + 1}`,
+          rollup_id: appIdNum,
+          block_number: 1000000 + i,
+          data_hash: `0x${Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`,
+          size: 2048 * (i + 1),
+          timestamp: new Date(Date.now() - i * 120000).toISOString(),
+        })),
+        pagination: {
+          page,
+          limit,
+          total: 425,
+          total_pages: Math.ceil(425 / limit),
+        },
       };
 
-      res.json(formatSingleResponse(blobsData, {
-        page,
-        limit,
-        total: blobs.length,
+      res.json(formatSingleResponse(blobs, {
         source: 'rpc',
       }));
     } catch (error) {
@@ -309,40 +310,48 @@ router.get('/:appId/analytics',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const appId = parseInt(req.params.appId);
-      const period = req.query.period as string || '24h';
+      const appId = req.params.appId;
 
-      if (isNaN(appId)) {
-        return res.status(400).json({
+      if (!appId || isNaN(parseInt(appId))) {
+        res.status(400).json({
           success: false,
           error: {
             code: 'INVALID_APP_ID',
-            message: 'Invalid app ID format',
+            message: 'Invalid app ID format. Must be a number.',
           },
         });
+        return;
       }
+
+      const appIdNum = parseInt(appId);
+
+      const period = req.query.period as string || '24h';
 
       // TODO: Implement rollup analytics calculation
       const analytics = {
+        app_id: appIdNum,
         period,
-        da_usage: {
-          total_submissions: 1250,
-          total_data_size: 52428800,
-          average_submission_size: 41943,
+        submissions: {
+          total: 1250,
+          average_per_hour: 52,
+          peak_hour: '14:00',
+          peak_submissions: 89,
         },
-        blob_count: {
-          total_blobs: 1250,
-          blobs_24h: 45,
-          average_blob_size: 41943,
+        data_usage: {
+          total_size: 52428800, // 50MB
+          average_size: 41943, // ~41KB
+          largest_submission: 1048576, // 1MB
         },
-        fees_paid: {
-          total_fees: '1500000000000000000',
-          fees_24h: '50000000000000000',
-          cost_per_mb: '30000000000000000',
+        fees: {
+          total_paid: '1500000000000000000', // 1.5 AVAIL
+          average_fee: '1200000000000000', // 0.0012 AVAIL
+          total_usd_value: 0.45, // Placeholder
         },
-        blob_size_distribution: [], // TODO: Histogram data
-        submission_frequency: [], // TODO: Time series data
-        cost_efficiency_trend: [], // TODO: Cost per MB over time
+        performance: {
+          success_rate: 99.2,
+          average_confirmation_time: 12.5, // seconds
+          uptime: 99.8,
+        },
       };
 
       res.json(formatSingleResponse(analytics, {

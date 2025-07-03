@@ -3,6 +3,7 @@ import { AvailBlockchainService } from '../../core/avail-blockchain';
 import { ValidatorRepository } from '../../../database/repositories/ValidatorRepository';
 import { ValidatorInfo } from '../../types/blockchain';
 import { JobType } from '../../types/service';
+import { Decimal } from '@prisma/client/runtime/library';
 
 /**
  * ValidatorIndexer - Fetches validator data from blockchain and stores it
@@ -108,8 +109,8 @@ export class ValidatorIndexer implements IValidatorIndexer {
         stashAddress: validatorData.accountId,
         controllerAddress: validatorData.controller || null,
         commission: parseFloat(validatorData.commission) || 0,
-        selfBonded: parseInt(validatorData.stake.own || '0'),
-        totalBonded: parseInt(validatorData.stake.total || '0'),
+        selfBonded: new Decimal(validatorData.stake.own || '0'),
+        totalBonded: new Decimal(validatorData.stake.total || '0'),
         nominatorCount: validatorData.nominators.length,
         status: validatorData.blocked ? 'inactive' as const : 'active' as const,
         identityName: validatorData.identity?.display || null,

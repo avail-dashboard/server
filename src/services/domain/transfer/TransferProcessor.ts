@@ -3,6 +3,7 @@ import { AvailBlockchainService } from '../../core/avail-blockchain';
 import { TransferRepository } from '../../../database/repositories/TransferRepository';
 import { SelfHealingProcessor, ExtractedEntity, DependencyResolver } from '../../types/self-healing';
 import { BlockData, ExtrinsicData } from '../../types/blockchain';
+import { Decimal } from '@prisma/client/runtime/library';
 
 /**
  * TransferProcessor - Self-Healing Transfer Data Processor
@@ -281,9 +282,9 @@ export class TransferProcessor implements SelfHealingProcessor {
         blockTimestamp: transferData.timestamp,
         fromAddress: transferData.fromAddress,
         toAddress: transferData.toAddress,
-        amount: parseInt(transferData.amount),
+        amount: new Decimal(transferData.amount),
         tokenType: 'AVAIL',
-        fees: parseInt(transferData.fee),
+        fees: new Decimal(transferData.fee),
         status: transferData.success ? 'success' : 'failed',
         blockNumber: transferData.blockNumber,
         extrinsicIndex: transferData.extrinsicIndex,

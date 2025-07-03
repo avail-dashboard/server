@@ -298,6 +298,13 @@ export const config = {
       oldBlocks: 86400,          // 24 hours
       eraData: 1800,             // 30 minutes
       sessionData: 900,          // 15 minutes
+      // Missing cache TTL properties
+      validators: 300,           // 5 minutes
+      accountBalance: 60,        // 1 minute
+      chainStats: 300,           // 5 minutes
+      blocks: 1800,              // 30 minutes
+      blockByNumber: 3600,       // 1 hour
+      blockByHash: 3600,         // 1 hour
     },
   },
 

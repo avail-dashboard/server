@@ -237,7 +237,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
       ]);
 
       const totalStaked = allValidators.validators.reduce(
-        (sum, validator) => sum + validator.totalBonded,
+        (sum, validator) => sum + Number(validator.totalBonded),
         0
       );
 
@@ -246,7 +246,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
         : 0;
 
       const topValidators = allValidators.validators
-        .sort((a, b) => b.totalBonded - a.totalBonded)
+        .sort((a, b) => Number(b.totalBonded) - Number(a.totalBonded))
         .slice(0, 10);
 
       const stats: ValidatorStats = {
@@ -292,7 +292,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
 
       const result = await this.nominationRepository.findByValidator(address, { page, limit });
       const totalNominated = result.nominations.reduce(
-        (sum, nomination) => sum + nomination.amount,
+        (sum, nomination) => sum + Number(nomination.amount),
         0
       );
 
@@ -460,7 +460,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
       ]);
 
       const totalStaked = allValidators.validators.reduce(
-        (sum, validator) => sum + validator.totalBonded,
+        (sum, validator) => sum + Number(validator.totalBonded),
         0
       );
 

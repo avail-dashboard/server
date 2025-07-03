@@ -131,7 +131,7 @@ export class EraRepository extends BaseRepository {
       totalEras: total,
       currentEra: current?.number || null,
       averageValidatorCount: aggregates._avg.validatorCount || 0,
-      totalStakeHistory: aggregates._sum.totalStaked || 0,
+      totalStakeHistory: Number(aggregates._sum.totalStaked) || 0,
     };
   }
 } 

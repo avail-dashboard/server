@@ -303,9 +303,9 @@ export class TransferRepository extends BaseRepository {
 
     return {
       totalTransfers: total,
-      totalVolume: aggregates._sum.amount || 0,
-      averageAmount: aggregates._avg.amount || 0,
-      totalFees: aggregates._sum.fees || 0,
+      totalVolume: Number(aggregates._sum.amount || 0),
+      averageAmount: Number(aggregates._avg.amount || 0),
+      totalFees: Number(aggregates._sum.fees || 0),
       successRate: total > 0 ? (successful / total) * 100 : 0,
     };
   }
@@ -352,7 +352,7 @@ export class TransferRepository extends BaseRepository {
       const date = transfer.timestamp.toISOString().split('T')[0];
       const existing = dailyData.get(date) || { volume: 0, count: 0 };
       dailyData.set(date, {
-        volume: existing.volume + transfer.amount,
+        volume: existing.volume + Number(transfer.amount),
         count: existing.count + 1,
       });
     });
@@ -393,7 +393,7 @@ export class TransferRepository extends BaseRepository {
 
     return result.map(item => ({
       address: item.fromAddress,
-      volume: item._sum.amount || 0,
+      volume: Number(item._sum.amount || 0),
       count: item._count,
     }));
   }

@@ -127,7 +127,7 @@ export class AvailConnectionManager {
             action: 'initializeConnection',
             provider: provider.provider,
             url: provider.url,
-            error: error.message,
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }
@@ -252,7 +252,7 @@ export class AvailConnectionManager {
           component: 'avail-connection-manager', 
           action: 'disconnect',
           url: connection.url,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     });
@@ -333,7 +333,7 @@ export class AvailConnectionManager {
           component: 'avail-connection-manager',
           action: 'establishPrimaryConnection',
           url,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }

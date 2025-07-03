@@ -49,7 +49,8 @@ router.get('/:hash', async (req: Request, res: Response) => {
     const extrinsic = await extrinsicService.getExtrinsic(hash);
 
     if (!extrinsic) {
-      return res.status(404).json(formatErrorResponse('Extrinsic not found', 'NOT_FOUND', 404));
+      res.status(404).json(formatErrorResponse('Extrinsic not found', 'NOT_FOUND', 404));
+      return;
     }
 
     res.json(formatSingleResponse(extrinsic));
@@ -69,7 +70,8 @@ router.get('/block/:blockNumber', async (req: Request, res: Response) => {
     const blockNumber = parseInt(req.params.blockNumber);
 
     if (isNaN(blockNumber)) {
-      return res.status(400).json(formatErrorResponse('Invalid block number', 'INVALID_PARAMETERS', 400));
+      res.status(400).json(formatErrorResponse('Invalid block number', 'INVALID_PARAMETERS', 400));
+      return;
     }
 
     const extrinsicService = serviceFactory.get<ExtrinsicService>('extrinsicService');
@@ -93,7 +95,8 @@ router.get('/block/:blockNumber/:index', async (req: Request, res: Response) => 
     const index = parseInt(req.params.index);
 
     if (isNaN(blockNumber) || isNaN(index)) {
-      return res.status(400).json(formatErrorResponse('Invalid block number or extrinsic index', 'INVALID_PARAMETERS', 400));
+      res.status(400).json(formatErrorResponse('Invalid block number or extrinsic index', 'INVALID_PARAMETERS', 400));
+      return;
     }
 
     const extrinsicService = serviceFactory.get<ExtrinsicService>('extrinsicService');
@@ -103,7 +106,8 @@ router.get('/block/:blockNumber/:index', async (req: Request, res: Response) => 
     const extrinsic = blockExtrinsics.find(ext => ext.extrinsic_index === index);
 
     if (!extrinsic) {
-      return res.status(404).json(formatErrorResponse('Extrinsic not found', 'NOT_FOUND', 404));
+      res.status(404).json(formatErrorResponse('Extrinsic not found', 'NOT_FOUND', 404));
+      return;
     }
 
     res.json(formatSingleResponse(extrinsic));

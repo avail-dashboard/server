@@ -19,7 +19,8 @@ router.get('/',
       const query = req.query.query as string;
 
       if (!query) {
-        return res.status(400).json(formatErrorResponse('Search query parameter is required', 'VALIDATION_ERROR', 400));
+        res.status(400).json(formatErrorResponse('Search query parameter is required', 'VALIDATION_ERROR', 400));
+        return;
       }
 
       // Get search service from factory

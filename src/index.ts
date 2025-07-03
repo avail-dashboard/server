@@ -127,13 +127,14 @@ class AvailExplorerServer {
           error: err.message,
         });
         
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: {
             code: 'INVALID_JSON',
             message: 'Invalid JSON in request body',
           },
         });
+        return;
       }
       next(err);
     });
