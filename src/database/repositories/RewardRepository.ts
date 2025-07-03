@@ -4,7 +4,7 @@ export type RewardCreateInput = {
   id: string;
   address: string;
   validatorAddress?: string | null;
-  amount: bigint;
+  amount: number;
   era: number;
   rewardType: 'validator' | 'nominator' | 'slash';
   blockNumber: number;
@@ -194,10 +194,10 @@ export class RewardRepository extends BaseRepository {
     fromEra?: number;
     toEra?: number;
   } = {}): Promise<{
-    totalRewards: bigint;
+    totalRewards: number;
     rewardCount: number;
     averageReward: number;
-    rewardsByType: Record<string, { amount: bigint; count: number }>;
+    rewardsByType: Record<string, { amount: number; count: number }>;
   }> {
     const { fromEra, toEra } = params;
     
@@ -228,16 +228,16 @@ export class RewardRepository extends BaseRepository {
       }),
     ]);
 
-    const rewardsByTypeMap: Record<string, { amount: bigint; count: number }> = {};
+    const rewardsByTypeMap: Record<string, { amount: number; count: number }> = {};
     rewardsByType.forEach(item => {
       rewardsByTypeMap[item.rewardType] = {
-        amount: item._sum.amount || BigInt(0),
+        amount: item._sum.amount || 0,
         count: item._count,
       };
     });
 
     return {
-      totalRewards: aggregates._sum.amount || BigInt(0),
+      totalRewards: aggregates._sum.amount || 0,
       rewardCount: aggregates._count,
       averageReward: aggregates._avg.amount || 0,
       rewardsByType: rewardsByTypeMap,
@@ -248,10 +248,10 @@ export class RewardRepository extends BaseRepository {
    * Get era reward summary
    */
   async getEraRewardSummary(era: number): Promise<{
-    totalDistributed: bigint;
-    validatorRewards: bigint;
-    nominatorRewards: bigint;
-    slashAmount: bigint;
+    totalDistributed: number;
+    validatorRewards: number;
+    nominatorRewards: number;
+    slashAmount: number;
     rewardCount: number;
   }> {
     const [aggregates, typeBreakdown] = await Promise.all([
@@ -268,15 +268,15 @@ export class RewardRepository extends BaseRepository {
     ]);
 
     const breakdown = typeBreakdown.reduce((acc, item) => {
-      acc[item.rewardType] = item._sum.amount || BigInt(0);
+      acc[item.rewardType] = item._sum.amount || 0;
       return acc;
-    }, {} as Record<string, bigint>);
+    }, {} as Record<string, number>);
 
     return {
-      totalDistributed: aggregates._sum.amount || BigInt(0),
-      validatorRewards: breakdown.validator || BigInt(0),
-      nominatorRewards: breakdown.nominator || BigInt(0),
-      slashAmount: breakdown.slash || BigInt(0),
+      totalDistributed: aggregates._sum.amount || 0,
+      validatorRewards: breakdown.validator || 0,
+      nominatorRewards: breakdown.nominator || 0,
+      slashAmount: breakdown.slash || 0,
       rewardCount: aggregates._count,
     };
   }

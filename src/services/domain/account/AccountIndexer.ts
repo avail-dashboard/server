@@ -1,6 +1,8 @@
 import { logger, logError } from '../../../utils/logger';
 import { AvailBlockchainService } from '../../core/avail-blockchain';
+import { AccountRepository, AccountCreateInput } from '../../../database/repositories/AccountRepository';
 import { JobType } from '../../types/service';
+import { Decimal } from '@prisma/client/runtime/library';
 
 /**
  * AccountIndexer - Fetches account data from blockchain and stores it
@@ -38,10 +40,16 @@ export interface AccountData {
 
 export class AccountIndexer implements IAccountIndexer {
   private blockchain: AvailBlockchainService;
+  private accountRepository: AccountRepository;
   private queueService?: any;
 
-  constructor(blockchain: AvailBlockchainService, queueService?: any) {
+  constructor(
+    blockchain: AvailBlockchainService, 
+    accountRepository: AccountRepository,
+    queueService?: any
+  ) {
     this.blockchain = blockchain;
+    this.accountRepository = accountRepository;
     this.queueService = queueService;
   }
 
@@ -69,15 +77,53 @@ export class AccountIndexer implements IAccountIndexer {
         };
       }
 
+      // Store account data in database (convert to Decimal for unlimited precision)
+      let currentBalance: Decimal;
+      let reservedBalance: Decimal;
+      let frozenBalance: Decimal;
+      
+      try {
+        // Convert balance values to Decimal for precise handling
+        currentBalance = new Decimal(String(accountInfo.balance.free || '0'));
+        reservedBalance = new Decimal(String(accountInfo.balance.reserved || '0'));  
+        frozenBalance = new Decimal(String(accountInfo.balance.frozen || '0'));
+      } catch (balanceError) {
+        logger.warn('Failed to convert balance to Decimal, using 0', {
+          component: 'account-indexer',
+          accountAddress,
+          balanceData: accountInfo.balance,
+          error: (balanceError as Error).message,
+        });
+        currentBalance = new Decimal('0');
+        reservedBalance = new Decimal('0');
+        frozenBalance = new Decimal('0');
+      }
+
+      const accountCreateData: AccountCreateInput = {
+        address: accountInfo.address,
+        currentBalance,
+        reservedBalance,
+        frozenBalance,
+        nonce: accountInfo.nonce,
+        identityName: accountInfo.identityName,
+        accountType: accountInfo.isValidator ? 'validator' : 'regular',
+        lastActivityBlock: null, // Will be updated when we see transactions
+        transactionCount: 0,
+        transferCount: 0,
+      };
+
+      const { account: storedAccount, created } = await this.accountRepository.createIfNotExists(accountCreateData);
+
       const duration = Date.now() - startTime;
       
-      logger.info('Account indexed successfully', {
+      logger.info('Account indexed and stored successfully', {
         component: 'account-indexer',
         action: 'indexAccount',
         accountAddress,
         balance: accountInfo.balance.free,
         nonce: accountInfo.nonce,
         isValidator: accountInfo.isValidator,
+        created,
         duration,
       });
 
@@ -233,7 +279,8 @@ export class AccountIndexer implements IAccountIndexer {
  */
 export const createAccountIndexer = (
   blockchain: AvailBlockchainService,
+  accountRepository: AccountRepository,
   queueService?: any,
 ): AccountIndexer => {
-  return new AccountIndexer(blockchain, queueService);
+  return new AccountIndexer(blockchain, accountRepository, queueService);
 }; 

@@ -10,8 +10,8 @@ export type ValidatorCreateInput = {
   controllerAddress?: string | null;
   rewardAddress?: string | null;
   commission: number;
-  selfBonded: bigint;
-  totalBonded: bigint;
+  selfBonded: number;
+  totalBonded: number;
   nominatorCount?: number;
   status?: ValidatorStatus;
   sessionKeys?: any;
@@ -25,8 +25,8 @@ export type ValidatorUpdateInput = Partial<Omit<Validator, 'stashAddress' | 'cre
 
 export type ValidatorFilters = {
   status?: ValidatorStatus;
-  minTotalBonded?: bigint;
-  maxTotalBonded?: bigint;
+  minTotalBonded?: number;
+  maxTotalBonded?: number;
   hasIdentity?: boolean;
   isActive?: boolean;
 };
@@ -206,7 +206,7 @@ export class ValidatorRepository extends BaseRepository {
   async updateStats(stashAddress: string, stats: {
     blocksProduced?: number;
     lastBlockProduced?: number;
-    totalBonded?: bigint;
+    totalBonded?: number;
     nominatorCount?: number;
   }): Promise<Validator> {
     return this.prisma.validator.update({
@@ -224,7 +224,7 @@ export class ValidatorRepository extends BaseRepository {
   async getStats(): Promise<{
     totalValidators: number;
     activeValidators: number;
-    totalStaked: bigint;
+    totalStaked: number;
     averageCommission: number;
   }> {
     const [total, active, staking, commission] = await Promise.all([
@@ -243,7 +243,7 @@ export class ValidatorRepository extends BaseRepository {
     return {
       totalValidators: total,
       activeValidators: active,
-      totalStaked: staking._sum.totalBonded || BigInt(0),
+      totalStaked: staking._sum.totalBonded || 0,
       averageCommission: commission._avg.commission || 0,
     };
   }

@@ -215,9 +215,10 @@ class CacheService {
 export const CacheKeys = {
   // Blocks
   latestBlocks: () => 'blocks:latest',
-  blockByNumber: (number: bigint) => `blocks:number:${number}`,
+  blockByNumber: (number: number) => `blocks:number:${number}`,
   blockByHash: (hash: string) => `blocks:hash:${hash}`,
-  blockExtrinsics: (number: bigint) => `blocks:${number}:extrinsics`,
+  blockExtrinsics: (number: number) => `blocks:${number}:extrinsics`,
+  blocks: () => 'blocks:list',
   
   // Blockchain cache keys for stable data (simple Redis cache plan)
   validatorIdentity: (address: string) => `validator:identity:${address}`,
@@ -230,7 +231,7 @@ export const CacheKeys = {
   // Extrinsics
   latestExtrinsics: () => 'extrinsics:latest',
   extrinsicByHash: (hash: string) => `extrinsics:hash:${hash}`,
-  extrinsicsByBlock: (blockNumber: bigint) => `extrinsics:block:${blockNumber}`,
+  extrinsicsByBlock: (blockNumber: number) => `extrinsics:block:${blockNumber}`,
 
   // Accounts
   accountDetails: (address: string) => `accounts:${address}:details`,
@@ -244,6 +245,7 @@ export const CacheKeys = {
 
   // Validators
   validatorsList: () => 'validators:list',
+  validators: () => 'validators:all',
   validatorDetails: (address: string) => `validators:${address}:details`,
   validatorStats: () => 'validators:stats',
 
@@ -265,12 +267,18 @@ export const CacheKeys = {
 
 // Cache TTL constants (in seconds) - Simple Redis Cache Plan
 export const CACHE_TTL = {
-  VALIDATOR_IDENTITY: 300,    // 5 minutes
-  RUNTIME_METADATA: 1800,     // 30 minutes
-  CHAIN_CONSTANTS: 3600,      // 1 hour
-  OLD_BLOCKS: 86400,          // 24 hours
-  ERA_DATA: 1800,             // 30 minutes
-  SESSION_DATA: 900,          // 15 minutes
+  validatorIdentity: 300,    // 5 minutes
+  runtimeMetadata: 1800,     // 30 minutes
+  chainConstants: 3600,      // 1 hour
+  oldBlocks: 86400,          // 24 hours
+  eraData: 1800,             // 30 minutes
+  sessionData: 900,          // 15 minutes
+  chainStats: 60,            // 1 minute
+  validators: 300,           // 5 minutes
+  accountBalance: 30,        // 30 seconds
+  blocks: 60,               // 1 minute
+  blockByHash: 3600,        // 1 hour
+  blockByNumber: 3600,      // 1 hour
 };
 
 // Create cache service instance

@@ -5,7 +5,7 @@ export type NominationCreateInput = {
   id: string;
   nominatorAddress: string;
   validatorAddress: string;
-  amount: bigint;
+  amount: number;
   era?: number | null;
   active?: boolean;
 };

@@ -1,14 +1,15 @@
 import { Account, AccountType } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 import { logger } from '../../utils/logger';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export type AccountCreateInput = {
   address: string;
-  balance?: number | null;
+  balance?: Decimal | null;
   nonce?: number | null;
-  currentBalance?: bigint | null;
-  reservedBalance?: bigint | null;
-  frozenBalance?: bigint | null;
+  currentBalance?: Decimal | null;
+  reservedBalance?: Decimal | null;
+  frozenBalance?: Decimal | null;
   accountType?: AccountType;
   identityName?: string | null;
   identityInfo?: any;

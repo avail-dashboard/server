@@ -238,7 +238,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
 
       const totalStaked = allValidators.validators.reduce(
         (sum, validator) => sum + validator.totalBonded,
-        BigInt(0)
+        0
       );
 
       const averageCommission = allValidators.validators.length > 0
@@ -246,7 +246,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
         : 0;
 
       const topValidators = allValidators.validators
-        .sort((a, b) => Number(b.totalBonded - a.totalBonded))
+        .sort((a, b) => b.totalBonded - a.totalBonded)
         .slice(0, 10);
 
       const stats: ValidatorStats = {
@@ -293,7 +293,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
       const result = await this.nominationRepository.findByValidator(address, { page, limit });
       const totalNominated = result.nominations.reduce(
         (sum, nomination) => sum + nomination.amount,
-        BigInt(0)
+        0
       );
 
       const nominatorList: NominatorList = {
@@ -339,7 +339,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
       const result = await this.rewardRepository.findByValidator(address, { page, limit });
       const totalAmount = result.rewards.reduce(
         (sum, reward) => sum + reward.amount,
-        BigInt(0)
+        0
       );
 
       const rewardList: RewardList = {
@@ -461,7 +461,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
 
       const totalStaked = allValidators.validators.reduce(
         (sum, validator) => sum + validator.totalBonded,
-        BigInt(0)
+        0
       );
 
       const averageCommission = allValidators.validators.length > 0
@@ -477,7 +477,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
         totalStaked: totalStaked.toString(),
         totalIssuance: chainInfo.totalIssuance,
         stakingRate: chainInfo.totalIssuance !== '0' 
-          ? Number(totalStaked * BigInt(100) / BigInt(chainInfo.totalIssuance))
+          ? Number(totalStaked * 100 / parseInt(chainInfo.totalIssuance))
           : 0,
         averageCommission,
         currentEra: currentEra?.number || 0,
@@ -509,12 +509,12 @@ export class ValidatorApiService implements BaseService, IValidatorService {
 
   // Private helper methods
 
-  private async getTotalNominated(validatorAddress: string): Promise<bigint> {
+  private async getTotalNominated(validatorAddress: string): Promise<number> {
     try {
       const nominations = await this.nominationRepository.findByValidator(validatorAddress, { limit: 1000 });
       return nominations.nominations.reduce(
         (sum, nomination) => sum + nomination.amount,
-        BigInt(0)
+        0
       );
     } catch (error) {
       logger.warn('ValidatorApiService: Failed to get total nominated', {
@@ -522,7 +522,7 @@ export class ValidatorApiService implements BaseService, IValidatorService {
         validator: validatorAddress.substring(0, 20) + '...',
         error: (error as Error).message,
       });
-      return BigInt(0);
+      return 0;
     }
   }
 

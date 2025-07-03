@@ -12,7 +12,7 @@ type Era = any;
  */
 export interface ValidatorWithDetails extends Validator {
   nominatorCount: number;
-  totalNominated: bigint;
+  totalNominated: number;
   recentBlocks: Block[];
   currentEra?: Era;
   performance: ValidatorPerformance;
@@ -39,7 +39,7 @@ export interface ValidatorList {
 export interface ValidatorStats {
   totalValidators: number;
   activeValidators: number;
-  totalStaked: bigint;
+  totalStaked: number;
   averageCommission: number;
   topValidators: Validator[];
 }
@@ -50,7 +50,7 @@ export interface ValidatorStats {
 export interface NominatorList {
   nominators: Nomination[];
   total: number;
-  totalNominated: bigint;
+  totalNominated: number;
 }
 
 /**
@@ -59,7 +59,7 @@ export interface NominatorList {
 export interface RewardList {
   rewards: Reward[];
   total: number;
-  totalAmount: bigint;
+  totalAmount: number;
 }
 
 /**

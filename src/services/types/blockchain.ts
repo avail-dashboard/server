@@ -42,6 +42,22 @@ export interface ExtrinsicData {
   fee?: string;
   success: boolean;
   error?: string;
+  // Enhanced fields for complete extrinsic data
+  lifetime?: {
+    birth?: number;
+    death?: number;
+    immortal?: boolean;
+  };
+  signature?: {
+    signature: string;
+    signedExtensions: Record<string, any>;
+  };
+  actualFee?: string;
+  transferCount?: number;
+  length?: number;
+  weight?: string;
+  class?: string;
+  paysFee?: boolean;
 }
 
 export interface EventData {

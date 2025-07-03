@@ -269,8 +269,8 @@ export class ValidatorProcessor implements SelfHealingProcessor {
         validator = await this.validatorRepository.create({
           stashAddress,
           commission: 0, // Default commission
-          selfBonded: BigInt(0),
-          totalBonded: BigInt(0),
+          selfBonded: 0,
+          totalBonded: 0,
           nominatorCount: 0,
           status: 'active',
           blocksProduced: 1,

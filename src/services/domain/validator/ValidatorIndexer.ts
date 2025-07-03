@@ -108,8 +108,8 @@ export class ValidatorIndexer implements IValidatorIndexer {
         stashAddress: validatorData.accountId,
         controllerAddress: validatorData.controller || null,
         commission: parseFloat(validatorData.commission) || 0,
-        selfBonded: BigInt(validatorData.stake.own || '0'),
-        totalBonded: BigInt(validatorData.stake.total || '0'),
+        selfBonded: parseInt(validatorData.stake.own || '0'),
+        totalBonded: parseInt(validatorData.stake.total || '0'),
         nominatorCount: validatorData.nominators.length,
         status: validatorData.blocked ? 'inactive' as const : 'active' as const,
         identityName: validatorData.identity?.display || null,
@@ -340,7 +340,7 @@ export class ValidatorIndexer implements IValidatorIndexer {
             stakeInfo = {
               total: exposureData.total.toString(),
               own: exposureData.own.toString(),
-              others: exposureData.others.reduce((sum: bigint, nom: any) => sum + nom.value.toBigInt(), 0n).toString(),
+              others: exposureData.others.reduce((sum: number, nom: any) => sum + parseInt(nom.value.toString()), 0).toString(),
             };
             nominators = exposureData.others.map((nom: any) => nom.who.toString());
             break;

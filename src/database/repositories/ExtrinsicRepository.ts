@@ -4,6 +4,8 @@ import { BaseRepository } from './BaseRepository';
 export type ExtrinsicCreateInput = {
   hash: string;
   blockNumber: number;
+  blockHash?: string | null;
+  blockTimestamp?: Date | null;
   extrinsicIndex?: number | null;
   module?: string | null;
   call?: string | null;
@@ -11,6 +13,16 @@ export type ExtrinsicCreateInput = {
   timestamp?: Date | null;
   signer?: string | null;
   fee?: number | null;
+  nonce?: number | null;
+  lifetime?: any | null;
+  parameters?: any | null;
+  signatureInfo?: any | null;
+  tip?: number | null;
+  actualFee?: number | null;
+  transferCount?: number | null;
+  methodObject?: any | null;
+  methodArgs?: any | null;
+  extrinsicOrder?: number | null;
 };
 
 export class ExtrinsicRepository extends BaseRepository {
@@ -57,13 +69,15 @@ export class ExtrinsicRepository extends BaseRepository {
   }
 
   /**
-   * Create new extrinsic
+   * Create new extrinsic with enhanced fields
    */
   async create(data: ExtrinsicCreateInput): Promise<Extrinsic> {
     return this.prisma.extrinsic.create({
       data: {
         hash: data.hash,
         blockNumber: data.blockNumber,
+        blockHash: data.blockHash,
+        blockTimestamp: data.blockTimestamp,
         extrinsicIndex: data.extrinsicIndex,
         module: data.module,
         call: data.call,
@@ -71,6 +85,16 @@ export class ExtrinsicRepository extends BaseRepository {
         timestamp: data.timestamp,
         signer: data.signer,
         fee: data.fee,
+        nonce: data.nonce,
+        lifetime: data.lifetime,
+        parameters: data.parameters,
+        signatureInfo: data.signatureInfo,
+        tip: data.tip,
+        actualFee: data.actualFee,
+        transferCount: data.transferCount,
+        methodObject: data.methodObject,
+        methodArgs: data.methodArgs,
+        extrinsicOrder: data.extrinsicOrder,
       },
     });
   }

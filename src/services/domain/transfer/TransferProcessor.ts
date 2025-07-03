@@ -220,10 +220,10 @@ export class TransferProcessor implements SelfHealingProcessor {
       }
 
       // Extract amount
-      let amount = BigInt(0);
+      let amount = 0;
       if (extrinsic.method.args.value) {
         try {
-          amount = BigInt(extrinsic.method.args.value.toString());
+          amount = parseInt(extrinsic.method.args.value.toString());
         } catch {
           logger.warn('TransferProcessor: Could not parse transfer amount', {
             component: 'transfer-processor',
@@ -281,9 +281,9 @@ export class TransferProcessor implements SelfHealingProcessor {
         blockTimestamp: transferData.timestamp,
         fromAddress: transferData.fromAddress,
         toAddress: transferData.toAddress,
-        amount: BigInt(transferData.amount),
+        amount: parseInt(transferData.amount),
         tokenType: 'AVAIL',
-        fees: BigInt(transferData.fee),
+        fees: parseInt(transferData.fee),
         status: transferData.success ? 'success' : 'failed',
         blockNumber: transferData.blockNumber,
         extrinsicIndex: transferData.extrinsicIndex,

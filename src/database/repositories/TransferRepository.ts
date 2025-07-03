@@ -10,8 +10,8 @@ export type TransferCreateInput = Omit<Transfer, 'createdAt'>;
 export type TransferFilters = {
   fromAddress?: string;
   toAddress?: string;
-  minAmount?: bigint;
-  maxAmount?: bigint;
+  minAmount?: number;
+  maxAmount?: number;
   status?: TransferStatus;
   tokenType?: string;
   fromBlock?: number;
@@ -267,9 +267,9 @@ export class TransferRepository extends BaseRepository {
     address?: string;
   } = {}): Promise<{
     totalTransfers: number;
-    totalVolume: bigint;
+    totalVolume: number;
     averageAmount: number;
-    totalFees: bigint;
+    totalFees: number;
     successRate: number;
   }> {
     const { fromDate, toDate, address } = params;
@@ -303,9 +303,9 @@ export class TransferRepository extends BaseRepository {
 
     return {
       totalTransfers: total,
-      totalVolume: aggregates._sum.amount || BigInt(0),
+      totalVolume: aggregates._sum.amount || 0,
       averageAmount: aggregates._avg.amount || 0,
-      totalFees: aggregates._sum.fees || BigInt(0),
+      totalFees: aggregates._sum.fees || 0,
       successRate: total > 0 ? (successful / total) * 100 : 0,
     };
   }
@@ -317,7 +317,7 @@ export class TransferRepository extends BaseRepository {
     fromDate: Date;
     toDate: Date;
     address?: string;
-  }): Promise<Array<{ date: string; volume: bigint; count: number }>> {
+  }): Promise<Array<{ date: string; volume: number; count: number }>> {
     const { fromDate, toDate, address } = params;
     
     const whereClause: any = {
@@ -346,11 +346,11 @@ export class TransferRepository extends BaseRepository {
     });
 
     // Group by date
-    const dailyData = new Map<string, { volume: bigint; count: number }>();
+    const dailyData = new Map<string, { volume: number; count: number }>();
     
     transfers.forEach(transfer => {
       const date = transfer.timestamp.toISOString().split('T')[0];
-      const existing = dailyData.get(date) || { volume: BigInt(0), count: 0 };
+      const existing = dailyData.get(date) || { volume: 0, count: 0 };
       dailyData.set(date, {
         volume: existing.volume + transfer.amount,
         count: existing.count + 1,
@@ -371,7 +371,7 @@ export class TransferRepository extends BaseRepository {
     limit?: number;
     fromDate?: Date;
     toDate?: Date;
-  } = {}): Promise<Array<{ address: string; volume: bigint; count: number }>> {
+  } = {}): Promise<Array<{ address: string; volume: number; count: number }>> {
     const { limit = 10, fromDate, toDate } = params;
     
     const whereClause: any = { status: 'success' };
@@ -393,7 +393,7 @@ export class TransferRepository extends BaseRepository {
 
     return result.map(item => ({
       address: item.fromAddress,
-      volume: item._sum.amount || BigInt(0),
+      volume: item._sum.amount || 0,
       count: item._count,
     }));
   }

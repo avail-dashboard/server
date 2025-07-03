@@ -8,6 +8,7 @@
 
 import { Account, Extrinsic, Validator, Reward } from '@prisma/client';
 import { TransferWithRelations } from '../../../database/repositories/TransferRepository';
+import { Decimal } from '@prisma/client/runtime/library';
 
 /**
  * Account balance information from blockchain RPC
@@ -47,9 +48,9 @@ export interface AccountWithDetails extends Account {
   /** Total number of extrinsics signed by this account */
   extrinsicCount: number;
   /** Total amount transferred out by this account */
-  totalTransferred: bigint;
+  totalTransferred: Decimal;
   /** Total amount received by this account */
-  totalReceived: bigint;
+  totalReceived: Decimal;
 }
 
 /**
@@ -87,9 +88,9 @@ export interface AccountStats {
   /** Date of most recent activity */
   lastActivity: Date | null;
   /** Total amount sent in transfers */
-  totalSent: bigint;
+  totalSent: Decimal;
   /** Total amount received in transfers */
-  totalReceived: bigint;
+  totalReceived: Decimal;
 }
 
 /**

@@ -4,7 +4,7 @@ export type EraCreateInput = {
   number: number;
   startBlock: number;
   endBlock?: number | null;
-  totalStaked: bigint;
+  totalStaked: number;
   validatorCount: number;
   active?: boolean;
 };
@@ -113,7 +113,7 @@ export class EraRepository extends BaseRepository {
     totalEras: number;
     currentEra: number | null;
     averageValidatorCount: number;
-    totalStakeHistory: bigint;
+    totalStakeHistory: number;
   }> {
     const [total, current, aggregates] = await Promise.all([
       this.prisma.era.count(),
@@ -131,7 +131,7 @@ export class EraRepository extends BaseRepository {
       totalEras: total,
       currentEra: current?.number || null,
       averageValidatorCount: aggregates._avg.validatorCount || 0,
-      totalStakeHistory: aggregates._sum.totalStaked || BigInt(0),
+      totalStakeHistory: aggregates._sum.totalStaked || 0,
     };
   }
 } 

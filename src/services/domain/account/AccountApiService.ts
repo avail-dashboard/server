@@ -554,7 +554,7 @@ export class AccountApiService implements BaseService, IAccountService {
     }
   }
 
-  private async getTransferStatistics(address: string): Promise<{ count: number; totalSent: bigint; totalReceived: bigint }> {
+  private async getTransferStatistics(address: string): Promise<{ count: number; totalSent: number; totalReceived: number }> {
     try {
       const [sentResult, receivedResult] = await Promise.all([
         db.query<{ count: number; total: string }>(
@@ -572,8 +572,8 @@ export class AccountApiService implements BaseService, IAccountService {
 
       return {
         count: sent.count + received.count,
-        totalSent: BigInt(sent.total || '0'),
-        totalReceived: BigInt(received.total || '0'),
+        totalSent: parseInt(sent.total || '0'),
+        totalReceived: parseInt(received.total || '0'),
       };
 
     } catch (error) {
@@ -585,8 +585,8 @@ export class AccountApiService implements BaseService, IAccountService {
       
       return {
         count: 0,
-        totalSent: BigInt(0),
-        totalReceived: BigInt(0),
+        totalSent: 0,
+        totalReceived: 0,
       };
     }
   }

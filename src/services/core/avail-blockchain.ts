@@ -204,11 +204,11 @@ export class AvailBlockchainService implements BaseService {
     // Cache the chain info for 30 minutes
     if (config.cache.redis.enabled) {
       const cacheKey = CacheKeys.runtimeMetadata();
-      await cache.set(cacheKey, chainInfo, CACHE_TTL.RUNTIME_METADATA);
+      await cache.set(cacheKey, chainInfo, CACHE_TTL.runtimeMetadata);
       
       logger.debug('Chain info cached', { 
         component: 'avail-blockchain',
-        ttl: CACHE_TTL.RUNTIME_METADATA,
+        ttl: CACHE_TTL.runtimeMetadata,
       });
     }
 
@@ -318,13 +318,13 @@ export class AvailBlockchainService implements BaseService {
       
       if (blockAge > 100) {
         const cacheKey = CacheKeys.oldBlock(hashOrNumber);
-        await cache.set(cacheKey, blockData, CACHE_TTL.OLD_BLOCKS);
+        await cache.set(cacheKey, blockData, CACHE_TTL.oldBlocks);
         
         logger.debug('Block cached', {
           component: 'avail-blockchain',
           blockNumber: hashOrNumber,
           blockAge,
-          ttl: CACHE_TTL.OLD_BLOCKS,
+          ttl: CACHE_TTL.oldBlocks,
         });
       }
     }
@@ -333,7 +333,7 @@ export class AvailBlockchainService implements BaseService {
   }
 
   /**
-   * Extract extrinsics data from raw block extrinsics
+   * Extract extrinsics data from raw block extrinsics with complete field extraction
    */
   private extractExtrinsicsData(rawExtrinsics: any[]): any[] {
     return rawExtrinsics.map((extrinsic, index) => {
@@ -341,13 +341,14 @@ export class AvailBlockchainService implements BaseService {
         // Try to extract extrinsic data safely
         const hash = extrinsic.hash?.toString() || `0x${index.toString().padStart(64, '0')}`;
         
-        // Extract method information if available
-        let method = { section: 'unknown', method: 'unknown' };
+        // Extract method information with complete args
+        let method = { section: 'unknown', method: 'unknown', args: {} };
         try {
           if (extrinsic.method) {
             method = {
               section: extrinsic.method.section || 'unknown',
               method: extrinsic.method.method || 'unknown',
+              args: this.extractMethodArgs(extrinsic.method.args) || {},
             };
           }
         } catch (methodError) {
@@ -355,6 +356,22 @@ export class AvailBlockchainService implements BaseService {
             component: 'avail-blockchain',
             extrinsicIndex: index,
             error: (methodError as Error).message,
+          });
+        }
+
+        // Debug: Log the raw extrinsic structure for the first few extrinsics
+        if (index < 3) {
+          logger.debug('Raw extrinsic structure debug', {
+            component: 'avail-blockchain',
+            extrinsicIndex: index,
+            hasMethod: !!extrinsic.method,
+            hasSignature: !!extrinsic.signature,
+            hasNonce: !!extrinsic.nonce,
+            hasEra: !!extrinsic.era,
+            isSigned: !!extrinsic.isSigned,
+            methodSection: extrinsic.method?.section,
+            methodMethod: extrinsic.method?.method,
+            availableKeys: Object.keys(extrinsic),
           });
         }
 
@@ -366,13 +383,75 @@ export class AvailBlockchainService implements BaseService {
           // Signer extraction failed - this is common for unsigned extrinsics
         }
 
+        // Extract signature and nonce information (adapted for Substrate types)
+        let nonce;
+        let signature;
+        let tip;
+        let lifetime;
+        try {
+          if (extrinsic.isSigned) {
+            // For signed extrinsics, extract nonce from the signature
+            if (extrinsic.signature) {
+              nonce = extrinsic.signature.nonce?.toNumber?.() || extrinsic.nonce?.toNumber?.();
+              tip = extrinsic.signature.tip?.toString?.() || extrinsic.tip?.toString?.();
+              
+              // Extract signature details
+              signature = {
+                signature: extrinsic.signature.toString(),
+                signedExtensions: {},
+              };
+            }
+
+            // Extract era/lifetime information (Substrate mortality)
+            if (extrinsic.era) {
+              if (extrinsic.era.isMortalEra) {
+                lifetime = {
+                  birth: extrinsic.era.asMortalEra.birth,
+                  death: extrinsic.era.asMortalEra.death,
+                  immortal: false,
+                };
+              } else {
+                lifetime = {
+                  birth: 0,
+                  death: 0,
+                  immortal: true,
+                };
+              }
+            }
+          }
+        } catch (signatureError) {
+          logger.debug('Failed to extract signature data from extrinsic', {
+            component: 'avail-blockchain',
+            extrinsicIndex: index,
+            error: (signatureError as Error).message,
+            rawExtrinsic: {
+              isSigned: extrinsic.isSigned,
+              hasSignature: !!extrinsic.signature,
+              hasNonce: !!extrinsic.nonce,
+              hasEra: !!extrinsic.era,
+            },
+          });
+        }
+
+        // Determine if this is a signed extrinsic
+        const isSigned = !!extrinsic.isSigned;
+
         return {
           hash,
           index,
+          isSigned,
           method,
           signer,
+          nonce,
+          tip,
+          signature,
+          lifetime,
           success: true, // Will be determined by events in processor
-          fee: null, // Fee calculation requires more complex logic
+          fee: null, // Fee calculation requires event processing
+          actualFee: null, // Will be calculated from events
+          transferCount: this.countTransfersInExtrinsic(method),
+          length: extrinsic.encodedLength || 0,
+          paysFee: this.determineIfPaysFee(method),
         };
       } catch (error) {
         logger.warn('Failed to extract extrinsic data', {
@@ -385,13 +464,148 @@ export class AvailBlockchainService implements BaseService {
         return {
           hash: `0x${index.toString().padStart(64, '0')}`,
           index,
-          method: { section: 'unknown', method: 'unknown' },
+          isSigned: false,
+          method: { section: 'unknown', method: 'unknown', args: {} },
           signer: undefined,
           success: false,
           fee: null,
         };
       }
     });
+  }
+
+  /**
+   * Extract method arguments safely from Substrate types
+   */
+  private extractMethodArgs(args: any): Record<string, any> {
+    if (!args) return {};
+    
+    try {
+      // Handle different formats of args
+      if (Array.isArray(args)) {
+        // If args is an array, convert to object with numeric keys
+        const extractedArgs: Record<string, any> = {};
+        args.forEach((arg, index) => {
+          extractedArgs[index.toString()] = this.convertSubstrateValue(arg);
+        });
+        return extractedArgs;
+      } else if (typeof args === 'object') {
+        // If args is an object, convert each property
+        const extractedArgs: Record<string, any> = {};
+        Object.keys(args).forEach(key => {
+          extractedArgs[key] = this.convertSubstrateValue(args[key]);
+        });
+        return extractedArgs;
+      } else {
+        // Single value
+        return { value: this.convertSubstrateValue(args) };
+      }
+    } catch (error) {
+      logger.debug('Failed to extract method args', {
+        component: 'avail-blockchain',
+        error: (error as Error).message,
+        argsType: typeof args,
+        isArray: Array.isArray(args),
+      });
+      return {};
+    }
+  }
+
+  /**
+   * Convert Substrate type values to JSON-serializable format
+   */
+  private convertSubstrateValue(value: any): any {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    
+    try {
+      // Handle Substrate types with toString() method
+      if (typeof value.toString === 'function') {
+        return value.toString();
+      }
+      
+      // Handle arrays recursively
+      if (Array.isArray(value)) {
+        return value.map(item => this.convertSubstrateValue(item));
+      }
+      
+      // Handle objects recursively
+      if (typeof value === 'object') {
+        const converted: any = {};
+        Object.keys(value).forEach(key => {
+          converted[key] = this.convertSubstrateValue(value[key]);
+        });
+        return converted;
+      }
+      
+      // Return primitive values as-is
+      return value;
+    } catch {
+      return 'conversion_failed';
+    }
+  }
+
+  /**
+   * Extract signed extensions from signature
+   */
+  private extractSignedExtensions(signature: any): Record<string, any> {
+    try {
+      if (!signature || !signature.signedExtensions) return {};
+      
+      const extensions: Record<string, any> = {};
+      Object.keys(signature.signedExtensions).forEach(key => {
+        const value = signature.signedExtensions[key];
+        extensions[key] = value?.toString() || value;
+      });
+      
+      return extensions;
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * Count transfers within an extrinsic method
+   */
+  private countTransfersInExtrinsic(method: any): number {
+    if (!method) return 0;
+    
+    if (method.section === 'balances' && method.method === 'transfer') {
+      return 1;
+    }
+    
+    if (method.section === 'balances' && method.method === 'transferAll') {
+      return 1;
+    }
+    
+    if (method.section === 'utility' && method.method === 'batch') {
+      // Count transfers in batch calls
+      const calls = method.args?.calls || [];
+      return calls.filter((call: any) => 
+        call.section === 'balances' && 
+        (call.method === 'transfer' || call.method === 'transferAll')
+      ).length;
+    }
+    
+    return 0;
+  }
+
+  /**
+   * Determine if extrinsic pays fees
+   */
+  private determineIfPaysFee(method: any): boolean {
+    if (!method) return false;
+    
+    // Unsigned extrinsics that don't pay fees
+    const freeMethods = [
+      'timestamp.set',
+      'parachainSystem.setValidationData',
+      'parachainSystem.sudo',
+    ];
+    
+    const methodName = `${method.section}.${method.method}`;
+    return !freeMethods.includes(methodName);
   }
 
   /**

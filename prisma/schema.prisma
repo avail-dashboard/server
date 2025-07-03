@@ -26,9 +26,9 @@ model Block {
   
   // Block metadata
   specVersion          Int?             @map("spec_version")
-  totalFees            BigInt?          @map("total_fees")
+  totalFees            Decimal?         @map("total_fees") @db.Decimal(65,18)
   transferCount        Int?             @map("transfer_count")
-  dataSubmissionsSize  BigInt?          @map("data_submissions_size")
+  dataSubmissionsSize  Int?             @map("data_submissions_size")
   createdAt            DateTime         @default(now()) @map("created_at")
   
   // Indexes for performance (FK indexes removed)
@@ -53,15 +53,15 @@ model Extrinsic {
   success          Boolean?
   timestamp        DateTime?
   signer           String?  @db.VarChar(64)
-  fee              Int?
+  fee              Decimal? @db.Decimal(65,18)
   
   // Extrinsic details
   nonce            Int?
   lifetime         Json?    // { birth: number, death: number, immortal: boolean }
   parameters       Json?    // Complete extrinsic arguments
   signatureInfo    Json?    @map("signature_info") // { signature, signedExtensions }
-  tip              BigInt?
-  actualFee        BigInt?  @map("actual_fee") // Calculated from events
+  tip              Decimal? @db.Decimal(65,18)
+  actualFee        Decimal? @map("actual_fee") @db.Decimal(65,18) // Calculated from events
   transferCount    Int?     @map("transfer_count") // Number of transfers in this extrinsic
   methodObject     Json?    @map("method_object") // Complete method object
   methodArgs       Json?    @map("method_args") // Method arguments separately
@@ -78,13 +78,13 @@ model Extrinsic {
 
 model Account {
   address              String   @id @db.VarChar(64)
-  balance              Int?
+  balance              Decimal? @db.Decimal(65,18)
   nonce                Int?
   
-  // Account balances
-  currentBalance       BigInt?  @map("current_balance")
-  reservedBalance      BigInt?  @map("reserved_balance")
-  frozenBalance        BigInt?  @map("frozen_balance")
+  // Account balances (using Decimal for unlimited precision)
+  currentBalance       Decimal?  @map("current_balance") @db.Decimal(65,18)
+  reservedBalance      Decimal?  @map("reserved_balance") @db.Decimal(65,18)
+  frozenBalance        Decimal?  @map("frozen_balance") @db.Decimal(65,18)
   
   // Account metadata
   accountType          AccountType @default(regular) @map("account_type")
@@ -228,8 +228,8 @@ model Validator {
   
   // Validator details
   commission          Int         // Stored as Perbill (parts per billion)
-  selfBonded          BigInt      @map("self_bonded")
-  totalBonded         BigInt      @map("total_bonded")
+  selfBonded          Decimal     @map("self_bonded") @db.Decimal(65,18)
+  totalBonded         Decimal     @map("total_bonded") @db.Decimal(65,18)
   nominatorCount      Int         @default(0) @map("nominator_count")
   status              ValidatorStatus @default(inactive)
   sessionKeys         Json?       @map("session_keys") // All session keys
@@ -269,9 +269,9 @@ model Transfer {
   toAddress       String      @map("to_address") @db.VarChar(64)
   
   // Transfer details
-  amount          BigInt
+  amount          Decimal     @db.Decimal(65,18)
   tokenType       String      @default("AVAIL") @map("token_type") @db.VarChar(10)
-  fees            BigInt
+  fees            Decimal     @db.Decimal(65,18)
   status          TransferStatus @default(success)
   timestamp       DateTime
   createdAt       DateTime    @default(now()) @map("created_at")
@@ -292,7 +292,7 @@ model Nomination {
   nominatorAddress  String      @map("nominator_address") @db.VarChar(64)
   validatorAddress  String      @map("validator_address") @db.VarChar(64)
   
-  amount            BigInt
+  amount            Decimal     @db.Decimal(65,18)
   era               Int?
   active            Boolean     @default(true)
   createdAt         DateTime    @default(now()) @map("created_at")
@@ -309,7 +309,7 @@ model Era {
   number          Int         @id
   startBlock      Int         @map("start_block")
   endBlock        Int?        @map("end_block")
-  totalStaked     BigInt      @map("total_staked")
+  totalStaked     Decimal     @map("total_staked") @db.Decimal(65,18)
   validatorCount  Int         @map("validator_count")
   active          Boolean     @default(true)
   createdAt       DateTime    @default(now()) @map("created_at")
@@ -328,7 +328,7 @@ model Reward {
   // Validator reference (no FK constraint)
   validatorAddress  String?     @map("validator_address") @db.VarChar(64)
   
-  amount            BigInt
+  amount            Decimal     @db.Decimal(65,18)
   
   // Era reference (no FK constraint)
   era               Int

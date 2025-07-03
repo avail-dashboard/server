@@ -362,7 +362,7 @@ export class ServiceFactory {
       // Phase 3: Create domain indexers with cross-domain job queuing support
       const blockIndexer = createBlockIndexer(blockRepository, availBlockchainService, queueService);
       const validatorIndexer = createValidatorIndexer(validatorRepository, availBlockchainService, queueService);
-      const accountIndexer = createAccountIndexer(availBlockchainService, queueService);
+      const accountIndexer = createAccountIndexer(availBlockchainService, accountRepository, queueService);
       const transferIndexer = createTransferIndexer(transferRepository, queueService);
       const dataSubmissionIndexer = new AvailDataSubmissionIndexer(queueService);
       const extrinsicIndexer = createExtrinsicIndexer(extrinsicRepository, extrinsicService);

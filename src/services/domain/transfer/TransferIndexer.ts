@@ -80,9 +80,9 @@ export class TransferIndexer implements ITransferIndexer {
         extrinsicIndex: transferData.extrinsicIndex,
         fromAddress: transferData.fromAddress,
         toAddress: transferData.toAddress,
-        amount: BigInt(transferData.amount),
+        amount: parseInt(transferData.amount),
         tokenType: 'AVAIL',
-        fees: BigInt(transferData.fee || '0'),
+        fees: parseInt(transferData.fee || '0'),
         status: transferData.success ? 'success' as const : 'failed' as const,
         timestamp: transferData.timestamp,
       };

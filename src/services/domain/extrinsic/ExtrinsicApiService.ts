@@ -11,6 +11,7 @@ import {
   ExtrinsicApiResponse,
 } from '../../../types/database';
 import { IExtrinsicMapper } from '../../../mappers';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export interface ExtrinsicFeeInfo {
   baseFee: number;
@@ -217,7 +218,7 @@ export class ExtrinsicService implements IExtrinsicService {
   // Conversion method removed - now handled by ExtrinsicMapper
 
   /**
-   * Private: Process a single extrinsic
+   * Private: Process a single extrinsic with complete field extraction
    */
   private async processExtrinsic(
     blockData: BlockData,
@@ -228,25 +229,54 @@ export class ExtrinsicService implements IExtrinsicService {
       // Calculate fee information
       const feeInfo = await this.calculateFeeInfo(extrinsicData);
 
-      // Create extrinsic record
-      const extrinsicRecord = await this.extrinsicRepository.create({
+      // Convert tip and actualFee to Decimal if present (handle large values)
+      const tip = extrinsicData.tip ? new Decimal(String(extrinsicData.tip)) : null;
+      const actualFee = extrinsicData.actualFee ? new Decimal(String(extrinsicData.actualFee)) : null;
+
+      // Create comprehensive extrinsic record with all available fields (using createIfNotExists to handle duplicates)
+      const { extrinsic: extrinsicRecord, created } = await this.extrinsicRepository.createIfNotExists({
         hash: extrinsicData.hash,
         blockNumber: blockData.number,
+        blockHash: blockData.hash,
+        blockTimestamp: new Date(blockData.timestamp),
         extrinsicIndex: index,
         module: extrinsicData.method.section,
         call: extrinsicData.method.method,
         success: extrinsicData.success,
         timestamp: new Date(blockData.timestamp),
         signer: extrinsicData.signer,
-        fee: feeInfo.totalFee,
+        fee: feeInfo.totalFee ? new Decimal(String(feeInfo.totalFee)) : null,
+        nonce: extrinsicData.nonce,
+        lifetime: extrinsicData.lifetime,
+        parameters: extrinsicData.method.args,
+        signatureInfo: extrinsicData.signature,
+        tip,
+        actualFee,
+        transferCount: extrinsicData.transferCount || 0,
+        methodObject: {
+          section: extrinsicData.method.section,
+          method: extrinsicData.method.method,
+          isSigned: extrinsicData.isSigned,
+          paysFee: extrinsicData.paysFee,
+          length: extrinsicData.length,
+          weight: extrinsicData.weight,
+          class: extrinsicData.class,
+        },
+        methodArgs: extrinsicData.method.args,
+        extrinsicOrder: index,
       });
 
-      logger.debug('Processed extrinsic', {
+      logger.debug(`${created ? 'Created new' : 'Found existing'} extrinsic with complete data`, {
         component: 'extrinsic-service',
         blockNumber: blockData.number,
         extrinsicHash: extrinsicData.hash,
         success: extrinsicData.success,
         fee: feeInfo.totalFee,
+        created,
+        hasSignature: !!extrinsicData.signature,
+        hasParameters: !!extrinsicData.method.args && Object.keys(extrinsicData.method.args).length > 0,
+        transferCount: extrinsicData.transferCount || 0,
+        isSigned: extrinsicData.isSigned,
       });
 
       return extrinsicRecord;
@@ -257,6 +287,7 @@ export class ExtrinsicService implements IExtrinsicService {
         action: 'processExtrinsic',
         blockNumber: blockData.number,
         extrinsicHash: extrinsicData.hash,
+        extrinsicIndex: index,
       });
       throw error;
     }
