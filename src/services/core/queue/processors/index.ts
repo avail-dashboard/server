@@ -85,6 +85,11 @@ export class JobProcessorRegistry {
       this.coreProcessors.processExtrinsicIndexing(job),
     );
 
+    // ==================== Event Processing ====================
+    this.processors.set(JobType.INDEX_EVENT, (job: Job) =>
+      this.coreProcessors.processEventIndexing(job),
+    );
+
     this.processors.set(JobType.ANALYTICS_CALCULATION, async (_job: Job) => {
       return { success: true, message: 'Analytics calculation completed' };
     });

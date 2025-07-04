@@ -86,6 +86,7 @@ import {
   eraRepository,
   // Phase 3 repositories
   accountRepository,
+  eventRepository,
 } from '../database/repositories';
 
 // Phase 2: Dependency Management Services - Removed (replaced by queue-based approach)
@@ -97,6 +98,7 @@ import { createAccountIndexer } from './domain/account/AccountIndexer';
 import { createTransferIndexer } from './domain/transfer/TransferIndexer';
 import { AvailDataSubmissionIndexer } from './domain/dataSubmission/DataSubmissionIndexer';
 import { createExtrinsicIndexer } from './domain/extrinsic/ExtrinsicIndexer';
+import { createEventIndexer } from './domain/event/EventIndexer';
 
 // Service Factory for dependency injection
 export class ServiceFactory {
@@ -365,6 +367,7 @@ export class ServiceFactory {
       const transferIndexer = createTransferIndexer(transferRepository, queueService);
       const dataSubmissionIndexer = new AvailDataSubmissionIndexer(queueService, availBlockchainService);
       const extrinsicIndexer = createExtrinsicIndexer(extrinsicRepository, extrinsicService);
+      const eventIndexer = createEventIndexer(eventRepository);
       
       // Register domain indexers
       this.register('blockIndexer', blockIndexer);
@@ -373,6 +376,7 @@ export class ServiceFactory {
       this.register('transferIndexer', transferIndexer);
       this.register('dataSubmissionIndexer', dataSubmissionIndexer);
       this.register('extrinsicIndexer', extrinsicIndexer);
+      this.register('eventIndexer', eventIndexer);
       
       // Register repositories for DB-first dependency checking
       this.register('validatorRepository', validatorRepository);

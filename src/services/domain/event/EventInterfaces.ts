@@ -21,13 +21,15 @@ export interface EventFilters {
 export interface EventData {
   id?: number;
   blockNumber: number;
+  blockHash?: string;
+  blockTimestamp?: Date;
   extrinsicIndex?: number;
   eventIndex: number;
-  module: string;
-  eventName: string;
-  data: any[];
-  phase: EventPhase;
-  phaseType?: string;
+  module: string | null;
+  eventName: string | null;
+  data: any;
+  phase: any;
+  phaseType?: string | null;
   methodObject?: any;
   eventOrder?: number;
   timestamp?: Date;

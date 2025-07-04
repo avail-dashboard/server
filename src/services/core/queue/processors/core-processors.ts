@@ -506,4 +506,69 @@ export class CoreProcessors {
     }
   }
 
+  /**
+   * INDEX_EVENT processor
+   */
+  async processEventIndexing(job: Job<any>) {
+    const { blockNumber, blockHash } = job.data;
+    const startTime = Date.now();
+    
+    logger.debug('🔧 PROCESSOR: Starting event processing', {
+      component: 'event-processing-processor',
+      jobId: job.id,
+      blockNumber,
+      blockHash,
+    });
+
+    try {
+      // Get block data from blockchain service
+      const availBlockchain = await this.getService<any>('availBlockchain');
+      const blockData = blockHash ? 
+        await availBlockchain.getBlock(blockHash) : 
+        await availBlockchain.getBlock(blockNumber);
+      
+      // Delegate to domain-specific EventIndexer
+      const eventIndexer = await this.getService<any>('eventIndexer');
+      const result = await eventIndexer.indexEventsFromBlock(blockData);
+      
+      const duration = Date.now() - startTime;
+      
+      if (result.success) {
+        logger.debug('✅ PROCESSOR: Event processing completed', {
+          component: 'event-processing-processor',
+          jobId: job.id,
+          blockNumber,
+          processedCount: result.events.length,
+          duration
+        });
+
+        return {
+          success: true,
+          data: {
+            blockNumber,
+            processedEvents: result.events.length,
+            events: result.events
+          },
+          metrics: { duration }
+        };
+      } else {
+        throw new Error(result.error || 'Event processing failed');
+      }
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const classification = ErrorClassifier.classifyError(error as Error, JobType.INDEX_EVENT);
+      
+      logger.error('❌ PROCESSOR: Event processing failed', {
+        component: 'event-processing-processor',
+        jobId: job.id,
+        blockNumber,
+        error: (error as Error).message,
+        classification,
+        duration
+      });
+      
+      throw error;
+    }
+  }
+
 }

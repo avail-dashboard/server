@@ -229,6 +229,14 @@ export class BlockIndexer implements IBlockIndexer {
         });
       }
 
+      // Queue event processing job with consistent structure
+      if (blockData.events && blockData.events.length > 0) {
+        await this.queueService.addJob(JobType.INDEX_EVENT, {
+          blockNumber: blockData.number,
+          blockHash: blockData.hash,
+        });
+      }
+
       // Queue data submission jobs if block has data availability extrinsics
       const hasDataSubmissions = blockData.extrinsics.some(ext => 
         ext.method.section === 'dataAvailability' && 
@@ -248,6 +256,7 @@ export class BlockIndexer implements IBlockIndexer {
         validatorJobs: dependentEntities.validators.length,
         accountJobs: dependentEntities.accounts.length,
         transferJobs: dependentEntities.transfers.length,
+        eventJobs: blockData.events?.length > 0 ? 1 : 0,
         dataSubmissionJobs: hasDataSubmissions ? 1 : 0,
       });
 
