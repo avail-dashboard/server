@@ -90,6 +90,15 @@ export class JobProcessorRegistry {
       this.coreProcessors.processEventIndexing(job),
     );
 
+    // ==================== Era Processing ====================
+    this.processors.set(JobType.INDEX_ERA, (job: Job) =>
+      this.coreProcessors.processEraIndexing(job),
+    );
+
+    this.processors.set(JobType.ERA_TRANSITION, (job: Job) =>
+      this.coreProcessors.processEraTransition(job),
+    );
+
     this.processors.set(JobType.ANALYTICS_CALCULATION, async (_job: Job) => {
       return { success: true, message: 'Analytics calculation completed' };
     });

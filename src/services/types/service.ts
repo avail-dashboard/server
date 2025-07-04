@@ -155,6 +155,7 @@ export enum JobType {
   INDEX_DATA_SUBMISSION = 'index_data_submission',
   INDEX_EVENT = 'index_event',
   INDEX_ERA = 'index_era',
+  ERA_TRANSITION = 'era_transition',
   // Phase 2: Simplified Dependency Management Job Types - TASK-010 Implementation
   DEPENDENCY_DETECTION = 'dependency_detection',
   DEPENDENCY_RESOLUTION = 'dependency_resolution',

@@ -30,6 +30,8 @@ export { ValidatorIndexer, createValidatorIndexer } from './domain/validator/Val
 export { TransferIndexer, createTransferIndexer } from './domain/transfer/TransferIndexer';
 export { AvailDataSubmissionIndexer } from './domain/dataSubmission/DataSubmissionIndexer';
 export { ExtrinsicIndexer, createExtrinsicIndexer } from './domain/extrinsic/ExtrinsicIndexer';
+export { EventIndexer, createEventIndexer } from './domain/event/EventIndexer';
+export { EraIndexer, createEraIndexer } from './domain/era/EraIndexer';
 
 // Mappers
 export * from '../mappers';
@@ -99,6 +101,8 @@ import { createTransferIndexer } from './domain/transfer/TransferIndexer';
 import { AvailDataSubmissionIndexer } from './domain/dataSubmission/DataSubmissionIndexer';
 import { createExtrinsicIndexer } from './domain/extrinsic/ExtrinsicIndexer';
 import { createEventIndexer } from './domain/event/EventIndexer';
+import { createEraIndexer } from './domain/era/EraIndexer';
+import { createEraProcessor } from './domain/era/EraProcessor';
 
 // Service Factory for dependency injection
 export class ServiceFactory {
@@ -368,6 +372,8 @@ export class ServiceFactory {
       const dataSubmissionIndexer = new AvailDataSubmissionIndexer(queueService, availBlockchainService);
       const extrinsicIndexer = createExtrinsicIndexer(extrinsicRepository, extrinsicService);
       const eventIndexer = createEventIndexer(eventRepository);
+      const eraIndexer = createEraIndexer(eraRepository, availBlockchainService, queueService);
+      const eraProcessor = createEraProcessor(eraRepository, eraIndexer);
       
       // Register domain indexers
       this.register('blockIndexer', blockIndexer);
@@ -377,6 +383,8 @@ export class ServiceFactory {
       this.register('dataSubmissionIndexer', dataSubmissionIndexer);
       this.register('extrinsicIndexer', extrinsicIndexer);
       this.register('eventIndexer', eventIndexer);
+      this.register('eraIndexer', eraIndexer);
+      this.register('eraProcessor', eraProcessor);
       
       // Register repositories for DB-first dependency checking
       this.register('validatorRepository', validatorRepository);

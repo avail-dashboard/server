@@ -571,4 +571,128 @@ export class CoreProcessors {
     }
   }
 
+  /**
+   * INDEX_ERA processor
+   */
+  async processEraIndexing(job: Job<any>) {
+    const { eraNumber, blockNumber, blockHash } = job.data;
+    const startTime = Date.now();
+    
+    logger.debug('🔧 PROCESSOR: Starting era processing', {
+      component: 'era-processing-processor',
+      jobId: job.id,
+      eraNumber,
+      blockNumber,
+      blockHash,
+    });
+
+    try {
+      // Delegate to domain-specific EraProcessor
+      const eraProcessor = await this.getService<any>('eraProcessor');
+      
+      if (eraNumber !== undefined) {
+        // Process specific era
+        await eraProcessor.processEra(eraNumber);
+      } else {
+        // Process current era
+        await eraProcessor.processCurrentEra();
+      }
+      
+      const duration = Date.now() - startTime;
+      
+      logger.debug('✅ PROCESSOR: Era processing completed', {
+        component: 'era-processing-processor',
+        jobId: job.id,
+        eraNumber,
+        blockNumber,
+        duration
+      });
+
+      return {
+        success: true,
+        data: {
+          eraNumber,
+          blockNumber,
+          processed: true,
+        },
+        metrics: { duration }
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const classification = ErrorClassifier.classifyError(error as Error, JobType.INDEX_ERA);
+      
+      logger.error('❌ PROCESSOR: Era processing failed', {
+        component: 'era-processing-processor',
+        jobId: job.id,
+        eraNumber,
+        blockNumber,
+        error: (error as Error).message,
+        classification,
+        duration
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * ERA_TRANSITION processor
+   */
+  async processEraTransition(job: Job<any>) {
+    const { currentEra, newEra, transitionBlock } = job.data;
+    const startTime = Date.now();
+    
+    logger.info('🔧 PROCESSOR: Starting era transition processing', {
+      component: 'era-transition-processor',
+      jobId: job.id,
+      currentEra,
+      newEra,
+      transitionBlock,
+    });
+
+    try {
+      // Delegate to domain-specific EraProcessor
+      const eraProcessor = await this.getService<any>('eraProcessor');
+      await eraProcessor.processEraTransition(currentEra, newEra, transitionBlock);
+      
+      const duration = Date.now() - startTime;
+      
+      logger.info('✅ PROCESSOR: Era transition processing completed', {
+        component: 'era-transition-processor',
+        jobId: job.id,
+        currentEra,
+        newEra,
+        transitionBlock,
+        duration
+      });
+
+      return {
+        success: true,
+        data: {
+          currentEra,
+          newEra,
+          transitionBlock,
+          processed: true,
+        },
+        metrics: { duration }
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const classification = ErrorClassifier.classifyError(error as Error, JobType.ERA_TRANSITION);
+      
+      logger.error('❌ PROCESSOR: Era transition processing failed', {
+        component: 'era-transition-processor',
+        jobId: job.id,
+        currentEra,
+        newEra,
+        transitionBlock,
+        error: (error as Error).message,
+        classification,
+        duration
+      });
+      
+      throw error;
+    }
+  }
+
 }

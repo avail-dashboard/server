@@ -237,6 +237,9 @@ export class BlockIndexer implements IBlockIndexer {
         });
       }
 
+      // Queue era transition detection and processing
+      await this.detectAndQueueEraTransition(blockData);
+
       // Queue data submission jobs if block has data availability extrinsics
       const hasDataSubmissions = blockData.extrinsics.some(ext => 
         ext.method.section === 'dataAvailability' && 
@@ -364,6 +367,69 @@ export class BlockIndexer implements IBlockIndexer {
       accounts: Array.from(accounts),
       transfers,
     };
+  }
+
+  /**
+   * Detect era transitions from block events and queue appropriate jobs
+   */
+  private async detectAndQueueEraTransition(blockData: BlockData): Promise<void> {
+    if (!this.queueService) {
+      return;
+    }
+
+    try {
+      // Check for era transition events in the block
+      const eraTransitionEvents = blockData.events?.filter(event => 
+        event.section === 'staking' && (
+          event.method === 'NewEra' || 
+          event.method === 'EraPaid' ||
+          event.method === 'EraEnded'
+        )
+      ) || [];
+
+      if (eraTransitionEvents.length === 0) {
+        return;
+      }
+
+      // Extract era information from events
+      for (const event of eraTransitionEvents) {
+        if (event.method === 'NewEra' && event.data && Array.isArray(event.data)) {
+          const newEraNumber = Number(event.data[0]);
+          
+          if (!isNaN(newEraNumber)) {
+            logger.info('Era transition detected in block, queuing era processing', {
+              component: 'block-indexer',
+              blockNumber: blockData.number,
+              newEra: newEraNumber,
+              eventMethod: event.method,
+            });
+
+            // Queue era indexing job
+            await this.queueService.addJob(JobType.INDEX_ERA, {
+              eraNumber: newEraNumber,
+              blockNumber: blockData.number,
+              blockHash: blockData.hash,
+            });
+
+            // Queue era transition job (will handle ending previous era and starting new one)
+            const currentEraNumber = newEraNumber - 1;
+            await this.queueService.addJob(JobType.ERA_TRANSITION, {
+              currentEra: currentEraNumber,
+              newEra: newEraNumber,
+              transitionBlock: blockData.number,
+            });
+          }
+        }
+      }
+
+    } catch (error) {
+      logError(error as Error, {
+        component: 'block-indexer',
+        action: 'detectAndQueueEraTransition',
+        blockNumber: blockData.number,
+      });
+      // Don't throw - we don't want era detection failures to break block indexing
+    }
   }
 }
 

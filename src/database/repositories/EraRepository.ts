@@ -1,10 +1,11 @@
+import { Era } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 
 export type EraCreateInput = {
   number: number;
   startBlock: number;
   endBlock?: number | null;
-  totalStaked: number;
+  totalStaked: string | number; // Decimal can be string or number
   validatorCount: number;
   active?: boolean;
 };
@@ -13,7 +14,7 @@ export class EraRepository extends BaseRepository {
   /**
    * Find era by number
    */
-  async findByNumber(number: number): Promise<any | null> {
+  async findByNumber(number: number): Promise<Era | null> {
     return this.prisma.era.findUnique({
       where: { number },
     });
@@ -22,7 +23,7 @@ export class EraRepository extends BaseRepository {
   /**
    * Get current active era
    */
-  async getCurrentEra(): Promise<any | null> {
+  async getCurrentEra(): Promise<Era | null> {
     return this.prisma.era.findFirst({
       where: { active: true },
       orderBy: { number: 'desc' },
@@ -32,7 +33,7 @@ export class EraRepository extends BaseRepository {
   /**
    * Find current era (alias for getCurrentEra)
    */
-  async findCurrent(): Promise<any | null> {
+  async findCurrent(): Promise<Era | null> {
     return this.getCurrentEra();
   }
 
@@ -44,7 +45,7 @@ export class EraRepository extends BaseRepository {
     limit?: number;
     orderBy?: 'number' | 'startBlock' | 'totalStaked';
     orderDirection?: 'asc' | 'desc';
-  }): Promise<{ eras: any[]; total: number }> {
+  }): Promise<{ eras: Era[]; total: number }> {
     const { 
       page = 1, 
       limit = 20, 
@@ -69,7 +70,7 @@ export class EraRepository extends BaseRepository {
   /**
    * Create new era
    */
-  async create(data: EraCreateInput): Promise<any> {
+  async create(data: EraCreateInput): Promise<Era> {
     return this.prisma.era.create({
       data,
     });
@@ -78,7 +79,7 @@ export class EraRepository extends BaseRepository {
   /**
    * Update era
    */
-  async update(number: number, data: Partial<EraCreateInput>): Promise<any> {
+  async update(number: number, data: Partial<EraCreateInput>): Promise<Era> {
     return this.prisma.era.update({
       where: { number },
       data,
@@ -88,7 +89,7 @@ export class EraRepository extends BaseRepository {
   /**
    * End current era and start new one
    */
-  async endEraAndStartNew(currentEraNumber: number, endBlock: number, newEraData: EraCreateInput): Promise<any> {
+  async endEraAndStartNew(currentEraNumber: number, endBlock: number, newEraData: EraCreateInput): Promise<Era> {
     return this.transaction(async (tx: any) => {
       // End current era
       await tx.era.update({
