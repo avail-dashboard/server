@@ -233,8 +233,8 @@ export class ExtrinsicService implements IExtrinsicService {
       const tip = extrinsicData.tip ? new Decimal(String(extrinsicData.tip)) : null;
       const actualFee = extrinsicData.actualFee ? new Decimal(String(extrinsicData.actualFee)) : null;
 
-      // Create comprehensive extrinsic record with all available fields (using createIfNotExists to handle duplicates)
-      let extrinsicRecord = await this.extrinsicRepository.findByHash(extrinsicData.hash);
+      // Create comprehensive extrinsic record with all available fields (check for block-specific extrinsic)
+      let extrinsicRecord = await this.extrinsicRepository.findByHashAndBlock(extrinsicData.hash, blockData.number);
       let created = false;
 
       if (!extrinsicRecord) {

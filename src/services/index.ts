@@ -437,6 +437,10 @@ export class ServiceFactory {
     try {
       console.log('🚀 Starting service initialization...');
       
+      // Initialize correlation ID namespace for queue processing
+      const { initializeCorrelationId } = await import('../utils/correlationId');
+      initializeCorrelationId();
+      
       await this.initializeCoreServices();
       await this.initializeDomainServices();
       

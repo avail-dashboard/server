@@ -36,6 +36,18 @@ export class ExtrinsicRepository extends BaseRepository {
   }
 
   /**
+   * Find extrinsic by hash and block number
+   */
+  async findByHashAndBlock(hash: string, blockNumber: number): Promise<Extrinsic | null> {
+    return this.prisma.extrinsic.findFirst({
+      where: { 
+        hash,
+        blockNumber 
+      },
+    });
+  }
+
+  /**
    * Get extrinsics for a block
    */
   async findByBlock(blockNumber: number): Promise<Extrinsic[]> {

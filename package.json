@@ -37,6 +37,7 @@
     "sync:live": "ENV_FILE=.env.production tsx scripts/sync-blockchain-data.ts --mode live",
     "sync:range": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode range",
     "sync:test": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode range --from 1000000 --to 1000010 --batch-size 5",
+    "sync:missing": "ENV_FILE=.env.local tsx scripts/sync-missing.ts",
 
     "db:init": "npm run prisma:migrate:deploy && npm run prisma:generate",
     "db:reset": "npm run prisma:migrate:reset && npm run prisma:generate",
@@ -51,7 +52,7 @@
     "prisma:push": "dotenv -e .env.local -- prisma db push",
     "prisma:pull": "dotenv -e .env.local -- prisma db pull",
     "prisma:studio": "dotenv -e .env.local -- prisma studio",
-
+    
     "pre-commit": "npm run test:critical",
     "prepare": "husky install"
   },
@@ -64,6 +65,7 @@
     "axios": "^1.6.2",
     "bull": "^4.12.2",
     "cls-hooked": "^4.2.2",
+    "commander": "^14.0.0",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

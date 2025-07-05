@@ -40,14 +40,14 @@ model Block {
 
 model Extrinsic {
   id               Int      @id @default(autoincrement())
-  hash             String   @unique @db.VarChar(66)
+  hash             String   @db.VarChar(66)  // Removed @unique - Substrate allows duplicate hashes across blocks
   
   // Block reference (no FK constraint)
   blockNumber      Int      @map("block_number")
   blockHash        String?  @map("block_hash") @db.VarChar(66)  // Denormalized
   blockTimestamp   DateTime? @map("block_timestamp")            // Denormalized
   
-  extrinsicIndex   Int?     @map("extrinsic_index")
+  extrinsicIndex   Int      @map("extrinsic_index")
   module           String?  @db.VarChar(50)
   call             String?  @db.VarChar(50)
   success          Boolean?
@@ -68,8 +68,11 @@ model Extrinsic {
   extrinsicOrder   Int?     @map("extrinsic_order") // Order within block
   createdAt        DateTime @default(now()) @map("created_at")
   
+  // Substrate-compatible unique identification: block + extrinsic index
+  @@unique([blockNumber, extrinsicIndex], name: "unique_block_extrinsic")
   @@index([blockNumber], name: "idx_extrinsics_block")
   @@index([hash], name: "idx_extrinsics_hash")
+  @@index([hash, blockNumber], name: "idx_extrinsics_hash_block")  // Efficient lookup for hash+block
   @@index([signer], name: "idx_extrinsics_signer")
   @@index([timestamp], name: "idx_extrinsics_timestamp")
   @@index([blockNumber, extrinsicOrder], name: "idx_extrinsics_block_order")
