@@ -139,8 +139,10 @@ export class TransferIndexer implements ITransferIndexer {
               const relatedExtrinsic = blockData.extrinsics?.[extrinsicIndex];
               if (relatedExtrinsic) {
                 txHash = relatedExtrinsic.hash;
-                fee = relatedExtrinsic.fee;
               }
+              
+              // Extract fee from corresponding balances.Withdraw event
+              fee = this.extractFeeFromWithdrawEvent(blockData.events, extrinsicIndex, from.toString());
             }
             
             transfers.push({
@@ -163,6 +165,52 @@ export class TransferIndexer implements ITransferIndexer {
     }
 
     return transfers;
+  }
+
+  /**
+   * Extract transaction fee from balances.Withdraw event that corresponds to the same extrinsic
+   * In Substrate/Avail, transaction fees are withdrawn from the signer's account and recorded as Withdraw events
+   */
+  private extractFeeFromWithdrawEvent(events: any[], extrinsicIndex: number, signerAddress: string): string | undefined {
+    try {
+      // Find the balances.Withdraw event for this extrinsic from the signer's account
+      const withdrawEvent = events.find(event => 
+        event.section === 'balances' &&
+        event.method === 'Withdraw' &&
+        event.phase?.applyExtrinsic === extrinsicIndex &&
+        event.data &&
+        Array.isArray(event.data) &&
+        event.data.length >= 2 &&
+        event.data[0]?.toString() === signerAddress,
+      );
+
+      if (withdrawEvent && withdrawEvent.data[1]) {
+        const feeAmount = withdrawEvent.data[1].toString();
+        logger.debug('Fee extracted from Withdraw event', {
+          component: 'transfer-indexer',
+          extrinsicIndex,
+          signerAddress,
+          feeAmount,
+        });
+        return feeAmount;
+      }
+
+      logger.debug('No fee Withdraw event found for transfer', {
+        component: 'transfer-indexer',
+        extrinsicIndex,
+        signerAddress,
+      });
+      return undefined;
+
+    } catch (error) {
+      logger.warn('Failed to extract fee from Withdraw event', {
+        component: 'transfer-indexer',
+        extrinsicIndex,
+        signerAddress,
+        error: (error as Error).message,
+      });
+      return undefined;
+    }
   }
 
   /**

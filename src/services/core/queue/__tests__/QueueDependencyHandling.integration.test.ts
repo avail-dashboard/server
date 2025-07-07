@@ -199,7 +199,7 @@ describe('Queue-Based Dependency Handling Integration', () => {
     await queueService.start();
 
     // Create indexers with queue service
-    blockIndexer = createBlockIndexer(mockBlockRepository, mockBlockchainService);
+    blockIndexer = createBlockIndexer(mockBlockRepository, mockValidatorRepository, mockBlockchainService, queueService);
     accountIndexer = createAccountIndexer(mockBlockchainService, queueService);
     transferIndexer = createTransferIndexer(mockTransferRepository, queueService);
     validatorIndexer = createValidatorIndexer(mockValidatorRepository, mockBlockchainService, queueService);

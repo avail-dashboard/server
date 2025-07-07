@@ -30,7 +30,7 @@ export class ExtrinsicRepository extends BaseRepository {
    * Find extrinsic by hash
    */
   async findByHash(hash: string): Promise<Extrinsic | null> {
-    return this.prisma.extrinsic.findUnique({
+    return this.prisma.extrinsic.findFirst({
       where: { hash },
     });
   }
@@ -84,6 +84,9 @@ export class ExtrinsicRepository extends BaseRepository {
    * Create new extrinsic with enhanced fields
    */
   async create(data: ExtrinsicCreateInput): Promise<Extrinsic> {
+    if (data.extrinsicIndex === null || data.extrinsicIndex === undefined) {
+      throw new Error('extrinsicIndex is required');
+    }
     return this.prisma.extrinsic.create({
       data: {
         hash: data.hash,
@@ -115,17 +118,22 @@ export class ExtrinsicRepository extends BaseRepository {
    * Create multiple extrinsics efficiently
    */
   async createMany(extrinsics: ExtrinsicCreateInput[]): Promise<{ count: number }> {
-    const data = extrinsics.map(ext => ({
-      hash: ext.hash,
-      blockNumber: ext.blockNumber,
-      extrinsicIndex: ext.extrinsicIndex,
-      module: ext.module,
-      call: ext.call,
-      success: ext.success,
-      timestamp: ext.timestamp,
-      signer: ext.signer,
-      fee: ext.fee,
-    }));
+    const data = extrinsics.map(ext => {
+      if (ext.extrinsicIndex === null || ext.extrinsicIndex === undefined) {
+        throw new Error('extrinsicIndex is required for all extrinsics');
+      }
+      return {
+        hash: ext.hash,
+        blockNumber: ext.blockNumber,
+        extrinsicIndex: ext.extrinsicIndex,
+        module: ext.module,
+        call: ext.call,
+        success: ext.success,
+        timestamp: ext.timestamp,
+        signer: ext.signer,
+        fee: ext.fee,
+      }
+    });
 
     return this.prisma.extrinsic.createMany({
       data,
@@ -136,28 +144,39 @@ export class ExtrinsicRepository extends BaseRepository {
   /**
    * Update extrinsic
    */
-  async update(hash: string, data: Partial<ExtrinsicCreateInput>): Promise<Extrinsic> {
+  async update(blockNumber: number, extrinsicIndex: number, data: Partial<ExtrinsicCreateInput>): Promise<Extrinsic> {
+    const updateData: any = {};
+    if (data.blockNumber !== undefined) updateData.blockNumber = data.blockNumber;
+    if (data.extrinsicIndex !== undefined) updateData.extrinsicIndex = data.extrinsicIndex;
+    if (data.module !== undefined) updateData.module = data.module;
+    if (data.call !== undefined) updateData.call = data.call;
+    if (data.success !== undefined) updateData.success = data.success;
+    if (data.timestamp !== undefined) updateData.timestamp = data.timestamp;
+    if (data.signer !== undefined) updateData.signer = data.signer;
+    if (data.fee !== undefined) updateData.fee = data.fee;
+
     return this.prisma.extrinsic.update({
-      where: { hash },
-      data: {
-        ...(data.blockNumber !== undefined && { blockNumber: data.blockNumber }),
-        ...(data.extrinsicIndex !== undefined && { extrinsicIndex: data.extrinsicIndex }),
-        ...(data.module !== undefined && { module: data.module }),
-        ...(data.call !== undefined && { call: data.call }),
-        ...(data.success !== undefined && { success: data.success }),
-        ...(data.timestamp !== undefined && { timestamp: data.timestamp }),
-        ...(data.signer !== undefined && { signer: data.signer }),
-        ...(data.fee !== undefined && { fee: data.fee }),
-      },
+      where: { 
+        unique_block_extrinsic: {
+          blockNumber,
+          extrinsicIndex
+        }
+       },
+      data: updateData,
     });
   }
 
   /**
    * Delete extrinsic
    */
-  async delete(hash: string): Promise<Extrinsic> {
+  async delete(blockNumber: number, extrinsicIndex: number): Promise<Extrinsic> {
     return this.prisma.extrinsic.delete({
-      where: { hash },
+      where: { 
+        unique_block_extrinsic: {
+          blockNumber,
+          extrinsicIndex
+        }
+       },
     });
   }
 

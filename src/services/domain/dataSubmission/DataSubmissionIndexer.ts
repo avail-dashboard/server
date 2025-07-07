@@ -1,6 +1,6 @@
 import { AvailBlockchainService, createAvailBlockchainService } from '../../core/avail-blockchain';
 import { dataSubmissionRepository, rollupRepository, blockRepository, DataSubmissionCreateInput } from '../../../database';
-import { logger, logError } from '../../../utils/logger';
+import { logger } from '../../../utils/logger';
 import { JobType } from '../../types/service';
 
 export interface AvailDataSubmission {

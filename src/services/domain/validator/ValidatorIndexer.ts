@@ -279,30 +279,36 @@ export class ValidatorIndexer implements IValidatorIndexer {
   private async fetchValidatorFromBlockchain(validatorId: string): Promise<ValidatorInfo | null> {
     try {
       const api = await this.blockchain.getApi();
-      
+      const activeEraOpt = await api.query.staking.activeEra();
+      const activeEra = activeEraOpt.isSome ? activeEraOpt.unwrap().index : null;
+
+      const controllerAddressOpt = await api.query.staking.bonded(validatorId);
+      const controllerAddress = controllerAddressOpt.isSome ? controllerAddressOpt.unwrap().toString() : null;
+
       // Fetch validator info using Substrate API
-      const [
-        validatorPrefs,
-        stakingLedger,
-        identity,
-        exposure,
-      ] = await Promise.all([
+      const [validatorPrefs, stakingLedger, stashIdentity, controllerIdentity, exposure] = await Promise.all([
         api.query.staking.validators(validatorId),
-        api.query.staking.ledger(validatorId),
+        controllerAddress ? api.query.staking.ledger(controllerAddress) : Promise.resolve(api.createType('Option<StakingLedger>')),
         api.query.identity.identityOf(validatorId),
-        api.query.staking.erasStakers.entries(),
+        controllerAddress
+          ? api.query.identity.identityOf(controllerAddress)
+          : Promise.resolve(api.createType('Option<Registration>')),
+        activeEra ? api.query.staking.erasStakers(activeEra, validatorId) : Promise.resolve(api.createType('Option<Exposure>')),
       ]);
+
+      // Controller identity takes precedence over stash identity
+      const identity = controllerIdentity.isSome ? controllerIdentity : stashIdentity;
 
       // Parse validator preferences
       const prefs = validatorPrefs.toJSON() as any;
-      
+
       // Parse identity information with proper null safety
       let identityInfo = undefined;
       if (identity.isSome) {
         try {
           const identityUnwrapped = identity.unwrap();
           const identityData = identityUnwrapped?.info;
-          
+
           if (identityData) {
             identityInfo = {
               display: identityData.display?.isRaw ? identityData.display.asRaw.toUtf8() : undefined,
@@ -332,27 +338,22 @@ export class ValidatorIndexer implements IValidatorIndexer {
       let nominators: string[] = [];
 
       // Parse exposure data to get stake information
-      for (const [key, exposureOpt] of exposure) {
-        if (exposureOpt.isSome) {
-          const exposureData = exposureOpt.unwrap();
-          const [, validator] = key.args; // era not used, validator is the important part
-          
-          if (validator.toString() === validatorId) {
-            stakeInfo = {
-              total: exposureData.total.toString(),
-              own: exposureData.own.toString(),
-              others: exposureData.others.reduce((sum: number, nom: any) => sum + parseInt(nom.value.toString()), 0).toString(),
-            };
-            nominators = exposureData.others.map((nom: any) => nom.who.toString());
-            break;
-          }
-        }
+      if (exposure && exposure.isSome) {
+        const exposureData = exposure.unwrap();
+        stakeInfo = {
+          total: exposureData.total.toString(),
+          own: exposureData.own.toString(),
+          others: exposureData.others
+            .reduce((sum: number, nom: any) => sum + parseInt(nom.value.toString()), 0)
+            .toString(),
+        };
+        nominators = exposureData.others.map((nom: any) => nom.who.toString());
       }
 
       return {
         accountId: validatorId,
         stash: validatorId, // In most cases, stash and accountId are the same
-        controller: stakingLedger.isSome ? stakingLedger.unwrap().stash.toString() : undefined,
+        controller: controllerAddress,
         commission: prefs.commission ? (prefs.commission / 10000000).toString() : '0', // Convert from Perbill
         blocked: prefs.blocked || false,
         identity: identityInfo,
@@ -363,7 +364,6 @@ export class ValidatorIndexer implements IValidatorIndexer {
           blocked: prefs.blocked || false,
         },
       };
-
     } catch (error) {
       logger.warn('Failed to fetch validator from blockchain', {
         component: 'validator-indexer',

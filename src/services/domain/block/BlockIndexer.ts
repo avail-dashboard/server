@@ -79,7 +79,6 @@ export class BlockIndexer implements IBlockIndexer {
       // Extract additional block data for more complete indexing
       const extractedTimestamp = this.extractTimestampFromExtrinsics(blockData);
       const transferCount = this.calculateTransferCount(blockData);
-      const dataSubmissionsSize = this.calculateDataSubmissionsSize(blockData);
       const totalFees = this.calculateTotalFees(blockData);
 
       // Store block data in database
@@ -93,11 +92,9 @@ export class BlockIndexer implements IBlockIndexer {
         extrinsicsCount: blockData.extrinsics?.length || 0,
         eventsCount: blockData.events?.length || 0,
         validatorAddress: blockData.validator || null, // Extract from blockchain data
-        validatorName: null, // Will be populated when validator is indexed
         specVersion: specVersion, // Extract from chain info
         totalFees: totalFees !== '0' ? new Decimal(totalFees) : null,
         transferCount: transferCount,
-        dataSubmissionsSize: dataSubmissionsSize,
       };
 
       // Check if block already exists
@@ -354,8 +351,12 @@ export class BlockIndexer implements IBlockIndexer {
 
     // Extract from events
     if (blockData.events) {
-      blockData.events.forEach(event => {
+      blockData.events.forEach((event, eventIndex) => {
         if (event.section === 'balances' && event.method === 'Transfer') {
+          // Create transfer ID matching TransferIndexer format
+          const transferId = `${blockData.hash}-event-${eventIndex}`;
+          transfers.push(transferId);
+          
           // Extract accounts from transfer events
           if (event.data && Array.isArray(event.data)) {
             const [from, to] = event.data;
@@ -496,38 +497,6 @@ export class BlockIndexer implements IBlockIndexer {
     }
   }
 
-  /**
-   * Calculate data submissions size from dataAvailability extrinsics
-   */
-  private calculateDataSubmissionsSize(blockData: BlockData): number {
-    try {
-      let totalSize = 0;
-      
-      blockData.extrinsics?.forEach(ext => {
-        if (ext.method?.section === 'dataAvailability' && ext.method?.method === 'submitData') {
-          // Extract data size from the arguments
-          const data = ext.method?.args?.data;
-          if (data) {
-            // Data can be a hex string, so calculate size in bytes
-            if (typeof data === 'string' && data.startsWith('0x')) {
-              totalSize += (data.length - 2) / 2; // Remove 0x prefix and divide by 2 for hex
-            } else if (data.length) {
-              totalSize += data.length;
-            }
-          }
-        }
-      });
-
-      return totalSize;
-    } catch (error) {
-      logger.debug('Failed to calculate data submissions size', {
-        component: 'block-indexer',
-        blockNumber: blockData.number,
-        error: (error as Error).message,
-      });
-      return 0;
-    }
-  }
 
   /**
    * Calculate total fees from balances.Withdraw events

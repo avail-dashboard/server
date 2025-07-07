@@ -176,17 +176,17 @@ export class EventIndexer implements IEventIndexer {
       }
       
       // Handle different phase structures
-      if (typeof phaseData === 'object') {
-        // Standard formats
-        if (phaseData.ApplyExtrinsic !== undefined) {
-          return phaseData.ApplyExtrinsic;
+      if (typeof phaseData === 'object' && phaseData !== null) {
+        // Standard formats with proper type checking
+        if ('ApplyExtrinsic' in phaseData && phaseData.ApplyExtrinsic !== undefined) {
+          return Number(phaseData.ApplyExtrinsic);
         }
-        if (phaseData.applyExtrinsic !== undefined) {
-          return phaseData.applyExtrinsic;
+        if ('applyExtrinsic' in phaseData && phaseData.applyExtrinsic !== undefined) {
+          return Number(phaseData.applyExtrinsic);
         }
         // Handle nested structure
-        if (phaseData.Apply && phaseData.Apply.Extrinsic !== undefined) {
-          return phaseData.Apply.Extrinsic;
+        if ('Apply' in phaseData && typeof phaseData.Apply === 'object' && phaseData.Apply !== null && 'Extrinsic' in phaseData.Apply && phaseData.Apply.Extrinsic !== undefined) {
+          return Number(phaseData.Apply.Extrinsic);
         }
       }
       
@@ -196,8 +196,10 @@ export class EventIndexer implements IEventIndexer {
         // Try to access via isApplyExtrinsic property (Polkadot-JS pattern)
         if ('isApplyExtrinsic' in phase && phase.isApplyExtrinsic && 'asApplyExtrinsic' in phase && typeof phase.asApplyExtrinsic !== 'undefined') {
           const extrinsicIndex = phase.asApplyExtrinsic;
-          return typeof extrinsicIndex === 'object' && extrinsicIndex.toNumber ? 
-            extrinsicIndex.toNumber() : Number(extrinsicIndex);
+          if (typeof extrinsicIndex === 'object' && extrinsicIndex !== null && 'toNumber' in extrinsicIndex && typeof extrinsicIndex.toNumber === 'function') {
+            return extrinsicIndex.toNumber();
+          }
+          return Number(extrinsicIndex);
         }
         
         // Try to access the raw value if it exists
@@ -229,21 +231,21 @@ export class EventIndexer implements IEventIndexer {
   /**
    * Extract phase type from event phase
    */
-  private extractPhaseType(phase: any): string | null {
+  private extractPhaseType(phase: unknown): string | null {
     if (!phase) return null;
     
     if (typeof phase === 'string') {
       return phase;
     }
     
-    if (typeof phase === 'object') {
-      if (phase.ApplyExtrinsic !== undefined) {
+    if (typeof phase === 'object' && phase !== null) {
+      if ('ApplyExtrinsic' in phase && phase.ApplyExtrinsic !== undefined) {
         return 'ApplyExtrinsic';
       }
-      if (phase.Finalization !== undefined) {
+      if ('Finalization' in phase && phase.Finalization !== undefined) {
         return 'Finalization';
       }
-      if (phase.Initialization !== undefined) {
+      if ('Initialization' in phase && phase.Initialization !== undefined) {
         return 'Initialization';
       }
       

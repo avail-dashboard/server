@@ -1,14 +1,17 @@
 import { BlockIndexer, createBlockIndexer } from '../BlockIndexer';
 import { BlockRepository } from '../../../../database/repositories/BlockRepository';
+import { ValidatorRepository } from '../../../../database/repositories/ValidatorRepository';
 import { AvailBlockchainService } from '../../../core/avail-blockchain';
 
 // Mock dependencies
 jest.mock('../../../../database/repositories/BlockRepository');
+jest.mock('../../../../database/repositories/ValidatorRepository');
 jest.mock('../../../core/avail-blockchain');
 
 describe('BlockIndexer', () => {
   let blockIndexer: BlockIndexer;
   let mockBlockRepository: jest.Mocked<BlockRepository>;
+  let mockValidatorRepository: jest.Mocked<ValidatorRepository>;
   let mockBlockchainService: jest.Mocked<AvailBlockchainService>;
 
   const mockBlockData = {
@@ -50,11 +53,15 @@ describe('BlockIndexer', () => {
       update: jest.fn(),
     } as any;
 
+    mockValidatorRepository = {
+      findByStashAddress: jest.fn(),
+    } as any;
+
     mockBlockchainService = {
       getBlock: jest.fn(),
     } as any;
 
-    blockIndexer = createBlockIndexer(mockBlockRepository, mockBlockchainService);
+    blockIndexer = createBlockIndexer(mockBlockRepository, mockValidatorRepository, mockBlockchainService);
   });
 
   describe('indexBlock', () => {
@@ -173,7 +180,7 @@ describe('BlockIndexer', () => {
   describe('Architecture Validation', () => {
     it('should operate independently without external dependencies', () => {
       // Verify BlockIndexer only depends on repository and blockchain service
-      const indexer = createBlockIndexer(mockBlockRepository, mockBlockchainService);
+      const indexer = createBlockIndexer(mockBlockRepository, mockValidatorRepository, mockBlockchainService);
       
       expect(indexer).toBeDefined();
       expect(indexer.indexBlock).toBeDefined();

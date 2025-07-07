@@ -22,13 +22,11 @@ model Block {
   
   // Validator info (no FK constraint)
   validatorAddress     String?          @map("validator_address") @db.VarChar(64)
-  validatorName        String?          @map("validator_name") @db.VarChar(255)
   
   // Block metadata
   specVersion          Int?             @map("spec_version")
   totalFees            Decimal?         @map("total_fees") @db.Decimal(65,18)
   transferCount        Int?             @map("transfer_count")
-  dataSubmissionsSize  Int?             @map("data_submissions_size")
   createdAt            DateTime         @default(now()) @map("created_at")
   
   // Indexes for performance (FK indexes removed)

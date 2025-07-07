@@ -652,12 +652,47 @@ export class AvailBlockchainService implements BaseService {
   private extractEventsData(rawEvents: any[]): any[] {
     return rawEvents.map((event, index) => {
       try {
+        // Extract phase information properly for transfer events
+        let phase: any = { finalization: 0 };
+        if (event.phase) {
+          try {
+            // Handle different phase formats from Substrate/Avail
+            if (event.phase.applyExtrinsic !== undefined) {
+              phase = { applyExtrinsic: event.phase.applyExtrinsic };
+            } else if (event.phase.ApplyExtrinsic !== undefined) {
+              phase = { applyExtrinsic: event.phase.ApplyExtrinsic };
+            } else if (typeof event.phase === 'object' && event.phase.isApplyExtrinsic) {
+              // Handle Substrate type format
+              phase = { applyExtrinsic: event.phase.asApplyExtrinsic.toNumber() };
+            } else if (event.phase.finalization !== undefined) {
+              phase = { finalization: event.phase.finalization };
+            } else {
+              // Try to convert phase to string/number if it's a primitive
+              const phaseStr = event.phase.toString();
+              if (phaseStr.includes('ApplyExtrinsic')) {
+                // Extract extrinsic index from string format
+                const match = phaseStr.match(/ApplyExtrinsic\((\d+)\)/);
+                if (match) {
+                  phase = { applyExtrinsic: parseInt(match[1], 10) };
+                }
+              }
+            }
+          } catch (phaseError) {
+            logger.debug('Failed to extract phase from event', {
+              component: 'avail-blockchain',
+              eventIndex: index,
+              phaseError: (phaseError as Error).message,
+              rawPhase: event.phase,
+            });
+          }
+        }
+        
         return {
           index,
           section: event.event?.section || 'unknown',
           method: event.event?.method || 'unknown',
           data: event.event?.data || [],
-          phase: event.phase || { finalization: 0 },
+          phase,
         };
       } catch (error) {
         logger.warn('Failed to extract event data', {
