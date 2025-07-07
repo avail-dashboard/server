@@ -119,6 +119,7 @@ model Event {
   module         String?  @db.VarChar(50)
   eventName      String?  @map("event_name") @db.VarChar(50)
   data           Json?
+  topics         Json?    // Array of topic strings for event filtering
   timestamp      DateTime?
   
   // Event details
@@ -244,6 +245,7 @@ model Validator {
   // Performance tracking
   blocksProduced      Int         @default(0) @map("blocks_produced")
   lastBlockProduced   Int?        @map("last_block_produced")
+  firstSeenBlock      Int?        @map("first_seen_block")
   createdAt           DateTime    @default(now()) @map("created_at")
   updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at")
   
@@ -251,6 +253,7 @@ model Validator {
   @@index([totalBonded], name: "idx_validators_total_bonded")
   @@index([commission], name: "idx_validators_commission")
   @@index([lastBlockProduced], name: "idx_validators_last_block")
+  @@index([firstSeenBlock], name: "idx_validators_first_seen")
   @@map("validators")
 }
 

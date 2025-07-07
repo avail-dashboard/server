@@ -23,6 +23,7 @@ export class BlockMapper implements IBlockMapper {
       extrinsics_root: block.extrinsicsRoot || block.extrinsics_root || undefined,
       timestamp: block.timestamp ? new Date(block.timestamp).toISOString() : new Date().toISOString(),
       extrinsics_count: block.extrinsicsCount || block.extrinsics_count || 0,
+      events_count: block.eventsCount || block.events_count || 0,
       created_at: block.createdAt ? new Date(block.createdAt).toISOString() : new Date().toISOString(),
     };
   }
@@ -47,6 +48,7 @@ export class BlockMapper implements IBlockMapper {
       extrinsics_root: block.extrinsicsRoot || block.extrinsics_root || undefined,
       timestamp: block.timestamp ? new Date(block.timestamp).toISOString() : new Date().toISOString(),
       extrinsics_count: block.extrinsicsCount || block.extrinsics_count || 0,
+      events_count: block.eventsCount || block.events_count || 0,
       created_at: block.createdAt ? new Date(block.createdAt).toISOString() : new Date().toISOString(),
       events: [],
       logs: [],

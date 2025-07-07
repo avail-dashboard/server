@@ -1,21 +1,7 @@
-import { Event } from '@prisma/client';
+import { Event, Prisma } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 
-export type EventCreateInput = {
-  blockNumber: number;
-  blockHash?: string | null;
-  blockTimestamp?: Date | null;
-  extrinsicIndex?: number | null;
-  eventIndex?: number | null;
-  module?: string | null;
-  eventName?: string | null;
-  data?: any;
-  timestamp?: Date | null;
-  phase?: any;
-  phaseType?: string | null;
-  methodObject?: any;
-  eventOrder?: number | null;
-};
+export type EventCreateInput = Omit<Prisma.EventCreateInput, 'id' | 'createdAt'>;
 
 export class EventRepository extends BaseRepository {
   /**
@@ -86,7 +72,7 @@ export class EventRepository extends BaseRepository {
       page?: number;
       limit?: number;
       orderBy?: 'asc' | 'desc';
-    } = {}
+    } = {},
   ): Promise<{ events: Event[]; total: number }> {
     const { page = 1, limit = 20, orderBy = 'desc' } = params;
     const skip = (page - 1) * limit;

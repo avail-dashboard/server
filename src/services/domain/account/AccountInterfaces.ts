@@ -51,6 +51,11 @@ export interface AccountWithDetails extends Account {
   totalTransferred: Decimal;
   /** Total amount received by this account */
   totalReceived: Decimal;
+  /** Account identity information */
+  identity?: {
+    display?: string;
+    info?: unknown;
+  } | null;
 }
 
 /**

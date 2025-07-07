@@ -34,7 +34,7 @@
 
     "sync:full": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode full",
     "sync:incremental": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode incremental",
-    "sync:live": "ENV_FILE=.env.production tsx scripts/sync-blockchain-data.ts --mode live",
+    "sync:live": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode live",
     "sync:range": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode range",
     "sync:test": "ENV_FILE=.env.local tsx scripts/sync-blockchain-data.ts --mode range --from 1000000 --to 1000010 --batch-size 5",
     "sync:missing": "ENV_FILE=.env.local tsx scripts/sync-missing.ts",

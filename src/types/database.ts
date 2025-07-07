@@ -162,7 +162,7 @@ export interface Log {
 // ==========================================
 
 export interface Transfer {
-  id: number;
+  id: string;
   extrinsic_hash: string;
   block_number: number;
   from_address: string;
@@ -297,6 +297,7 @@ export interface BlockApiResponse {
   extrinsics_root?: string; // Add missing extrinsics root
   timestamp: string; // ISO string instead of Date
   extrinsics_count: number;
+  events_count: number;
   created_at: string; // ISO string instead of Date
 }
 
@@ -321,6 +322,7 @@ export interface BlockWithMetadataApiResponse {
   extrinsics_root?: string; // Add missing extrinsics root
   timestamp: string; // ISO string instead of Date
   extrinsics_count: number;
+  events_count: number;
   created_at: string; // ISO string instead of Date
   events?: Event[];
   logs?: Log[];

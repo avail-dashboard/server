@@ -28,6 +28,7 @@ export interface TransferWithDetails {
   fromAddress: string;
   toAddress: string;
   amount: string;
+  asset_id: number;
   fee: string | null;
   success: boolean;
   blockNumber: number;

@@ -4,6 +4,7 @@ import { BlockRepository } from '../../../database/repositories/BlockRepository'
 import { BlockData } from '../../types/blockchain';
 import { QueueService } from '../../core/queue';
 import { JobType } from '../../types/service';
+import { Decimal } from '@prisma/client/runtime/library';
 
 /**
  * BlockIndexer - Fetches block data from blockchain and identifies dependencies
@@ -62,6 +63,25 @@ export class BlockIndexer implements IBlockIndexer {
       // Fetch block data from blockchain
       const blockData = await this.blockchain.getBlock(blockNumber);
       
+      // Get spec version from chain info
+      let specVersion: number | null = null;
+      try {
+        const chainInfo = await this.blockchain.getChainInfo();
+        specVersion = chainInfo.specVersion;
+      } catch (error) {
+        logger.debug('Failed to get spec version', {
+          component: 'block-indexer',
+          blockNumber,
+          error: (error as Error).message,
+        });
+      }
+      
+      // Extract additional block data for more complete indexing
+      const extractedTimestamp = this.extractTimestampFromExtrinsics(blockData);
+      const transferCount = this.calculateTransferCount(blockData);
+      const dataSubmissionsSize = this.calculateDataSubmissionsSize(blockData);
+      const totalFees = this.calculateTotalFees(blockData);
+
       // Store block data in database
       const blockEntity = {
         number: blockData.number,
@@ -69,15 +89,15 @@ export class BlockIndexer implements IBlockIndexer {
         parentHash: blockData.parentHash || null,
         stateRoot: blockData.stateRoot || null,
         extrinsicsRoot: blockData.extrinsicsRoot || null,
-        timestamp: blockData.timestamp ? new Date(blockData.timestamp) : new Date(),
+        timestamp: extractedTimestamp ? new Date(extractedTimestamp) : new Date(blockData.timestamp),
         extrinsicsCount: blockData.extrinsics?.length || 0,
         eventsCount: blockData.events?.length || 0,
-        validatorAddress: null, // Always null initially - updated when validator is indexed
+        validatorAddress: blockData.validator || null, // Extract from blockchain data
         validatorName: null, // Will be populated when validator is indexed
-        specVersion: null,
-        totalFees: null,
-        transferCount: null,
-        dataSubmissionsSize: null,
+        specVersion: specVersion, // Extract from chain info
+        totalFees: totalFees !== '0' ? new Decimal(totalFees) : null,
+        transferCount: transferCount,
+        dataSubmissionsSize: dataSubmissionsSize,
       };
 
       // Check if block already exists
@@ -429,6 +449,124 @@ export class BlockIndexer implements IBlockIndexer {
         blockNumber: blockData.number,
       });
       // Don't throw - we don't want era detection failures to break block indexing
+    }
+  }
+
+  /**
+   * Extract timestamp from timestamp.set extrinsic (first extrinsic in every block)
+   */
+  private extractTimestampFromExtrinsics(blockData: BlockData): number | null {
+    try {
+      // The first extrinsic in every Substrate block is timestamp.set
+      const timestampExtrinsic = blockData.extrinsics?.find(ext => 
+        ext.method?.section === 'timestamp' && ext.method?.method === 'set'
+      );
+
+      if (timestampExtrinsic && timestampExtrinsic.method?.args?.now) {
+        const timestamp = timestampExtrinsic.method.args.now;
+        // Convert from Unix timestamp to milliseconds
+        return typeof timestamp === 'number' ? timestamp : parseInt(timestamp.toString());
+      }
+    } catch (error) {
+      logger.debug('Failed to extract timestamp from extrinsics', {
+        component: 'block-indexer',
+        blockNumber: blockData.number,
+        error: (error as Error).message,
+      });
+    }
+    return null;
+  }
+
+  /**
+   * Calculate transfer count from balance transfer extrinsics
+   */
+  private calculateTransferCount(blockData: BlockData): number {
+    try {
+      return blockData.extrinsics?.filter(ext => 
+        ext.method?.section === 'balances' && 
+        (ext.method?.method === 'transfer' || ext.method?.method === 'transferKeepAlive')
+      ).length || 0;
+    } catch (error) {
+      logger.debug('Failed to calculate transfer count', {
+        component: 'block-indexer',
+        blockNumber: blockData.number,
+        error: (error as Error).message,
+      });
+      return 0;
+    }
+  }
+
+  /**
+   * Calculate data submissions size from dataAvailability extrinsics
+   */
+  private calculateDataSubmissionsSize(blockData: BlockData): number {
+    try {
+      let totalSize = 0;
+      
+      blockData.extrinsics?.forEach(ext => {
+        if (ext.method?.section === 'dataAvailability' && ext.method?.method === 'submitData') {
+          // Extract data size from the arguments
+          const data = ext.method?.args?.data;
+          if (data) {
+            // Data can be a hex string, so calculate size in bytes
+            if (typeof data === 'string' && data.startsWith('0x')) {
+              totalSize += (data.length - 2) / 2; // Remove 0x prefix and divide by 2 for hex
+            } else if (data.length) {
+              totalSize += data.length;
+            }
+          }
+        }
+      });
+
+      return totalSize;
+    } catch (error) {
+      logger.debug('Failed to calculate data submissions size', {
+        component: 'block-indexer',
+        blockNumber: blockData.number,
+        error: (error as Error).message,
+      });
+      return 0;
+    }
+  }
+
+  /**
+   * Calculate total fees from balances.Withdraw events
+   */
+  private calculateTotalFees(blockData: BlockData): string {
+    try {
+      let totalFees = new Decimal('0');
+      
+      // Sum all balances.Withdraw events which represent fee payments
+      blockData.events?.forEach(event => {
+        if (event.section === 'balances' && event.method === 'Withdraw') {
+          // Event data: [who, amount]
+          if (event.data && Array.isArray(event.data) && event.data.length >= 2) {
+            const amount = event.data[1];
+            if (amount) {
+              try {
+                const feeAmount = new Decimal(amount.toString());
+                totalFees = totalFees.add(feeAmount);
+              } catch (decimalError) {
+                logger.debug('Failed to convert fee amount to Decimal', {
+                  component: 'block-indexer',
+                  blockNumber: blockData.number,
+                  amount: amount,
+                  error: (decimalError as Error).message,
+                });
+              }
+            }
+          }
+        }
+      });
+
+      return totalFees.toString();
+    } catch (error) {
+      logger.debug('Failed to calculate total fees', {
+        component: 'block-indexer',
+        blockNumber: blockData.number,
+        error: (error as Error).message,
+      });
+      return '0';
     }
   }
 }

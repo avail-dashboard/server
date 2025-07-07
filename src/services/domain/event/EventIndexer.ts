@@ -53,7 +53,7 @@ export class EventIndexer implements IEventIndexer {
           blockNumber: blockData.number,
           blockHash: blockData.hash,
           blockTimestamp: blockData.timestamp ? new Date(blockData.timestamp) : new Date(),
-          extrinsicIndex: event.phase?.applyExtrinsic || undefined,
+          extrinsicIndex: this.extractExtrinsicIndex(event.phase),
           eventIndex: eventIndex,
           module: event.section || null,
           eventName: event.method || null,
@@ -157,6 +157,73 @@ export class EventIndexer implements IEventIndexer {
         error: (error as Error).message,
       };
     }
+  }
+
+  /**
+   * Extract extrinsic index from event phase
+   */
+  private extractExtrinsicIndex(phase: unknown): number | undefined {
+    if (!phase) {
+      return undefined;
+    }
+    
+    try {
+      // Handle Substrate/Polkadot-JS encoded phase objects
+      // First, try to convert to JSON format
+      let phaseData = phase;
+      if (typeof phase === 'object' && phase !== null && 'toJSON' in phase && typeof phase.toJSON === 'function') {
+        phaseData = phase.toJSON();
+      }
+      
+      // Handle different phase structures
+      if (typeof phaseData === 'object') {
+        // Standard formats
+        if (phaseData.ApplyExtrinsic !== undefined) {
+          return phaseData.ApplyExtrinsic;
+        }
+        if (phaseData.applyExtrinsic !== undefined) {
+          return phaseData.applyExtrinsic;
+        }
+        // Handle nested structure
+        if (phaseData.Apply && phaseData.Apply.Extrinsic !== undefined) {
+          return phaseData.Apply.Extrinsic;
+        }
+      }
+      
+      // If JSON conversion didn't work, try to access properties directly
+      // This handles cases where the phase object has encoded properties
+      if (typeof phase === 'object' && phase !== null) {
+        // Try to access via isApplyExtrinsic property (Polkadot-JS pattern)
+        if ('isApplyExtrinsic' in phase && phase.isApplyExtrinsic && 'asApplyExtrinsic' in phase && typeof phase.asApplyExtrinsic !== 'undefined') {
+          const extrinsicIndex = phase.asApplyExtrinsic;
+          return typeof extrinsicIndex === 'object' && extrinsicIndex.toNumber ? 
+            extrinsicIndex.toNumber() : Number(extrinsicIndex);
+        }
+        
+        // Try to access the raw value if it exists
+        if ('value' in phase && phase.value !== undefined && typeof phase.value === 'number') {
+          return phase.value;
+        }
+      }
+      
+      logger.debug('extractExtrinsicIndex: no matching pattern found', { 
+        component: 'event-indexer',
+        phaseType: typeof phase,
+        phaseKeys: typeof phase === 'object' && phase !== null ? Object.keys(phase) : [],
+        hasToJSON: typeof phase === 'object' && phase !== null && 'toJSON' in phase && typeof phase.toJSON === 'function',
+        hasIsApplyExtrinsic: typeof phase === 'object' && phase !== null && 'isApplyExtrinsic' in phase,
+        phaseData: phaseData,
+      });
+      
+    } catch (error) {
+      logger.error('extractExtrinsicIndex: error processing phase', { 
+        component: 'event-indexer',
+        error: (error as Error).message,
+        phase: phase,
+      });
+    }
+    
+    return undefined;
   }
 
   /**

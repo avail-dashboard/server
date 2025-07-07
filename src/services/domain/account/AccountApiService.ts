@@ -17,7 +17,7 @@ import { TransferRepository, TransferWithRelations } from '../../../database/rep
 import { ExtrinsicRepository } from '../../../database/repositories/ExtrinsicRepository';
 import { ValidatorRepository } from '../../../database/repositories/ValidatorRepository';
 import { RewardRepository } from '../../../database/repositories/RewardRepository';
-import { Account, Extrinsic, Validator, Reward } from '@prisma/client';
+import { Account, Extrinsic } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BaseService, ServiceHealth } from '../../types/service';
 import db from '../../../utils/database';
@@ -119,6 +119,10 @@ export class AccountApiService implements BaseService, IAccountService {
         extrinsicCount,
         totalTransferred: new Decimal(transferStats.totalSent),
         totalReceived: new Decimal(transferStats.totalReceived),
+        identity: account.identityInfo ? {
+          display: account.identityName || undefined,
+          info: account.identityInfo,
+        } : null,
       };
 
       logger.debug('AccountApiService: Account details retrieved', { 

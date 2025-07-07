@@ -126,6 +126,9 @@ export class ValidatorApiService implements BaseService, IValidatorService {
             totalNominated,
             recentBlocks,
             performance,
+            is_active: validator.status === 'active',
+            is_waiting: validator.status === 'waiting',
+            is_slashed: validator.status === 'slashed',
           } as ValidatorWithDetails;
         })
       );
@@ -202,6 +205,9 @@ export class ValidatorApiService implements BaseService, IValidatorService {
         recentBlocks,
         performance,
         currentEra,
+        is_active: validator.status === 'active',
+        is_waiting: validator.status === 'waiting',
+        is_slashed: validator.status === 'slashed',
       };
 
       logger.debug('ValidatorApiService: Validator details retrieved', { 
