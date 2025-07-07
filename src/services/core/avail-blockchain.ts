@@ -289,6 +289,10 @@ export class AvailBlockchainService implements BaseService {
       });
     }
 
+    // Extract events first to determine extrinsic success
+    const extractedEvents = this.extractEventsData(events as any);
+    const extrinsicSuccessMap = this.determineExtrinsicSuccess(extractedEvents);
+
     // Extract more complete information using avail-sdk capabilities
     const blockData: BlockData = {
       hash: hash, // Use the actual block hash, not header.hash
@@ -298,8 +302,8 @@ export class AvailBlockchainService implements BaseService {
       extrinsicsRoot: block.block.header.extrinsicsRoot.toString(),
       timestamp: Date.now(), // Should be extracted from timestamp extrinsic
       validator: blockAuthor, // Add the extracted block author
-      extrinsics: this.extractExtrinsicsData(block.block.extrinsics),
-      events: this.extractEventsData(events as any),
+      extrinsics: this.extractExtrinsicsData(block.block.extrinsics, extrinsicSuccessMap),
+      events: extractedEvents,
     };
 
     // Enhanced processing for avail-specific features
@@ -333,9 +337,34 @@ export class AvailBlockchainService implements BaseService {
   }
 
   /**
+   * Determine extrinsic success from events
+   */
+  private determineExtrinsicSuccess(extractedEvents: any[]): Map<number, boolean> {
+    const successMap = new Map<number, boolean>();
+    
+    extractedEvents.forEach(event => {
+      // Check if this event has an ApplyExtrinsic phase
+      if (event.phase && typeof event.phase === 'object' && 'applyExtrinsic' in event.phase) {
+        const extrinsicIndex = event.phase.applyExtrinsic;
+        
+        // Check for system success/failure events
+        if (event.section === 'system') {
+          if (event.method === 'ExtrinsicSuccess') {
+            successMap.set(extrinsicIndex, true);
+          } else if (event.method === 'ExtrinsicFailed') {
+            successMap.set(extrinsicIndex, false);
+          }
+        }
+      }
+    });
+    
+    return successMap;
+  }
+
+  /**
    * Extract extrinsics data from raw block extrinsics with complete field extraction
    */
-  private extractExtrinsicsData(rawExtrinsics: any[]): any[] {
+  private extractExtrinsicsData(rawExtrinsics: any[], extrinsicSuccessMap?: Map<number, boolean>): any[] {
     return rawExtrinsics.map((extrinsic, index) => {
       try {
         // Try to extract extrinsic data safely
@@ -446,7 +475,7 @@ export class AvailBlockchainService implements BaseService {
           tip,
           signature,
           lifetime,
-          success: true, // Will be determined by events in processor
+          success: extrinsicSuccessMap?.get(index) ?? null, // Determined from events
           fee: null, // Fee calculation requires event processing
           actualFee: null, // Will be calculated from events
           transferCount: this.countTransfersInExtrinsic(method),
