@@ -434,9 +434,18 @@ export class AvailBlockchainService implements BaseService {
             // Extract era/lifetime information (Substrate mortality)
             if (extrinsic.era) {
               if (extrinsic.era.isMortalEra) {
+                // Defensive: ensure birth/death are numbers, not functions or objects
+                let birth = extrinsic.era.asMortalEra.birth;
+                let death = extrinsic.era.asMortalEra.death;
+                if (typeof birth === 'function') { birth = birth(); }
+                else if (birth && typeof birth.toNumber === 'function') { birth = birth.toNumber(); }
+                else if (typeof birth !== 'number') { birth = Number(birth) || 0; }
+                if (typeof death === 'function') { death = death(); }
+                else if (death && typeof death.toNumber === 'function') { death = death.toNumber(); }
+                else if (typeof death !== 'number') { death = Number(death) || 0; }
                 lifetime = {
-                  birth: extrinsic.era.asMortalEra.birth,
-                  death: extrinsic.era.asMortalEra.death,
+                  birth,
+                  death,
                   immortal: false,
                 };
               } else {
