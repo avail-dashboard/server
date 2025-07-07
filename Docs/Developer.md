@@ -16,6 +16,11 @@ Use `AvailBlockchainService` for proper extrinsics extraction, not `BlockchainSe
 - ✅ **Correct:** `AvailBlockchainService` - extracts extrinsics properly with `avail-sdk`
 - ❌ **Wrong:** `BlockchainService` - returns empty extrinsics arrays, causes missing data
 
+### Substrate Extrinsic Hash Unique Constraint Violation
+The database schema violates Substrate blockchain architecture by enforcing unique constraint on extrinsic hashes.
+- ❌ **Wrong:** `hash String @unique` - Violates Substrate design where hashes can repeat across blocks
+- ✅ **Solution:** Remove unique constraint, use `@@unique([blockNumber, extrinsicIndex])` for proper Substrate identification
+
 ## 2. System Architecture
 
 High-level design and data flow.
@@ -62,6 +67,10 @@ Fixes for recurring problems.
 ### Large Balance Values Integer Overflow
 - **Issue:** Blockchain balance values (e.g., 14549686098333938000) exceed PostgreSQL INTEGER limits, causing "Unable to fit value into a 64-bit signed integer" errors.
 - **Solution:** Use Prisma `Decimal` type with `@db.Decimal(65,18)` for balance fields. Replace `parseInt()` with `new Decimal(value)` in indexers. Supports unlimited precision and database calculations while avoiding BigInt JSON serialization issues.
+
+### Queue Job Correlation Namespace Failures
+- **Issue:** Queue jobs fail with "Correlation namespace not initialized. Call initializeCorrelationId() first." causing all extrinsic processing to fail.
+- **Solution:** Ensure correlation namespace is initialized before job processing starts. Call `initializeCorrelationId()` in queue processor setup.
 
 ## 5. Performance
 
