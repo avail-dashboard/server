@@ -20,7 +20,7 @@ export class EraRepository extends BaseRepository {
     };
 
     return this.prisma.era.findUnique(
-      this.buildCachedQuery(query, useCache, 1800) // 30 minutes cache for era data
+      this.buildCachedQuery(query, useCache, 1800), // 30 minutes cache for era data
     );
   }
 
@@ -41,7 +41,7 @@ export class EraRepository extends BaseRepository {
     };
 
     return this.prisma.era.findFirst(
-      this.buildCachedQuery(query, useCache, 300, 'current-era') // 5 minutes cache for current era
+      this.buildCachedQuery(query, useCache, 300, 'current-era'), // 5 minutes cache for current era
     );
   }
 
@@ -65,7 +65,7 @@ export class EraRepository extends BaseRepository {
       page = 1, 
       limit = 20, 
       orderBy = 'number',
-      orderDirection = 'desc' 
+      orderDirection = 'desc', 
     } = params;
     
     const skip = (page - 1) * limit;
@@ -115,9 +115,11 @@ export class EraRepository extends BaseRepository {
         },
       });
 
-      // Start new era
-      return tx.era.create({
-        data: newEraData,
+      // Start new era with upsert to handle concurrent creation
+      return tx.era.upsert({
+        where: { number: newEraData.number },
+        update: {}, // Don't update existing era, just return it
+        create: newEraData,
       });
     });
   }
@@ -133,19 +135,19 @@ export class EraRepository extends BaseRepository {
   }> {
     const [total, current, aggregates] = await Promise.all([
       this.prisma.era.count(
-        this.buildCachedQuery({}, useCache, 600, 'era-total-count') // 10 minutes
+        this.buildCachedQuery({}, useCache, 600, 'era-total-count'), // 10 minutes
       ),
       this.prisma.era.findFirst(
         this.buildCachedQuery({
           where: { active: true },
           select: { number: true },
-        }, useCache, 300, 'era-current-number') // 5 minutes
+        }, useCache, 300, 'era-current-number'), // 5 minutes
       ),
       this.prisma.era.aggregate(
         this.buildCachedQuery({
           _avg: { validatorCount: true },
           _sum: { totalStaked: true },
-        }, useCache, 1800, 'era-aggregates') // 30 minutes
+        }, useCache, 1800, 'era-aggregates'), // 30 minutes
       ),
     ]);
 

@@ -1,4 +1,4 @@
-import { DataSubmission, Rollup, Prisma } from '@prisma/client';
+import { DataSubmission, Prisma } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 import { logger } from '../../utils/logger';
 
@@ -92,7 +92,7 @@ export class DataSubmissionRepository extends BaseRepository {
    */
   async findByAppId(
     appId: number,
-    params: { page?: number; limit?: number } = {}
+    params: { page?: number; limit?: number } = {},
   ): Promise<{ submissions: DataSubmissionWithRollup[]; total: number }> {
     const { page = 1, limit = 20 } = params;
     const skip = (page - 1) * limit;
@@ -117,7 +117,7 @@ export class DataSubmissionRepository extends BaseRepository {
    */
   async findMany(
     filters: DataSubmissionFilters = {},
-    params: { page?: number; limit?: number; orderBy?: 'asc' | 'desc' } = {}
+    params: { page?: number; limit?: number; orderBy?: 'asc' | 'desc' } = {},
   ): Promise<{ submissions: DataSubmissionWithRollup[]; total: number }> {
     const { page = 1, limit = 20, orderBy = 'desc' } = params;
     const skip = (page - 1) * limit;
@@ -125,20 +125,20 @@ export class DataSubmissionRepository extends BaseRepository {
     // Build where clause from filters
     const where: Prisma.DataSubmissionWhereInput = {};
     
-    if (filters.appId !== undefined) where.appId = filters.appId;
-    if (filters.submitter) where.submitter = filters.submitter;
-    if (filters.success !== undefined) where.success = filters.success;
+    if (filters.appId !== undefined) {where.appId = filters.appId;}
+    if (filters.submitter) {where.submitter = filters.submitter;}
+    if (filters.success !== undefined) {where.success = filters.success;}
     
     if (filters.fromTimestamp || filters.toTimestamp) {
       where.timestamp = {};
-      if (filters.fromTimestamp) where.timestamp.gte = filters.fromTimestamp;
-      if (filters.toTimestamp) where.timestamp.lte = filters.toTimestamp;
+      if (filters.fromTimestamp) {where.timestamp.gte = filters.fromTimestamp;}
+      if (filters.toTimestamp) {where.timestamp.lte = filters.toTimestamp;}
     }
 
     if (filters.fromBlock || filters.toBlock) {
       where.blockNumber = {};
-      if (filters.fromBlock) where.blockNumber.gte = filters.fromBlock;
-      if (filters.toBlock) where.blockNumber.lte = filters.toBlock;
+      if (filters.fromBlock) {where.blockNumber.gte = filters.fromBlock;}
+      if (filters.toBlock) {where.blockNumber.lte = filters.toBlock;}
     }
 
     const [submissions, total] = await Promise.all([
@@ -158,8 +158,10 @@ export class DataSubmissionRepository extends BaseRepository {
    * Create new data submission
    */
   async create(data: DataSubmissionCreateInput): Promise<DataSubmission> {
-    return this.prisma.dataSubmission.create({
-      data,
+    return this.prisma.dataSubmission.upsert({
+      where: { extrinsicHash: data.extrinsicHash },
+      update: {}, // Don't update existing submissions, just return them
+      create: data,
     });
   }
 
@@ -179,11 +181,11 @@ export class DataSubmissionRepository extends BaseRepository {
   async getStats(filters: DataSubmissionFilters = {}) {
     const where: Prisma.DataSubmissionWhereInput = {};
     
-    if (filters.appId !== undefined) where.appId = filters.appId;
+    if (filters.appId !== undefined) {where.appId = filters.appId;}
     if (filters.fromTimestamp || filters.toTimestamp) {
       where.timestamp = {};
-      if (filters.fromTimestamp) where.timestamp.gte = filters.fromTimestamp;
-      if (filters.toTimestamp) where.timestamp.lte = filters.toTimestamp;
+      if (filters.fromTimestamp) {where.timestamp.gte = filters.fromTimestamp;}
+      if (filters.toTimestamp) {where.timestamp.lte = filters.toTimestamp;}
     }
 
     const [
@@ -195,7 +197,7 @@ export class DataSubmissionRepository extends BaseRepository {
     ] = await Promise.all([
       this.prisma.dataSubmission.count({ where }),
       this.prisma.dataSubmission.count({ 
-        where: { ...where, success: true } 
+        where: { ...where, success: true }, 
       }),
       this.prisma.dataSubmission.aggregate({
         where,
@@ -248,9 +250,9 @@ export class DataSubmissionRepository extends BaseRepository {
   async count(filters: DataSubmissionFilters = {}): Promise<number> {
     const where: Prisma.DataSubmissionWhereInput = {};
     
-    if (filters.appId !== undefined) where.appId = filters.appId;
-    if (filters.submitter) where.submitter = filters.submitter;
-    if (filters.success !== undefined) where.success = filters.success;
+    if (filters.appId !== undefined) {where.appId = filters.appId;}
+    if (filters.submitter) {where.submitter = filters.submitter;}
+    if (filters.success !== undefined) {where.success = filters.success;}
     
     return this.prisma.dataSubmission.count({ where });
   }

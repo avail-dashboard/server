@@ -38,7 +38,7 @@ export class AccountRepository extends BaseRepository implements IAccountReposit
         select: { address: true },
       };
       const result = await this.prisma.account.findFirst(
-        this.buildCachedQuery(query, useCache, 3600, `account-exists:${address}`)
+        this.buildCachedQuery(query, useCache, 3600, `account-exists:${address}`),
       );
       return result !== null;
     } catch (error) {
@@ -59,7 +59,7 @@ export class AccountRepository extends BaseRepository implements IAccountReposit
       where: { address },
     };
     return this.prisma.account.findUnique(
-      this.buildCachedQuery(query, useCache, 3600) // 1 hour cache
+      this.buildCachedQuery(query, useCache, 3600), // 1 hour cache
     );
   }
 
@@ -97,23 +97,30 @@ export class AccountRepository extends BaseRepository implements IAccountReposit
    * Create account if it doesn't exist (upsert)
    */
   async createIfNotExists(data: AccountCreateInput): Promise<{ account: Account; created: boolean }> {
-    try {
-      const existing = await this.findByAddressFresh(data.address);
-      if (existing) {
-        return { account: existing, created: false };
-      }
+    const result = await this.prisma.account.upsert({
+      where: { address: data.address },
+      update: {}, // Don't update existing accounts, just return them
+      create: {
+        address: data.address,
+        balance: data.balance,
+        nonce: data.nonce || 0,
+        currentBalance: data.currentBalance,
+        reservedBalance: data.reservedBalance,
+        frozenBalance: data.frozenBalance,
+        accountType: data.accountType || AccountType.regular,
+        identityName: data.identityName,
+        identityInfo: data.identityInfo,
+        firstSeenBlock: data.firstSeenBlock,
+        lastActivityBlock: data.lastActivityBlock,
+        transactionCount: data.transactionCount || 0,
+        transferCount: data.transferCount || 0,
+      },
+    });
 
-      const account = await this.create(data);
-      return { account, created: true };
-    } catch (error) {
-      // Handle unique constraint violation - account was created by another process
-      if ((error as any).code === 'P2002') {
-        const existing = await this.findByAddressFresh(data.address);
-        if (existing) {
-          return { account: existing, created: false };
-        }
-      }
-      throw error;
-    }
+    // Determine if this was a creation by checking if firstSeenBlock matches
+    // This is a reasonable heuristic since new accounts will have the block they were first seen
+    const created = result.firstSeenBlock === data.firstSeenBlock;
+    
+    return { account: result, created };
   }
 } 

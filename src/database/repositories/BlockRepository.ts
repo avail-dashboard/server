@@ -21,7 +21,7 @@ export class BlockRepository extends BaseRepository {
     };
 
     return this.prisma.block.findUnique(
-      this.buildCachedQuery(query, useCache, 3600) // 1 hour cache for immutable blocks
+      this.buildCachedQuery(query, useCache, 3600), // 1 hour cache for immutable blocks
     );
   }
 
@@ -42,7 +42,7 @@ export class BlockRepository extends BaseRepository {
     };
 
     const result = await this.prisma.block.findFirst(
-      this.buildCachedQuery(query, useCache, 3600, `block-exists:${blockNumber}`)
+      this.buildCachedQuery(query, useCache, 3600, `block-exists:${blockNumber}`),
     );
     return result !== null;
   }
@@ -56,7 +56,7 @@ export class BlockRepository extends BaseRepository {
     };
 
     return this.prisma.block.findUnique(
-      this.buildCachedQuery(query, useCache, 3600) // 1 hour cache for immutable blocks
+      this.buildCachedQuery(query, useCache, 3600), // 1 hour cache for immutable blocks
     );
   }
 
@@ -69,7 +69,7 @@ export class BlockRepository extends BaseRepository {
     };
 
     return this.prisma.block.findFirst(
-      this.buildCachedQuery(query, useCache, 60, 'latest-block') // 1 minute cache for latest block
+      this.buildCachedQuery(query, useCache, 60, 'latest-block'), // 1 minute cache for latest block
     );
   }
 
@@ -97,10 +97,10 @@ export class BlockRepository extends BaseRepository {
 
     const [blocks, total] = await Promise.all([
       this.prisma.block.findMany(
-        this.buildCachedQuery(blocksQuery, useCache, 300, cacheKey) // 5 minutes for paginated results
+        this.buildCachedQuery(blocksQuery, useCache, 300, cacheKey), // 5 minutes for paginated results
       ),
       this.prisma.block.count(
-        this.buildCachedQuery(countQuery, useCache, 300, 'blocks-total-count') // 5 minutes for count
+        this.buildCachedQuery(countQuery, useCache, 300, 'blocks-total-count'), // 5 minutes for count
       ),
     ]);
 
@@ -170,12 +170,30 @@ export class BlockRepository extends BaseRepository {
   }
 
   /**
-   * Update block
+   * Update block (with race condition protection)
    */
   async update(blockNumber: number, data: Partial<BlockCreateInput>): Promise<Block> {
-    return this.prisma.block.update({
+    try {
+      return await this.prisma.block.update({
+        where: { number: blockNumber },
+        data,
+      });
+    } catch (error) {
+      if ((error as any).code === 'P2025') { // Record not found
+        throw new Error(`Block ${blockNumber} not found for update. Use upsert or create instead.`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Update or create block (upsert)
+   */
+  async upsert(blockNumber: number, data: BlockCreateInput): Promise<Block> {
+    return this.prisma.block.upsert({
       where: { number: blockNumber },
-      data,
+      update: data,
+      create: data,
     });
   }
 

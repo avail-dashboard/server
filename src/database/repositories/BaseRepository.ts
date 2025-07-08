@@ -69,15 +69,16 @@ export abstract class BaseRepository {
     useCache: boolean = true,
     ttl?: number,
     cacheKey?: string
-  ): any {
+  ): CachedQuery<T> {
+    if (!useCache) {
+      return this.withoutCache(baseQuery);
+    }
+    
     const options: QueryCacheOptions = { useCache };
     
     if (ttl !== undefined) options.ttl = ttl;
     if (cacheKey) options.cacheKey = cacheKey;
     
-    return {
-      ...baseQuery,
-      _cache: options
-    } as any;
+    return this.withCache(baseQuery, options);
   }
 }

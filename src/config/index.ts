@@ -90,7 +90,7 @@ export const config = {
     retentionDays: 7,
     defaultJobOptions: {
       removeOnComplete: 30, // Keep only the last 30 completed jobs in the queue for debugging
-      removeOnFail: 100,      // Keep only the last 100 failed jobs in the queue for analysis
+      removeOnFail: 1000,      // Keep only the last 100 failed jobs in the queue for analysis
       attempts: 2,          // Maximum number of retry attempts before marking a job as failed
       backoff: {
         type: 'exponential',

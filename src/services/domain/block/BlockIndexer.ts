@@ -97,17 +97,8 @@ export class BlockIndexer implements IBlockIndexer {
         transferCount: transferCount,
       };
 
-      // Check if block already exists
-      const existingBlock = await this.blockRepository.findByNumber(blockData.number);
-      if (existingBlock) {
-        logger.debug('Block already exists, updating', {
-          component: 'block-indexer',
-          blockNumber,
-        });
-        await this.blockRepository.update(blockData.number, blockEntity);
-      } else {
-        await this.blockRepository.create(blockEntity);
-      }
+      // Use upsert to handle concurrent block creation/updates
+      await this.blockRepository.upsert(blockData.number, blockEntity);
 
       // Extract dependent entities
       const dependentEntities = this.extractDependentEntities(blockData);

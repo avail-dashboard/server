@@ -403,38 +403,42 @@ class AvailExplorerServer {
     });
   }
 
-  public async start(): Promise<void> {
+  public async start(startServer = true): Promise<void> {
     try {
       // Connect to all services
       await this.connectServices();
 
-      // Create HTTP server
-      this.server = createServer(this.app);
+      if (startServer) {
+        // Create HTTP server
+        this.server = createServer(this.app);
 
-      // Setup WebSocket if enabled
-      this.setupWebSocket();
+        // Setup WebSocket if enabled
+        this.setupWebSocket();
 
-      // Setup graceful shutdown
-      this.setupGracefulShutdown();
+        // Setup graceful shutdown
+        this.setupGracefulShutdown();
 
-      // Start server
-      await new Promise<void>((resolve) => {
-        this.server.listen(config.server.port, () => {
-          logger.info(`Server: Started on port ${config.server.port}`, {
-            port: config.server.port,
-            env: config.server.env,
-            cors: config.server.corsOrigin,
-            features: {
-              websockets: config.features.websockets,
-              caching: config.features.caching,
-              rateLimiting: config.features.rateLimiting,
-              analytics: config.features.analytics,
-            },
+        // Start server
+        await new Promise<void>((resolve) => {
+          this.server.listen(config.server.port, () => {
+            logger.info(`Server: Started on port ${config.server.port}`, {
+              port: config.server.port,
+              env: config.server.env,
+              cors: config.server.corsOrigin,
+              features: {
+                websockets: config.features.websockets,
+                caching: config.features.caching,
+                rateLimiting: config.features.rateLimiting,
+                analytics: config.features.analytics,
+              },
+            });
+            resolve();
           });
-          resolve();
         });
-      });
-
+      } else {
+        logger.info('Server: Running in worker-only mode');
+        this.setupGracefulShutdown();
+      }
     } catch (error) {
       logger.error('Server: Failed to start', { error });
       throw error;
@@ -468,7 +472,8 @@ export const server = new AvailExplorerServer();
 
 // Start server if this file is run directly
 if (require.main === module) {
-  server.start().catch((error) => {
+  const startServer = process.env.WORKER_ONLY !== 'true';
+  server.start(startServer).catch((error) => {
     console.error('Failed to start server:', error);
     // eslint-disable-next-line no-process-exit
     process.exit(1);
