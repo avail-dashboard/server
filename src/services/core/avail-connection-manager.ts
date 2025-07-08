@@ -1,5 +1,5 @@
-import { initialize } from "avail-js-sdk/chain";
-import { ApiPromise } from "@polkadot/api";
+import { initialize } from 'avail-js-sdk/chain';
+import { ApiPromise } from '@polkadot/api';
 import { logger } from '../../utils/logger';
 import {
   ConnectionProvider,
@@ -241,7 +241,7 @@ export class AvailConnectionManager {
    */
   async disconnect(): Promise<void> {
     logger.info('AvailConnectionManager: Disconnecting all connections', { 
-      component: 'avail-connection-manager' 
+      component: 'avail-connection-manager',
     });
     
     const disconnectPromises = Array.from(this.connections.values()).map(async (connection) => {
@@ -281,7 +281,7 @@ export class AvailConnectionManager {
     logger.debug('Creating avail-sdk connection', {
       component: 'avail-connection-manager',
       provider: provider.provider,
-      url: provider.url
+      url: provider.url,
     });
 
     const api = await initialize(provider.url);

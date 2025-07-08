@@ -36,6 +36,7 @@ export class QueueService implements QueueServiceInterface {
   private logger = logger;
   private processorRegistry: JobProcessorRegistry | null = null;
   private dependencies: JobProcessorDependencies = {};
+  private isProcessorsInitialized = false;
 
   constructor() {
     // Processor registry will be initialized after dependencies are set
@@ -101,7 +102,7 @@ export class QueueService implements QueueServiceInterface {
       totalDuration,
       availableDependencies: Object.keys(dependencies),
       processorCount: this.processorRegistry.getProcessorCount(),
-      queueProcessorsSetup: !!this.queue && !!(this.queue as any)._processorsInitialized,
+      queueProcessorsSetup: this.isProcessorsInitialized,
     });
   }
 
@@ -553,10 +554,7 @@ export class QueueService implements QueueServiceInterface {
    * Setup queue processors with Bull
    */
   private setupQueueProcessors(): void {
-    this.logger.info('🔧 QUEUE: SETUP QUEUE PROCESSORS CALLED', { component: 'queue-service', operation: 'setupQueueProcessors' });
-    
     if (!this.queue) {
-      this.logger.info('❌ QUEUE: NO BULL QUEUE AVAILABLE', { component: 'queue-service', operation: 'setupQueueProcessors' });
       this.logger.warn('⚠️ Cannot setup processors: Bull queue not available', {
         component: 'queue-service',
         hasQueue: !!this.queue,
@@ -565,7 +563,6 @@ export class QueueService implements QueueServiceInterface {
     }
     
     if (!this.processorRegistry) {
-      this.logger.info('❌ QUEUE: NO PROCESSOR REGISTRY AVAILABLE', { component: 'queue-service', operation: 'setupQueueProcessors' });
       this.logger.warn('⚠️ Cannot setup processors: ProcessorRegistry not available', {
         component: 'queue-service',
         hasProcessorRegistry: !!this.processorRegistry,
@@ -573,11 +570,8 @@ export class QueueService implements QueueServiceInterface {
       return;
     }
     
-    this.logger.info('✅ QUEUE: BOTH QUEUE AND REGISTRY AVAILABLE', { component: 'queue-service', operation: 'setupQueueProcessors' });
-    
     // Check if processors are already set up to avoid duplicates
-    if ((this.queue as any)._processorsInitialized) {
-      this.logger.info('ℹ️ QUEUE: PROCESSORS ALREADY INITIALIZED, SKIPPING', { component: 'queue-service', operation: 'setupQueueProcessors' });
+    if (this.isProcessorsInitialized) {
       this.logger.info('ℹ️ Queue processors already initialized, skipping', {
         component: 'queue-service',
         processorCount: this.processorRegistry.getProcessorCount(),
@@ -585,7 +579,6 @@ export class QueueService implements QueueServiceInterface {
       return;
     }
 
-        this.logger.info(`🔧 QUEUE: SETTING UP ${this.processorRegistry.getProcessorCount()} PROCESSORS`, { component: 'queue-service', operation: 'setupQueueProcessors' });
     this.logger.info('🔧 Setting up Bull queue processors', {
       component: 'queue-service',
       processorCount: this.processorRegistry.getProcessorCount(),
@@ -635,9 +628,8 @@ export class QueueService implements QueueServiceInterface {
     });
     
     // Mark processors as initialized
-    (this.queue as any)._processorsInitialized = true;
+    this.isProcessorsInitialized = true;
     
-    this.logger.info('✅ QUEUE: BULL QUEUE PROCESSORS SETUP COMPLETE', { component: 'queue-service', operation: 'setupQueueProcessors' });
     this.logger.info('✅ Bull queue processors setup complete', {
       component: 'queue-service',
       processorCount: this.processorRegistry.getProcessorCount(),
@@ -993,8 +985,7 @@ export class QueueService implements QueueServiceInterface {
     // Calculate priority automatically if not provided and auto-calculation is enabled
     if (!priority) {
       try {
-        const config = await import('../../../config');
-        if (config.default.queueProcessing.blockDomains.priorityAssignment === 'auto') {
+        if (config.queueProcessing.blockDomains.priorityAssignment === 'auto') {
           // Phase 3: Simple priority - all blocks treated equally
           calculatedPriority = JobPriority.MEDIUM;
           
@@ -1077,8 +1068,7 @@ export class QueueService implements QueueServiceInterface {
       };
       
       // Generate alerts based on thresholds
-      const config = await import('../../../config');
-      const thresholds = config.default.queueProcessing.blockDomains.monitoring.alertThresholds;
+      const thresholds = config.queueProcessing.blockDomains.monitoring.alertThresholds;
       const alerts: string[] = [];
       
       if (queueLength > thresholds.queueBacklog) {
