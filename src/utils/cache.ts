@@ -263,6 +263,13 @@ export const CacheKeys = {
 
   // Rate Limiting
   rateLimit: (ip: string) => `rate_limit:${ip}`,
+  
+  // Staking-specific cache keys
+  validatorPrefs: (validatorId: string) => `staking:validators:${validatorId}`,
+  stakingLedger: (controllerAddress: string) => `staking:ledger:${controllerAddress}`,
+  bondedController: (stashAddress: string) => `staking:bonded:${stashAddress}`,
+  eraStakers: (era: number, validatorId: string) => `staking:era:${era}:${validatorId}`,
+  activeEra: () => 'staking:active-era',
 };
 
 // Cache TTL constants (in seconds) - Simple Redis Cache Plan
@@ -279,6 +286,13 @@ export const CACHE_TTL = {
   blocks: 60,               // 1 minute
   blockByHash: 3600,        // 1 hour
   blockByNumber: 3600,      // 1 hour
+  
+  // Staking-specific TTLs
+  validatorPrefs: 300,       // 5 minutes
+  stakingLedger: 300,        // 5 minutes  
+  bondedController: 900,     // 15 minutes
+  eraStakers: 1800,          // 30 minutes (more stable)
+  activeEra: 300,            // 5 minutes
 };
 
 // Create cache service instance

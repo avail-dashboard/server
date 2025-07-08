@@ -339,9 +339,8 @@ export class AvailDataSubmissionIndexer {
    */
   private async extractAppLookupFromBlock(blockNumber: number): Promise<any> {
     try {
-      const api = await this.availService.getApi();
-      const blockHash = await api.rpc.chain.getBlockHash(blockNumber);
-      const block = await api.rpc.chain.getBlock(blockHash);
+      // Use cached raw block method for header extension data (performance improvement)
+      const block = await this.availService.getRawBlock(blockNumber);
       
       const header = block.block.header;
       const headerJson = header.toJSON() as any;

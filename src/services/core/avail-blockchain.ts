@@ -10,7 +10,8 @@ import {
   ChainInfo,
   BlockData,
 } from '../types/blockchain';
-import { cache, CacheKeys, CACHE_TTL } from '../../utils/cache';
+import { CachedBlockchainApi } from '../types/cached-blockchain-api';
+import { cache, CacheKeys, CACHE_TTL, cacheWrapper } from '../../utils/cache';
 import { config } from '../../config';
 
 // Default Avail RPC Providers for avail-sdk
@@ -56,9 +57,11 @@ class AvailSubscriptionManager implements SubscriptionManager {
  * AvailBlockchainService - Avail-SDK based blockchain operations
  * 
  * This service provides native Avail blockchain operations using avail-js-sdk
- * with enhanced support for Avail-specific features like data submissions
+ * with enhanced support for Avail-specific features like data submissions.
+ * 
+ * Implements CachedBlockchainApi to enforce cached access patterns.
  */
-export class AvailBlockchainService implements BaseService {
+export class AvailBlockchainService implements BaseService, CachedBlockchainApi {
   private connectionManager: AvailConnectionManager;
   private subscriptionManager: AvailSubscriptionManager;
 
@@ -152,8 +155,9 @@ export class AvailBlockchainService implements BaseService {
 
   /**
    * Get API instance (avail-sdk version)
+   * PRIVATE: Use cached methods instead of direct API access
    */
-  async getApi(): Promise<any> {
+  private async getApi(): Promise<any> {
     const connection = await this.connectionManager.getHealthyConnection();
     return connection.api;
   }
@@ -238,10 +242,13 @@ export class AvailBlockchainService implements BaseService {
       ? hashOrNumber 
       : (await api.rpc.chain.getBlockHash(hashOrNumber)).toString();
     
-    // Try cache first for old blocks
+    // Try cache first for old blocks (avoid circular call)
     if (config.cache.redis.enabled && typeof hashOrNumber === 'number') {
-      const latestBlock = await this.getLatestBlock();
-      const blockAge = latestBlock.number - hashOrNumber;
+      // Get latest block number directly to avoid circular dependency
+      const latestHash = await api.rpc.chain.getFinalizedHead();
+      const latestHeader = await api.rpc.chain.getHeader(latestHash);
+      const latestBlockNumber = latestHeader.number.toNumber();
+      const blockAge = latestBlockNumber - hashOrNumber;
       
       if (blockAge > 100) {
         const cacheKey = CacheKeys.oldBlock(hashOrNumber);
@@ -317,8 +324,11 @@ export class AvailBlockchainService implements BaseService {
 
     // Cache old blocks (>100 blocks old) for 24 hours
     if (config.cache.redis.enabled && typeof hashOrNumber === 'number') {
-      const latestBlock = await this.getLatestBlock();
-      const blockAge = latestBlock.number - blockData.number;
+      // Use already available data to avoid extra calls
+      const latestHash = await api.rpc.chain.getFinalizedHead();
+      const latestHeader = await api.rpc.chain.getHeader(latestHash);
+      const latestBlockNumber = latestHeader.number.toNumber();
+      const blockAge = latestBlockNumber - blockData.number;
       
       if (blockAge > 100) {
         const cacheKey = CacheKeys.oldBlock(hashOrNumber);
@@ -388,21 +398,6 @@ export class AvailBlockchainService implements BaseService {
           });
         }
 
-        // Debug: Log the raw extrinsic structure for the first few extrinsics
-        if (index < 3) {
-          logger.debug('Raw extrinsic structure debug', {
-            component: 'avail-blockchain',
-            extrinsicIndex: index,
-            hasMethod: !!extrinsic.method,
-            hasSignature: !!extrinsic.signature,
-            hasNonce: !!extrinsic.nonce,
-            hasEra: !!extrinsic.era,
-            isSigned: !!extrinsic.isSigned,
-            methodSection: extrinsic.method?.section,
-            methodMethod: extrinsic.method?.method,
-            availableKeys: Object.keys(extrinsic),
-          });
-        }
 
         // Extract signer information if available
         let signer;
@@ -516,7 +511,7 @@ export class AvailBlockchainService implements BaseService {
    * Extract method arguments safely from Substrate types
    */
   private extractMethodArgs(args: any): Record<string, any> {
-    if (!args) return {};
+    if (!args) {return {};}
     
     try {
       // Handle different formats of args
@@ -584,30 +579,12 @@ export class AvailBlockchainService implements BaseService {
     }
   }
 
-  /**
-   * Extract signed extensions from signature
-   */
-  private extractSignedExtensions(signature: any): Record<string, any> {
-    try {
-      if (!signature || !signature.signedExtensions) return {};
-      
-      const extensions: Record<string, any> = {};
-      Object.keys(signature.signedExtensions).forEach(key => {
-        const value = signature.signedExtensions[key];
-        extensions[key] = value?.toString() || value;
-      });
-      
-      return extensions;
-    } catch {
-      return {};
-    }
-  }
 
   /**
    * Count transfers within an extrinsic method
    */
   private countTransfersInExtrinsic(method: any): number {
-    if (!method) return 0;
+    if (!method) {return 0;}
     
     if (method.section === 'balances' && method.method === 'transfer') {
       return 1;
@@ -622,7 +599,7 @@ export class AvailBlockchainService implements BaseService {
       const calls = method.args?.calls || [];
       return calls.filter((call: any) => 
         call.section === 'balances' && 
-        (call.method === 'transfer' || call.method === 'transferAll')
+        (call.method === 'transfer' || call.method === 'transferAll'),
       ).length;
     }
     
@@ -633,7 +610,7 @@ export class AvailBlockchainService implements BaseService {
    * Determine if extrinsic pays fees
    */
   private determineIfPaysFee(method: any): boolean {
-    if (!method) return false;
+    if (!method) {return false;}
     
     // Unsigned extrinsics that don't pay fees
     const freeMethods = [
@@ -832,6 +809,269 @@ export class AvailBlockchainService implements BaseService {
    */
   getConnectionManager(): AvailConnectionManager {
     return this.connectionManager;
+  }
+
+  // ============================================================================
+  // CACHED BLOCKCHAIN QUERY METHODS
+  // ============================================================================
+
+  /**
+   * Get validator preferences with caching
+   * Used by ValidatorIndexer to fetch validator commission and blocked status
+   */
+  async getValidatorPrefs(validatorId: string): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.staking.validators(validatorId);
+    }
+
+    const cacheKey = CacheKeys.validatorPrefs(validatorId);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.staking.validators(validatorId);
+    }, CACHE_TTL.validatorPrefs);
+
+    return result.data;
+  }
+
+  /**
+   * Get identity information with caching
+   * Used for both stash and controller identity lookups
+   */
+  async getIdentity(address: string): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.identity.identityOf(address);
+    }
+
+    const cacheKey = CacheKeys.validatorIdentity(address);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.identity.identityOf(address);
+    }, CACHE_TTL.validatorIdentity);
+
+    return result.data;
+  }
+
+  /**
+   * Get staking ledger with caching
+   * Used to fetch controller staking information
+   */
+  async getStakingLedger(controllerAddress: string): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.staking.ledger(controllerAddress);
+    }
+
+    const cacheKey = CacheKeys.stakingLedger(controllerAddress);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.staking.ledger(controllerAddress);
+    }, CACHE_TTL.stakingLedger);
+
+    return result.data;
+  }
+
+  /**
+   * Get bonded controller with caching
+   * Used to find the controller address for a stash address
+   */
+  async getBondedController(stashAddress: string): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.staking.bonded(stashAddress);
+    }
+
+    const cacheKey = CacheKeys.bondedController(stashAddress);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.staking.bonded(stashAddress);
+    }, CACHE_TTL.bondedController);
+
+    return result.data;
+  }
+
+  /**
+   * Get era stakers with caching
+   * Used to fetch validator exposure and nominator information
+   */
+  async getEraStakers(era: number, validatorId: string): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.staking.erasStakers(era, validatorId);
+    }
+
+    const cacheKey = CacheKeys.eraStakers(era, validatorId);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.staking.erasStakers(era, validatorId);
+    }, CACHE_TTL.eraStakers);
+
+    return result.data;
+  }
+
+  /**
+   * Get active era with caching
+   * Used to determine the current era for staking queries
+   */
+  async getActiveEra(): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.staking.activeEra();
+    }
+
+    const cacheKey = CacheKeys.activeEra();
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.staking.activeEra();
+    }, CACHE_TTL.activeEra);
+
+    return result.data;
+  }
+
+  /**
+   * Get account data with caching (balance, nonce, etc.)
+   * Used by AccountApiService for balance queries
+   */
+  async getAccountData(address: string): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.system.account(address);
+    }
+
+    const cacheKey = CacheKeys.accountBalance(address);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.system.account(address);
+    }, CACHE_TTL.accountBalance);
+
+    return result.data;
+  }
+
+  /**
+   * Get all validators entries with caching
+   * Used by AccountIndexer to check if account is a validator
+   */
+  async getValidatorEntries(): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.staking.validators.entries();
+    }
+
+    const cacheKey = CacheKeys.validators();
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.staking.validators.entries();
+    }, CACHE_TTL.validators);
+
+    return result.data;
+  }
+
+  /**
+   * Get chain constants with caching
+   * Used by ChainService for constants like sessionsPerEra, bondingDuration, etc.
+   */
+  async getChainConstants(): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return api.consts;
+    }
+
+    const cacheKey = CacheKeys.chainConstants();
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return api.consts;
+    }, CACHE_TTL.chainConstants);
+
+    return result.data;
+  }
+
+  /**
+   * Get system RPC calls with caching (chain, version, properties)
+   * Used by ChainService for chain metadata
+   */
+  async getSystemRpc(): Promise<{ chain: any; version: any; properties: any }> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      const [chain, version, properties] = await Promise.all([
+        api.rpc.system.chain(),
+        api.rpc.system.version(),
+        api.rpc.system.properties(),
+      ]);
+      return { chain, version, properties };
+    }
+
+    const cacheKey = 'system:rpc:metadata';
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      const [chain, version, properties] = await Promise.all([
+        api.rpc.system.chain(),
+        api.rpc.system.version(),
+        api.rpc.system.properties(),
+      ]);
+      return { chain, version, properties };
+    }, CACHE_TTL.runtimeMetadata);
+
+    return result.data;
+  }
+
+  /**
+   * Get raw block with header extensions for data submission processing
+   * Used by DataSubmissionIndexer for app lookup extraction
+   */
+  async getRawBlock(blockNumber: number): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      const blockHash = await api.rpc.chain.getBlockHash(blockNumber);
+      return await api.rpc.chain.getBlock(blockHash);
+    }
+
+    const cacheKey = CacheKeys.blockByNumber(blockNumber);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      const blockHash = await api.rpc.chain.getBlockHash(blockNumber);
+      return await api.rpc.chain.getBlock(blockHash);
+    }, CACHE_TTL.blockByNumber);
+
+    return result.data;
+  }
+
+  /**
+   * Get era total stake with caching
+   * Used by EraIndexer for era statistics
+   */
+  async getEraTotalStake(era: number): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.staking.erasTotalStake(era);
+    }
+
+    const cacheKey = CacheKeys.eraData(era);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.staking.erasTotalStake(era);
+    }, CACHE_TTL.eraData);
+
+    return result.data;
+  }
+
+  /**
+   * Get era validator reward with caching
+   * Used by EraIndexer for era statistics
+   */
+  async getEraValidatorReward(era: number): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.query.staking.erasValidatorReward(era);
+    }
+
+    const cacheKey = CacheKeys.eraData(era);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.query.staking.erasValidatorReward(era);
+    }, CACHE_TTL.eraData);
+
+    return result.data;
   }
 }
 

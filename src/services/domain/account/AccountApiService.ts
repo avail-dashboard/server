@@ -155,9 +155,8 @@ export class AccountApiService implements BaseService, IAccountService {
         address: address.substring(0, 10) + '...',
       });
 
-      // Get balance from blockchain
-      const api = await this.blockchain.getApi();
-      const accountInfo = await api.query.system.account(address);
+      // Get balance from blockchain using cached method
+      const accountInfo = await this.blockchain.getAccountData(address);
       const accountData = accountInfo.data;
 
       const balance: AccountBalance = {
@@ -329,8 +328,7 @@ export class AccountApiService implements BaseService, IAccountService {
         address: address.substring(0, 10) + '...',
       });
 
-      const api = await this.blockchain.getApi();
-      const identityInfo = await api.query.identity.identityOf(address);
+      const identityInfo = await this.blockchain.getIdentity(address);
 
       if (identityInfo.isSome) {
         const identity = identityInfo.unwrap();
