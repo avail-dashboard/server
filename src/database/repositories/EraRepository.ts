@@ -12,29 +12,44 @@ export type EraCreateInput = {
 
 export class EraRepository extends BaseRepository {
   /**
-   * Find era by number
+   * Find era by number with cache support
    */
-  async findByNumber(number: number): Promise<Era | null> {
-    return this.prisma.era.findUnique({
+  async findByNumber(number: number, useCache: boolean = true): Promise<Era | null> {
+    const query = {
       where: { number },
-    });
+    };
+
+    return this.prisma.era.findUnique(
+      this.buildCachedQuery(query, useCache, 1800) // 30 minutes cache for era data
+    );
   }
 
   /**
-   * Get current active era
+   * Find era by number - force fresh data
    */
-  async getCurrentEra(): Promise<Era | null> {
-    return this.prisma.era.findFirst({
+  async findByNumberFresh(number: number): Promise<Era | null> {
+    return this.findByNumber(number, false);
+  }
+
+  /**
+   * Get current active era with cache support
+   */
+  async getCurrentEra(useCache: boolean = true): Promise<Era | null> {
+    const query = {
       where: { active: true },
-      orderBy: { number: 'desc' },
-    });
+      orderBy: { number: 'desc' as const },
+    };
+
+    return this.prisma.era.findFirst(
+      this.buildCachedQuery(query, useCache, 300, 'current-era') // 5 minutes cache for current era
+    );
   }
 
   /**
    * Find current era (alias for getCurrentEra)
    */
-  async findCurrent(): Promise<Era | null> {
-    return this.getCurrentEra();
+  async findCurrent(useCache: boolean = true): Promise<Era | null> {
+    return this.getCurrentEra(useCache);
   }
 
   /**
@@ -108,31 +123,37 @@ export class EraRepository extends BaseRepository {
   }
 
   /**
-   * Get era statistics
+   * Get era statistics with cache support
    */
-  async getStats(): Promise<{
+  async getStats(useCache: boolean = true): Promise<{
     totalEras: number;
     currentEra: number | null;
     averageValidatorCount: number;
     totalStakeHistory: number;
   }> {
     const [total, current, aggregates] = await Promise.all([
-      this.prisma.era.count(),
-      this.prisma.era.findFirst({
-        where: { active: true },
-        select: { number: true },
-      }),
-      this.prisma.era.aggregate({
-        _avg: { validatorCount: true },
-        _sum: { totalStaked: true },
-      }),
+      this.prisma.era.count(
+        this.buildCachedQuery({}, useCache, 600, 'era-total-count') // 10 minutes
+      ),
+      this.prisma.era.findFirst(
+        this.buildCachedQuery({
+          where: { active: true },
+          select: { number: true },
+        }, useCache, 300, 'era-current-number') // 5 minutes
+      ),
+      this.prisma.era.aggregate(
+        this.buildCachedQuery({
+          _avg: { validatorCount: true },
+          _sum: { totalStaked: true },
+        }, useCache, 1800, 'era-aggregates') // 30 minutes
+      ),
     ]);
 
     return {
       totalEras: total,
       currentEra: current?.number || null,
-      averageValidatorCount: aggregates._avg.validatorCount || 0,
-      totalStakeHistory: Number(aggregates._sum.totalStaked) || 0,
+      averageValidatorCount: aggregates._avg?.validatorCount || 0,
+      totalStakeHistory: Number(aggregates._sum?.totalStaked) || 0,
     };
   }
 } 

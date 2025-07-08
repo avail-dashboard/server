@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import prisma from '../client';
+import { QueryCacheOptions } from '../../config/cache-config';
+import { withCache, withoutCache, withTTL, withCacheKey, CachedQuery } from '../../middleware/prisma-cache-middleware';
 
 export abstract class BaseRepository {
   protected prisma: PrismaClient;
@@ -25,5 +27,57 @@ export abstract class BaseRepository {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Cache utility methods for repositories
+   */
+  
+  /**
+   * Add cache options to a query
+   */
+  protected withCache<T>(query: T, options: QueryCacheOptions): CachedQuery<T> {
+    return withCache(query, options);
+  }
+
+  /**
+   * Disable cache for a query
+   */
+  protected withoutCache<T>(query: T): CachedQuery<T> {
+    return withoutCache(query);
+  }
+
+  /**
+   * Set custom TTL for a query
+   */
+  protected withTTL<T>(query: T, ttl: number): CachedQuery<T> {
+    return withTTL(query, ttl);
+  }
+
+  /**
+   * Set custom cache key for a query
+   */
+  protected withCacheKey<T>(query: T, cacheKey: string): CachedQuery<T> {
+    return withCacheKey(query, cacheKey);
+  }
+
+  /**
+   * Helper method to build cache-aware queries
+   */
+  protected buildCachedQuery<T>(
+    baseQuery: T,
+    useCache: boolean = true,
+    ttl?: number,
+    cacheKey?: string
+  ): any {
+    const options: QueryCacheOptions = { useCache };
+    
+    if (ttl !== undefined) options.ttl = ttl;
+    if (cacheKey) options.cacheKey = cacheKey;
+    
+    return {
+      ...baseQuery,
+      _cache: options
+    } as any;
   }
 }

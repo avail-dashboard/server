@@ -20,22 +20,26 @@ export type AccountCreateInput = {
 };
 
 export interface IAccountRepository {
-  exists(address: string): Promise<boolean>;
-  findByAddress(address: string): Promise<Account | null>;
+  exists(address: string, useCache?: boolean): Promise<boolean>;
+  findByAddress(address: string, useCache?: boolean): Promise<Account | null>;
+  findByAddressFresh(address: string): Promise<Account | null>;
   create(data: AccountCreateInput): Promise<Account>;
   createIfNotExists(data: AccountCreateInput): Promise<{ account: Account; created: boolean }>;
 }
 
 export class AccountRepository extends BaseRepository implements IAccountRepository {
   /**
-   * Check if account exists by address - Phase 3 requirement
+   * Check if account exists by address with cache support
    */
-  async exists(address: string): Promise<boolean> {
+  async exists(address: string, useCache: boolean = true): Promise<boolean> {
     try {
-      const result = await this.prisma.account.findFirst({
+      const query = {
         where: { address },
         select: { address: true },
-      });
+      };
+      const result = await this.prisma.account.findFirst(
+        this.buildCachedQuery(query, useCache, 3600, `account-exists:${address}`)
+      );
       return result !== null;
     } catch (error) {
       logger.error('Failed to check account existence', {
@@ -48,12 +52,22 @@ export class AccountRepository extends BaseRepository implements IAccountReposit
   }
 
   /**
-   * Find account by address
+   * Find account by address with cache support
    */
-  async findByAddress(address: string): Promise<Account | null> {
-    return this.prisma.account.findUnique({
+  async findByAddress(address: string, useCache: boolean = true): Promise<Account | null> {
+    const query = {
       where: { address },
-    });
+    };
+    return this.prisma.account.findUnique(
+      this.buildCachedQuery(query, useCache, 3600) // 1 hour cache
+    );
+  }
+
+  /**
+   * Find account by address - force fresh data
+   */
+  async findByAddressFresh(address: string): Promise<Account | null> {
+    return this.findByAddress(address, false);
   }
 
   /**
@@ -84,7 +98,7 @@ export class AccountRepository extends BaseRepository implements IAccountReposit
    */
   async createIfNotExists(data: AccountCreateInput): Promise<{ account: Account; created: boolean }> {
     try {
-      const existing = await this.findByAddress(data.address);
+      const existing = await this.findByAddressFresh(data.address);
       if (existing) {
         return { account: existing, created: false };
       }
@@ -94,7 +108,7 @@ export class AccountRepository extends BaseRepository implements IAccountReposit
     } catch (error) {
       // Handle unique constraint violation - account was created by another process
       if ((error as any).code === 'P2002') {
-        const existing = await this.findByAddress(data.address);
+        const existing = await this.findByAddressFresh(data.address);
         if (existing) {
           return { account: existing, created: false };
         }

@@ -35,17 +35,26 @@ export type ValidatorFilters = {
 export class ValidatorRepository extends BaseRepository {
   /**
    * Find validator by stash address
+   * TODO: Re-enable caching once TypeScript compatibility is resolved
    */
-  async findByStashAddress(stashAddress: string): Promise<Validator | null> {
+  async findByStashAddress(stashAddress: string, _useCache: boolean = true): Promise<Validator | null> {
     return this.prisma.validator.findUnique({
       where: { stashAddress },
     });
   }
 
   /**
-   * Check if validator exists by stash address
+   * Find validator by stash address - force fresh data
    */
-  async exists(stashAddress: string): Promise<boolean> {
+  async findByStashAddressFresh(stashAddress: string): Promise<Validator | null> {
+    return this.findByStashAddress(stashAddress, false);
+  }
+
+  /**
+   * Check if validator exists by stash address
+   * TODO: Re-enable caching once TypeScript compatibility is resolved
+   */
+  async exists(stashAddress: string, _useCache: boolean = true): Promise<boolean> {
     const result = await this.prisma.validator.findFirst({
       where: { stashAddress },
       select: { stashAddress: true },
@@ -55,8 +64,12 @@ export class ValidatorRepository extends BaseRepository {
 
   /**
    * Find validator without relations (simplified)
+   * TODO: Re-enable caching once TypeScript compatibility is resolved
    */
-  async findWithRelations(stashAddress: string): Promise<ValidatorWithRelations | null> {
+  async findWithRelations(
+    stashAddress: string,
+    _useCache: boolean = true
+  ): Promise<ValidatorWithRelations | null> {
     return this.prisma.validator.findUnique({
       where: { stashAddress },
     });
@@ -64,6 +77,7 @@ export class ValidatorRepository extends BaseRepository {
 
   /**
    * Get all validators with filters and pagination
+   * TODO: Re-enable caching once TypeScript compatibility is resolved
    */
   async findMany(params: {
     page?: number;
@@ -71,23 +85,24 @@ export class ValidatorRepository extends BaseRepository {
     filters?: ValidatorFilters;
     orderBy?: 'totalBonded' | 'commission' | 'blocksProduced' | 'lastBlockProduced';
     orderDirection?: 'asc' | 'desc';
+    useCache?: boolean;
   }): Promise<{ validators: Validator[]; total: number }> {
-    const { 
-      page = 1, 
-      limit = 20, 
-      filters = {}, 
+    const {
+      page = 1,
+      limit = 20,
+      filters = {},
       orderBy = 'totalBonded',
-      orderDirection = 'desc' 
+      orderDirection = 'desc',
     } = params;
-    
+
     const skip = (page - 1) * limit;
-    
+
     const whereClause: any = {};
-    
+
     if (filters.status) {
       whereClause.status = filters.status;
     }
-    
+
     if (filters.minTotalBonded || filters.maxTotalBonded) {
       whereClause.totalBonded = {};
       if (filters.minTotalBonded) {
@@ -97,11 +112,11 @@ export class ValidatorRepository extends BaseRepository {
         whereClause.totalBonded.lte = filters.maxTotalBonded;
       }
     }
-    
+
     if (filters.hasIdentity !== undefined) {
       whereClause.identityName = filters.hasIdentity ? { not: null } : null;
     }
-    
+
     if (filters.isActive !== undefined) {
       whereClause.status = filters.isActive ? 'active' : { not: 'active' };
     }
@@ -113,7 +128,9 @@ export class ValidatorRepository extends BaseRepository {
         take: limit,
         orderBy: { [orderBy]: orderDirection },
       }),
-      this.prisma.validator.count({ where: whereClause }),
+      this.prisma.validator.count({
+        where: whereClause,
+      }),
     ]);
 
     return { validators, total };
@@ -121,11 +138,12 @@ export class ValidatorRepository extends BaseRepository {
 
   /**
    * Get active validators
+   * TODO: Re-enable caching once TypeScript compatibility is resolved
    */
-  async findActive(): Promise<Validator[]> {
+  async findActive(_useCache: boolean = true): Promise<Validator[]> {
     return this.prisma.validator.findMany({
-      where: { status: 'active' },
-      orderBy: { totalBonded: 'desc' },
+      where: { status: 'active' as ValidatorStatus },
+      orderBy: { totalBonded: 'desc' as const },
     });
   }
 
@@ -174,42 +192,31 @@ export class ValidatorRepository extends BaseRepository {
    * Upsert validator (create or update)
    */
   async upsert(stashAddress: string, data: ValidatorCreateInput): Promise<Validator> {
-    const { stashAddress: _, ...updateData } = data;
-    
-    // Build update object with only defined fields
-    const updateObject: any = {
-      updatedAt: new Date(),
-    };
+    const updateData = { ...data };
+    delete (updateData as any).stashAddress; // Remove stashAddress from update data
 
-    if (updateData.status !== undefined) updateObject.status = updateData.status;
-    if (updateData.controllerAddress !== undefined) updateObject.controllerAddress = updateData.controllerAddress;
-    if (updateData.rewardAddress !== undefined) updateObject.rewardAddress = updateData.rewardAddress;
-    if (updateData.commission !== undefined) updateObject.commission = updateData.commission;
-    if (updateData.selfBonded !== undefined) updateObject.selfBonded = updateData.selfBonded;
-    if (updateData.totalBonded !== undefined) updateObject.totalBonded = updateData.totalBonded;
-    if (updateData.nominatorCount !== undefined) updateObject.nominatorCount = updateData.nominatorCount;
-    if (updateData.sessionKeys !== undefined) updateObject.sessionKeys = updateData.sessionKeys;
-    if (updateData.identityName !== undefined) updateObject.identityName = updateData.identityName;
-    if (updateData.identityInfo !== undefined) updateObject.identityInfo = updateData.identityInfo;
-    if (updateData.blocksProduced !== undefined) updateObject.blocksProduced = updateData.blocksProduced;
-    if (updateData.lastBlockProduced !== undefined) updateObject.lastBlockProduced = updateData.lastBlockProduced;
-    
     return this.prisma.validator.upsert({
       where: { stashAddress },
+      update: {
+        ...updateData,
+        updatedAt: new Date(),
+      },
       create: data,
-      update: updateObject,
     });
   }
 
   /**
    * Update validator statistics
    */
-  async updateStats(stashAddress: string, stats: {
-    blocksProduced?: number;
-    lastBlockProduced?: number;
-    totalBonded?: number;
-    nominatorCount?: number;
-  }): Promise<Validator> {
+  async updateStats(
+    stashAddress: string,
+    stats: {
+      blocksProduced?: number;
+      lastBlockProduced?: number;
+      totalBonded?: number;
+      nominatorCount?: number;
+    }
+  ): Promise<Validator> {
     return this.prisma.validator.update({
       where: { stashAddress },
       data: {
@@ -221,16 +228,21 @@ export class ValidatorRepository extends BaseRepository {
 
   /**
    * Get validator statistics
+   * TODO: Re-enable caching once TypeScript compatibility is resolved
    */
-  async getStats(): Promise<{
+  async getStats(
+    _useCache: boolean = true
+  ): Promise<{
     totalValidators: number;
     activeValidators: number;
     totalStaked: number;
     averageCommission: number;
   }> {
-    const [total, active, staking, commission] = await Promise.all([
+    const [totalValidators, activeValidators, stakingAggregates, commissionAggregates] = await Promise.all([
       this.prisma.validator.count(),
-      this.prisma.validator.count({ where: { status: 'active' } }),
+      this.prisma.validator.count({
+        where: { status: 'active' },
+      }),
       this.prisma.validator.aggregate({
         _sum: { totalBonded: true },
         where: { status: 'active' },
@@ -242,17 +254,21 @@ export class ValidatorRepository extends BaseRepository {
     ]);
 
     return {
-      totalValidators: total,
-      activeValidators: active,
-      totalStaked: Number(staking._sum.totalBonded || 0),
-      averageCommission: commission._avg.commission || 0,
+      totalValidators,
+      activeValidators,
+      totalStaked: Number(stakingAggregates._sum.totalBonded || 0),
+      averageCommission: Number(commissionAggregates._avg.commission || 0),
     };
   }
 
   /**
-   * Find validators by controller address
+   * Find validator by controller address
+   * TODO: Re-enable caching once TypeScript compatibility is resolved
    */
-  async findByControllerAddress(controllerAddress: string): Promise<Validator | null> {
+  async findByControllerAddress(
+    controllerAddress: string,
+    _useCache: boolean = true
+  ): Promise<Validator | null> {
     return this.prisma.validator.findUnique({
       where: { controllerAddress },
     });
@@ -260,11 +276,12 @@ export class ValidatorRepository extends BaseRepository {
 
   /**
    * Get top validators by total bonded
+   * TODO: Re-enable caching once TypeScript compatibility is resolved
    */
-  async getTopValidators(limit: number = 10): Promise<Validator[]> {
+  async getTopValidators(limit: number = 10, _useCache: boolean = true): Promise<Validator[]> {
     return this.prisma.validator.findMany({
-      where: { status: 'active' },
-      orderBy: { totalBonded: 'desc' },
+      where: { status: 'active' as ValidatorStatus },
+      orderBy: { totalBonded: 'desc' as const },
       take: limit,
     });
   }
@@ -277,4 +294,4 @@ export class ValidatorRepository extends BaseRepository {
       where: { stashAddress },
     });
   }
-} 
+}

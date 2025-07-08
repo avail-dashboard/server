@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { createPrismaCacheMiddleware } from '../middleware/prisma-cache-middleware';
 
 // Global for Next.js hot reload (avoid multiple instances)
 const globalForPrisma = globalThis as unknown as {
@@ -9,6 +10,9 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
   errorFormat: 'pretty',
 });
+
+// Add cache middleware
+prisma.$use(createPrismaCacheMiddleware());
 
 // Ensure single instance in development
 if (process.env.NODE_ENV !== 'production') {

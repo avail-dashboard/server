@@ -16,6 +16,7 @@
     "sourceMap": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "moduleResolution": "node",
     "baseUrl": "./src",
     "paths": {
       "@/*": ["*"],

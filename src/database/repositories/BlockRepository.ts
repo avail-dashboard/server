@@ -13,61 +13,95 @@ export type BlockCreateInput = Omit<Block, 'createdAt'>;
 
 export class BlockRepository extends BaseRepository {
   /**
-   * Find block by number
+   * Find block by number with cache support
    */
-  async findByNumber(blockNumber: number): Promise<Block | null> {
-    return this.prisma.block.findUnique({
+  async findByNumber(blockNumber: number, useCache: boolean = true): Promise<Block | null> {
+    const query = {
       where: { number: blockNumber },
-    });
+    };
+
+    return this.prisma.block.findUnique(
+      this.buildCachedQuery(query, useCache, 3600) // 1 hour cache for immutable blocks
+    );
   }
 
   /**
-   * Check if block exists by number
+   * Find block by number - force fresh data
    */
-  async exists(blockNumber: number): Promise<boolean> {
-    const result = await this.prisma.block.findFirst({
+  async findByNumberFresh(blockNumber: number): Promise<Block | null> {
+    return this.findByNumber(blockNumber, false);
+  }
+
+  /**
+   * Check if block exists by number with cache support
+   */
+  async exists(blockNumber: number, useCache: boolean = true): Promise<boolean> {
+    const query = {
       where: { number: blockNumber },
       select: { number: true },
-    });
+    };
+
+    const result = await this.prisma.block.findFirst(
+      this.buildCachedQuery(query, useCache, 3600, `block-exists:${blockNumber}`)
+    );
     return result !== null;
   }
 
   /**
-   * Find block by hash
+   * Find block by hash with cache support
    */
-  async findByHash(hash: string): Promise<Block | null> {
-    return this.prisma.block.findUnique({
+  async findByHash(hash: string, useCache: boolean = true): Promise<Block | null> {
+    const query = {
       where: { hash },
-    });
+    };
+
+    return this.prisma.block.findUnique(
+      this.buildCachedQuery(query, useCache, 3600) // 1 hour cache for immutable blocks
+    );
   }
 
   /**
-   * Get latest block
+   * Get latest block with shorter cache TTL
    */
-  async getLatest(): Promise<Block | null> {
-    return this.prisma.block.findFirst({
-      orderBy: { number: 'desc' },
-    });
+  async getLatest(useCache: boolean = true): Promise<Block | null> {
+    const query = {
+      orderBy: { number: 'desc' as const },
+    };
+
+    return this.prisma.block.findFirst(
+      this.buildCachedQuery(query, useCache, 60, 'latest-block') // 1 minute cache for latest block
+    );
   }
 
   /**
-   * Get blocks with pagination
+   * Get blocks with pagination and cache support
    */
   async findMany(params: {
     page?: number;
     limit?: number;
     orderBy?: 'asc' | 'desc';
+    useCache?: boolean;
   }): Promise<{ blocks: Block[]; total: number }> {
-    const { page = 1, limit = 20, orderBy = 'desc' } = params;
+    const { page = 1, limit = 20, orderBy = 'desc', useCache = true } = params;
     const skip = (page - 1) * limit;
 
+    const cacheKey = `blocks-page:${page}:${limit}:${orderBy}`;
+
+    const blocksQuery = {
+      skip,
+      take: limit,
+      orderBy: { number: orderBy },
+    };
+
+    const countQuery = {};
+
     const [blocks, total] = await Promise.all([
-      this.prisma.block.findMany({
-        skip,
-        take: limit,
-        orderBy: { number: orderBy },
-      }),
-      this.prisma.block.count(),
+      this.prisma.block.findMany(
+        this.buildCachedQuery(blocksQuery, useCache, 300, cacheKey) // 5 minutes for paginated results
+      ),
+      this.prisma.block.count(
+        this.buildCachedQuery(countQuery, useCache, 300, 'blocks-total-count') // 5 minutes for count
+      ),
     ]);
 
     return { blocks, total };
