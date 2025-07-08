@@ -310,14 +310,14 @@ export class RecoveryJobScheduler {
    */
   private getEntityPriority(entityType: string): RecoveryPriority {
     switch (entityType) {
-      case 'validators':
-      case 'accounts':
-        return RecoveryPriority.MEDIUM;
-      case 'transfers':
-      case 'data_submissions':
-        return RecoveryPriority.LOW;
-      default:
-        return RecoveryPriority.MEDIUM;
+    case 'validators':
+    case 'accounts':
+      return RecoveryPriority.MEDIUM;
+    case 'transfers':
+    case 'data_submissions':
+      return RecoveryPriority.LOW;
+    default:
+      return RecoveryPriority.MEDIUM;
     }
   }
 
@@ -326,16 +326,16 @@ export class RecoveryJobScheduler {
    */
   private getJobTypeForEntity(entityType: string): JobType | null {
     switch (entityType) {
-      case 'validators':
-        return JobType.INDEX_VALIDATOR;
-      case 'accounts':
-        return JobType.INDEX_ACCOUNT;
-      case 'transfers':
-        return JobType.INDEX_TRANSFER;
-      case 'data_submissions':
-        return JobType.INDEX_DATA_SUBMISSION;
-      default:
-        return null;
+    case 'validators':
+      return JobType.INDEX_VALIDATOR;
+    case 'accounts':
+      return JobType.INDEX_ACCOUNT;
+    case 'transfers':
+      return JobType.INDEX_TRANSFER;
+    case 'data_submissions':
+      return JobType.INDEX_DATA_SUBMISSION;
+    default:
+      return null;
     }
   }
 
@@ -344,14 +344,14 @@ export class RecoveryJobScheduler {
    */
   private getJobTypeForIssue(issueType: string): JobType | null {
     switch (issueType) {
-      case 'extrinsics':
-        return JobType.EXTRINSIC_PROCESSING;
-      case 'events':
-        return JobType.INDEX_EVENT;
-      case 'data_submissions':
-        return JobType.INDEX_DATA_SUBMISSION;
-      default:
-        return null;
+    case 'extrinsics':
+      return JobType.EXTRINSIC_PROCESSING;
+    case 'events':
+      return JobType.INDEX_EVENT;
+    case 'data_submissions':
+      return JobType.INDEX_DATA_SUBMISSION;
+    default:
+      return null;
     }
   }
 

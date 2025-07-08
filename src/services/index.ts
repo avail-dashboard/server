@@ -1,6 +1,8 @@
 // Service Layer Entry Point
 // Simple service factory and dependency injection
 
+import { logger } from '../utils/logger';
+
 // Core Services
 export { AvailBlockchainService, createAvailBlockchainService } from './core/avail-blockchain';
 export { AvailConnectionManager, createAvailConnectionManager } from './core/avail-connection-manager';
@@ -122,14 +124,14 @@ export class ServiceFactory {
   // Register a service instance
   register<T>(name: string, service: T): void {
     this.services.set(name, service);
-    console.log(`🔧 Service registered: ${name}`);
+    logger.info(`🔧 Service registered: ${name}`);
   }
 
   // Get a service instance with proper typing
   get<T = any>(name: string): T {
     const service = this.services.get(name);
     if (!service) {
-      console.error(`❌ Service '${name}' not found. Available services:`, Array.from(this.services.keys()));
+      logger.error(`❌ Service '${name}' not found. Available services:`, Array.from(this.services.keys()));
       throw new Error(`Service '${name}' not found. Make sure it's registered.`);
     }
     return service as T;
@@ -148,7 +150,7 @@ export class ServiceFactory {
   // Initialize all core services
   async initializeCoreServices(): Promise<void> {
     try {
-      console.log('🔧 Initializing core services...');
+      logger.info('🔧 Initializing core services...');
       
       // Create core service instances
       const providers = config.avail.rpc.endpoints.map((endpoint, index) => ({
@@ -174,9 +176,9 @@ export class ServiceFactory {
       await availBlockchainService.start();
       // Queue service and health monitor will be started after dependencies are initialized in initializeDomainServices()
       
-      console.log('✅ Core services initialized successfully');
+      logger.info('✅ Core services initialized successfully');
     } catch (error) {
-      console.error('❌ Failed to initialize core services:', error);
+      logger.error('❌ Failed to initialize core services:', error);
       throw error;
     }
   }
@@ -184,7 +186,7 @@ export class ServiceFactory {
   // Initialize domain services (after core services are ready)
   async initializeDomainServices(): Promise<void> {
     try {
-      console.log('🔧 Initializing domain services...');
+      logger.info('🔧 Initializing domain services...');
       
       // Get core services from registry with proper typing
       const availBlockchainService = this.get<AvailBlockchainService>('availBlockchain');
@@ -425,9 +427,9 @@ export class ServiceFactory {
       await selfHealingBlockProcessor.start();
       // Phase 3: Orchestrators removed - independent domain processing via queue
       
-      console.log('✅ Domain services initialized successfully');
+      logger.info('✅ Domain services initialized successfully');
     } catch (error) {
-      console.error('❌ Failed to initialize domain services:', error);
+      logger.error('❌ Failed to initialize domain services:', error);
       throw error;
     }
   }
@@ -435,7 +437,7 @@ export class ServiceFactory {
   // Initialize all services (core + domain)
   async initializeAllServices(): Promise<void> {
     try {
-      console.log('🚀 Starting service initialization...');
+      logger.info('🚀 Starting service initialization...');
       
       // Initialize correlation ID namespace for queue processing
       const { initializeCorrelationId } = await import('../utils/correlationId');
@@ -445,9 +447,9 @@ export class ServiceFactory {
       await this.initializeDomainServices();
       
       this.initialized = true;
-      console.log('✅ All services initialized successfully. Registered services:', this.getRegisteredServices());
+      logger.info('✅ All services initialized successfully. Registered services:', this.getRegisteredServices());
     } catch (error) {
-      console.error('❌ Failed to initialize all services:', error);
+      logger.error('❌ Failed to initialize all services:', error);
       this.initialized = false;
       throw error;
     }
@@ -461,7 +463,7 @@ export class ServiceFactory {
   // Shutdown all services
   async shutdown(): Promise<void> {
     try {
-      console.log('🔄 Shutting down services...');
+      logger.info('🔄 Shutting down services...');
       
       // Define the shutdown order (reverse of startup order for proper dependency cleanup)
       const shutdownOrder = [
@@ -491,15 +493,15 @@ export class ServiceFactory {
           try {
             const service = this.get(serviceName);
             if (service && typeof service.stop === 'function') {
-              console.log(`🔄 Stopping service: ${serviceName}`);
+              logger.info(`🔄 Stopping service: ${serviceName}`);
               await service.stop();
-              console.log(`✅ Service stopped: ${serviceName}`);
+              logger.info(`✅ Service stopped: ${serviceName}`);
             } else {
-              console.log(`ℹ️  Service ${serviceName} has no stop() method, skipping`);
+              logger.info(`ℹ️  Service ${serviceName} has no stop() method, skipping`);
             }
           } catch (error) {
             const errorMsg = `Failed to stop ${serviceName}: ${(error as Error).message}`;
-            console.error(`❌ ${errorMsg}`);
+            logger.error(`❌ ${errorMsg}`);
             shutdownErrors.push(errorMsg);
             // Continue with other services even if one fails
           }
@@ -511,19 +513,19 @@ export class ServiceFactory {
       const remainingServices = allServices.filter(name => !shutdownOrder.includes(name));
       
       if (remainingServices.length > 0) {
-        console.log(`🔄 Stopping remaining services: ${remainingServices.join(', ')}`);
+        logger.info(`🔄 Stopping remaining services: ${remainingServices.join(', ')}`);
         
         for (const serviceName of remainingServices) {
           try {
             const service = this.get(serviceName);
             if (service && typeof service.stop === 'function') {
-              console.log(`🔄 Stopping remaining service: ${serviceName}`);
+              logger.info(`🔄 Stopping remaining service: ${serviceName}`);
               await service.stop();
-              console.log(`✅ Remaining service stopped: ${serviceName}`);
+              logger.info(`✅ Remaining service stopped: ${serviceName}`);
             }
           } catch (error) {
             const errorMsg = `Failed to stop remaining service ${serviceName}: ${(error as Error).message}`;
-            console.error(`❌ ${errorMsg}`);
+            logger.error(`❌ ${errorMsg}`);
             shutdownErrors.push(errorMsg);
           }
         }
@@ -534,14 +536,14 @@ export class ServiceFactory {
       this.initialized = false;
       
       if (shutdownErrors.length > 0) {
-        console.warn(`⚠️  Some services had shutdown errors: ${shutdownErrors.join('; ')}`);
-        console.log('✅ Service shutdown completed with warnings');
+        logger.warn(`⚠️  Some services had shutdown errors: ${shutdownErrors.join('; ')}`);
+        logger.info('✅ Service shutdown completed with warnings');
       } else {
-        console.log('✅ All services shutdown completed successfully');
+        logger.info('✅ All services shutdown completed successfully');
       }
       
     } catch (error) {
-      console.error('❌ Critical error during service shutdown:', error);
+      logger.error('❌ Critical error during service shutdown:', error);
       // Even on critical error, try to clear the registry
       this.services.clear();
       this.initialized = false;

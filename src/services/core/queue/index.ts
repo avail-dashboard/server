@@ -553,10 +553,10 @@ export class QueueService implements QueueServiceInterface {
    * Setup queue processors with Bull
    */
   private setupQueueProcessors(): void {
-    console.log('🔧 SETUP QUEUE PROCESSORS CALLED');
+    this.logger.info('🔧 QUEUE: SETUP QUEUE PROCESSORS CALLED', { component: 'queue-service', operation: 'setupQueueProcessors' });
     
     if (!this.queue) {
-      console.log('❌ NO BULL QUEUE AVAILABLE');
+      this.logger.info('❌ QUEUE: NO BULL QUEUE AVAILABLE', { component: 'queue-service', operation: 'setupQueueProcessors' });
       this.logger.warn('⚠️ Cannot setup processors: Bull queue not available', {
         component: 'queue-service',
         hasQueue: !!this.queue,
@@ -565,7 +565,7 @@ export class QueueService implements QueueServiceInterface {
     }
     
     if (!this.processorRegistry) {
-      console.log('❌ NO PROCESSOR REGISTRY AVAILABLE');
+      this.logger.info('❌ QUEUE: NO PROCESSOR REGISTRY AVAILABLE', { component: 'queue-service', operation: 'setupQueueProcessors' });
       this.logger.warn('⚠️ Cannot setup processors: ProcessorRegistry not available', {
         component: 'queue-service',
         hasProcessorRegistry: !!this.processorRegistry,
@@ -573,11 +573,11 @@ export class QueueService implements QueueServiceInterface {
       return;
     }
     
-    console.log('✅ BOTH QUEUE AND REGISTRY AVAILABLE');
+    this.logger.info('✅ QUEUE: BOTH QUEUE AND REGISTRY AVAILABLE', { component: 'queue-service', operation: 'setupQueueProcessors' });
     
     // Check if processors are already set up to avoid duplicates
     if ((this.queue as any)._processorsInitialized) {
-      console.log('ℹ️ PROCESSORS ALREADY INITIALIZED, SKIPPING');
+      this.logger.info('ℹ️ QUEUE: PROCESSORS ALREADY INITIALIZED, SKIPPING', { component: 'queue-service', operation: 'setupQueueProcessors' });
       this.logger.info('ℹ️ Queue processors already initialized, skipping', {
         component: 'queue-service',
         processorCount: this.processorRegistry.getProcessorCount(),
@@ -585,7 +585,7 @@ export class QueueService implements QueueServiceInterface {
       return;
     }
 
-    console.log('🔧 SETTING UP', this.processorRegistry.getProcessorCount(), 'PROCESSORS');
+        this.logger.info(`🔧 QUEUE: SETTING UP ${this.processorRegistry.getProcessorCount()} PROCESSORS`, { component: 'queue-service', operation: 'setupQueueProcessors' });
     this.logger.info('🔧 Setting up Bull queue processors', {
       component: 'queue-service',
       processorCount: this.processorRegistry.getProcessorCount(),
@@ -637,7 +637,7 @@ export class QueueService implements QueueServiceInterface {
     // Mark processors as initialized
     (this.queue as any)._processorsInitialized = true;
     
-    console.log('✅ BULL QUEUE PROCESSORS SETUP COMPLETE');
+    this.logger.info('✅ QUEUE: BULL QUEUE PROCESSORS SETUP COMPLETE', { component: 'queue-service', operation: 'setupQueueProcessors' });
     this.logger.info('✅ Bull queue processors setup complete', {
       component: 'queue-service',
       processorCount: this.processorRegistry.getProcessorCount(),

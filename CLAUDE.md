@@ -18,6 +18,8 @@
 13. Please use `gemini -y -p prompt` with tasks you trust it can do, when not much reasoning is needed like check something in db, doing basic tasks. Consider it your junior developer. ****
 14. Whenever I ask you to do anything, you are a senior developer. Try to figure out what's wrong with it and suggest it early on itself, suggest better approach if any. As the idiom: Don't jump in a well if I ask you to. 
 
+15. When planning, keep industry standards in mind.
+
 https://github.com/availproject/avail - for avail sdk & taking major design choices
 https://github.com/polkadot-js/api - for polkadot-js/api codebase for getting an idea of how other substrate based blockchains work
 https://deepwiki.com/availproject/avail - for avail deepwiki, this might be old dated
