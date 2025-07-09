@@ -242,7 +242,7 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       ? hashOrNumber 
       : (await api.rpc.chain.getBlockHash(hashOrNumber)).toString();
     
-    // Try cache first for old blocks (avoid circular call)
+    // Try cache first for both old and recent blocks (avoid circular call)
     if (config.cache.redis.enabled && typeof hashOrNumber === 'number') {
       // Get latest block number directly to avoid circular dependency
       const latestHash = await api.rpc.chain.getFinalizedHead();
@@ -250,18 +250,29 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       const latestBlockNumber = latestHeader.number.toNumber();
       const blockAge = latestBlockNumber - hashOrNumber;
       
+      let cacheKey: string;
+      let cacheType: string;
+      
       if (blockAge > 100) {
-        const cacheKey = CacheKeys.oldBlock(hashOrNumber);
-        const cached = await cache.get<BlockData>(cacheKey);
-        
-        if (cached) {
-          logger.debug('Block cache hit', {
-            component: 'avail-blockchain',
-            blockNumber: hashOrNumber,
-            blockAge,
-          });
-          return cached;
-        }
+        // Old blocks - cache for 24 hours
+        cacheKey = CacheKeys.oldBlock(hashOrNumber);
+        cacheType = 'old';
+      } else {
+        // Recent blocks - cache for 5 minutes
+        cacheKey = CacheKeys.recentBlock(hashOrNumber);
+        cacheType = 'recent';
+      }
+      
+      const cached = await cache.get<BlockData>(cacheKey);
+      
+      if (cached) {
+        logger.debug('Block cache hit', {
+          component: 'avail-blockchain',
+          blockNumber: hashOrNumber,
+          blockAge,
+          cacheType,
+        });
+        return cached;
       }
     }
     
@@ -322,7 +333,7 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       hasAuthor: !!blockData.validator,
     });
 
-    // Cache old blocks (>100 blocks old) for 24 hours
+    // Cache both old and recent blocks with appropriate TTL
     if (config.cache.redis.enabled && typeof hashOrNumber === 'number') {
       // Use already available data to avoid extra calls
       const latestHash = await api.rpc.chain.getFinalizedHead();
@@ -330,17 +341,31 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       const latestBlockNumber = latestHeader.number.toNumber();
       const blockAge = latestBlockNumber - blockData.number;
       
+      let cacheKey: string;
+      let ttl: number;
+      let cacheType: string;
+      
       if (blockAge > 100) {
-        const cacheKey = CacheKeys.oldBlock(hashOrNumber);
-        await cache.set(cacheKey, blockData, CACHE_TTL.oldBlocks);
-        
-        logger.debug('Block cached', {
-          component: 'avail-blockchain',
-          blockNumber: hashOrNumber,
-          blockAge,
-          ttl: CACHE_TTL.oldBlocks,
-        });
+        // Old blocks - cache for 24 hours
+        cacheKey = CacheKeys.oldBlock(hashOrNumber);
+        ttl = CACHE_TTL.oldBlocks;
+        cacheType = 'old';
+      } else {
+        // Recent blocks - cache for 5 minutes
+        cacheKey = CacheKeys.recentBlock(hashOrNumber);
+        ttl = CACHE_TTL.recentBlocks;
+        cacheType = 'recent';
       }
+      
+      await cache.set(cacheKey, blockData, ttl);
+      
+      logger.debug('Block cached', {
+        component: 'avail-blockchain',
+        blockNumber: hashOrNumber,
+        blockAge,
+        ttl,
+        cacheType,
+      });
     }
 
     return blockData;
@@ -1070,6 +1095,25 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       const api = await this.getApi();
       return await api.query.staking.erasValidatorReward(era);
     }, CACHE_TTL.eraData);
+
+    return result.data;
+  }
+
+  /**
+   * Get block header with caching
+   * Used by event processing to reduce failed chain_getHeader calls
+   */
+  async getBlockHeader(blockHash: string): Promise<any> {
+    if (!config.cache.redis.enabled) {
+      const api = await this.getApi();
+      return await api.rpc.chain.getHeader(blockHash);
+    }
+
+    const cacheKey = CacheKeys.blockHeader(blockHash);
+    const result = await cacheWrapper(cacheKey, async () => {
+      const api = await this.getApi();
+      return await api.rpc.chain.getHeader(blockHash);
+    }, CACHE_TTL.blockHeaders);
 
     return result.data;
   }

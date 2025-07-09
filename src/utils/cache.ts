@@ -225,6 +225,8 @@ export const CacheKeys = {
   runtimeMetadata: () => 'runtime:metadata',
   chainConstants: () => 'chain:constants',
   oldBlock: (number: number) => `block:old:${number}`,
+  recentBlock: (number: number) => `block:recent:${number}`,
+  blockHeader: (hash: string) => `block:header:${hash}`,
   eraData: (era: number) => `era:${era}`,
   sessionData: (session: number) => `session:${session}`,
 
@@ -293,6 +295,10 @@ export const CACHE_TTL = {
   bondedController: 900,     // 15 minutes
   eraStakers: 1800,          // 30 minutes (more stable)
   activeEra: 300,            // 5 minutes
+  
+  // Block-specific TTLs
+  recentBlocks: 300,         // 5 minutes for recent blocks
+  blockHeaders: 600,         // 10 minutes for block headers
 };
 
 // Create cache service instance

@@ -12,6 +12,7 @@ export interface CachedBlockchainApi {
   getChainInfo(): Promise<any>;
   getLatestBlock(): Promise<any>;
   getBlock(hashOrNumber: string | number): Promise<any>;
+  getBlockHeader(blockHash: string): Promise<any>;
   
   // Validator and staking queries (cached)
   getValidatorPrefs(validatorId: string): Promise<any>;
