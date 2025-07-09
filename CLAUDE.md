@@ -19,6 +19,7 @@
 14. Whenever I ask you to do anything, you are a senior developer. Try to figure out what's wrong with it and suggest it early on itself, suggest better approach if any. As the idiom: Don't jump in a well if I ask you to. 
 
 15. When planning, keep industry standards in mind.
+16. always take advantage of existing solutions online, don't reinvent the wheel.
 
 https://github.com/availproject/avail - for avail sdk & taking major design choices
 https://github.com/polkadot-js/api - for polkadot-js/api codebase for getting an idea of how other substrate based blockchains work
