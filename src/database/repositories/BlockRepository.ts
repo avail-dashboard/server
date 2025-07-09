@@ -1,5 +1,6 @@
 import { Block } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
+import { createBatchLoader, arrayToMap, BatchLoader } from '../../utils/batch-loader';
 
 export type BlockWithExtrinsics = Block & {
   extrinsics: Array<{
@@ -12,6 +13,33 @@ export type BlockWithExtrinsics = Block & {
 export type BlockCreateInput = Omit<Block, 'createdAt'>;
 
 export class BlockRepository extends BaseRepository {
+  private blockNumberBatchLoader: BatchLoader<number, Block>;
+  private blockHashBatchLoader: BatchLoader<string, Block>;
+
+  constructor() {
+    super();
+    
+    // Initialize batch loaders
+    this.blockNumberBatchLoader = createBatchLoader(
+      async (blockNumbers: number[]) => {
+        const blocks = await this.prisma.block.findMany({
+          where: { number: { in: blockNumbers } },
+        });
+        return arrayToMap(blocks, (block: Block) => block.number);
+      },
+      { maxBatchSize: 50, batchTimeoutMs: 10 }
+    );
+
+    this.blockHashBatchLoader = createBatchLoader(
+      async (hashes: string[]) => {
+        const blocks = await this.prisma.block.findMany({
+          where: { hash: { in: hashes } },
+        });
+        return arrayToMap(blocks, (block: Block) => block.hash);
+      },
+      { maxBatchSize: 50, batchTimeoutMs: 10 }
+    );
+  }
   /**
    * Find block by number with cache support
    */
@@ -20,9 +48,36 @@ export class BlockRepository extends BaseRepository {
       where: { number: blockNumber },
     };
 
-    return this.prisma.block.findUnique(
-      this.buildCachedQuery(query, useCache, 3600), // 1 hour cache for immutable blocks
-    );
+    // Temporarily disable cache integration due to type issues
+    return this.prisma.block.findUnique(query);
+  }
+
+  /**
+   * Find block by number using batch loader (optimized for multiple concurrent requests)
+   */
+  async findByNumberBatched(blockNumber: number): Promise<Block | null> {
+    return this.blockNumberBatchLoader.load(blockNumber);
+  }
+
+  /**
+   * Find multiple blocks by numbers using batch loader
+   */
+  async findManyByNumbers(blockNumbers: number[]): Promise<(Block | null)[]> {
+    return this.blockNumberBatchLoader.loadMany(blockNumbers);
+  }
+
+  /**
+   * Find block by hash using batch loader
+   */
+  async findByHashBatched(hash: string): Promise<Block | null> {
+    return this.blockHashBatchLoader.load(hash);
+  }
+
+  /**
+   * Find multiple blocks by hashes using batch loader
+   */
+  async findManyByHashes(hashes: string[]): Promise<(Block | null)[]> {
+    return this.blockHashBatchLoader.loadMany(hashes);
   }
 
   /**

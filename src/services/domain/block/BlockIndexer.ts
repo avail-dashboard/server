@@ -163,17 +163,57 @@ export class BlockIndexer implements IBlockIndexer {
     });
 
     const results: BlockIndexingResult[] = [];
+    const concurrency = 5; // Process 5 blocks concurrently
     
-    for (let blockNumber = startBlock; blockNumber <= endBlock; blockNumber++) {
-      const result = await this.indexBlock(blockNumber);
-      results.push(result);
+    // Process blocks in concurrent batches
+    for (let i = startBlock; i <= endBlock; i += concurrency) {
+      const batchEnd = Math.min(i + concurrency - 1, endBlock);
+      const batchPromises: Promise<BlockIndexingResult>[] = [];
       
-      if (!result.success) {
-        logger.warn('Block indexing failed in range', {
-          component: 'block-indexer',
-          blockNumber,
-          error: result.error,
-        });
+      // Create batch of concurrent promises
+      for (let blockNumber = i; blockNumber <= batchEnd; blockNumber++) {
+        batchPromises.push(this.indexBlock(blockNumber));
+      }
+      
+      // Wait for batch to complete
+      const batchResults = await Promise.allSettled(batchPromises);
+      
+      // Process results
+      batchResults.forEach((result, index) => {
+        const blockNumber = i + index;
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+          if (!result.value.success) {
+            logger.warn('Block indexing failed in range', {
+              component: 'block-indexer',
+              blockNumber,
+              error: result.value.error,
+            });
+          }
+        } else {
+          // Handle rejected promises
+          const failedResult: BlockIndexingResult = {
+            blockNumber,
+            success: false,
+            error: result.reason?.message || 'Unknown error',
+            entities: {
+              block: null,
+              extrinsics: [],
+              events: [],
+            },
+          };
+          results.push(failedResult);
+          logger.error('Block indexing failed with exception in range', {
+            component: 'block-indexer',
+            blockNumber,
+            error: result.reason,
+          });
+        }
+      });
+      
+      // Add small delay between batches to prevent overwhelming the system
+      if (batchEnd < endBlock) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 

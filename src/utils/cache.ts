@@ -61,6 +61,72 @@ class CacheService {
     }
   }
 
+  /**
+   * Clear cache entries by pattern
+   */
+  async clearByPattern(pattern: string): Promise<number> {
+    if (!this.isConnected) {
+      return 0;
+    }
+
+    try {
+      const keys = await this.redis.keys(pattern);
+      if (keys.length === 0) {
+        return 0;
+      }
+
+      await this.redis.del(...keys);
+      logger.info('Cache: Cleared keys by pattern', {
+        component: 'cache',
+        pattern,
+        count: keys.length,
+      });
+      
+      return keys.length;
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'cache', 
+        action: 'clearByPattern',
+        pattern,
+      });
+      return 0;
+    }
+  }
+
+  /**
+   * Clear all cache entries for a specific API endpoint
+   */
+  async clearEndpoint(method: string, path: string): Promise<number> {
+    const pattern = `http:${method}:${path}*`;
+    return this.clearByPattern(pattern);
+  }
+
+  /**
+   * Clear all HTTP cache entries
+   */
+  async clearAllHttpCache(): Promise<number> {
+    return this.clearByPattern('http:*');
+  }
+
+  /**
+   * Get all cache keys (for debugging/monitoring)
+   */
+  async getAllKeys(): Promise<string[]> {
+    if (!this.isConnected) {
+      return [];
+    }
+
+    try {
+      return await this.redis.keys('*');
+    } catch (error) {
+      logError(error as Error, { 
+        component: 'cache', 
+        action: 'getAllKeys',
+      });
+      return [];
+    }
+  }
+
   async get<T = unknown>(key: string): Promise<T | null> {
     if (!this.isConnected) {
       logCacheMiss(key);

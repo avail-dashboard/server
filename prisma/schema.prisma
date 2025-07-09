@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model Block {
@@ -33,6 +34,8 @@ model Block {
   @@index([timestamp], name: "idx_blocks_timestamp")
   @@index([hash], name: "idx_blocks_hash")
   @@index([validatorAddress], name: "idx_blocks_validator")
+  @@index([timestamp, number], name: "idx_blocks_timestamp_number") // Composite for ordering
+  @@index([validatorAddress, timestamp], name: "idx_blocks_validator_timestamp") // Validator blocks by time
   @@map("blocks")
 }
 
@@ -74,6 +77,9 @@ model Extrinsic {
   @@index([signer], name: "idx_extrinsics_signer")
   @@index([timestamp], name: "idx_extrinsics_timestamp")
   @@index([blockNumber, extrinsicOrder], name: "idx_extrinsics_block_order")
+  @@index([signer, timestamp], name: "idx_extrinsics_signer_timestamp") // Signer activity by time
+  @@index([module, call], name: "idx_extrinsics_module_call") // Module/call combination queries
+  @@index([success, timestamp], name: "idx_extrinsics_success_timestamp") // Success/failure analysis
   @@map("extrinsics")
 }
 
@@ -199,6 +205,9 @@ model DataSubmission {
   @@index([submitter], name: "idx_data_submissions_submitter")
   @@index([timestamp], name: "idx_data_submissions_timestamp")
   @@index([extrinsicHash], name: "idx_data_submissions_hash")
+  @@index([appId, timestamp], name: "idx_data_submissions_app_timestamp") // App submissions by time
+  @@index([submitter, timestamp], name: "idx_data_submissions_submitter_timestamp") // Submitter activity
+  @@index([dataSize, timestamp], name: "idx_data_submissions_size_timestamp") // Size analysis
   @@map("data_submissions")
 }
 
@@ -286,6 +295,9 @@ model Transfer {
   @@index([toAddress], name: "idx_transfers_to")
   @@index([timestamp], name: "idx_transfers_timestamp")
   @@index([amount], name: "idx_transfers_amount")
+  @@index([fromAddress, timestamp], name: "idx_transfers_from_timestamp") // From address activity
+  @@index([toAddress, timestamp], name: "idx_transfers_to_timestamp") // To address activity
+  @@index([amount, timestamp], name: "idx_transfers_amount_timestamp") // Large transfers by time
   @@map("transfers")
 }
 

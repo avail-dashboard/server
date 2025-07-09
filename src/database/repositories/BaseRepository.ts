@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import prisma from '../client';
 import { QueryCacheOptions } from '../../config/cache-config';
 import { withCache, withoutCache, withTTL, withCacheKey, CachedQuery } from '../../middleware/prisma-cache-middleware';
+import { logger } from '../../utils/logger';
 
 export abstract class BaseRepository {
   protected prisma: PrismaClient;
@@ -13,7 +14,7 @@ export abstract class BaseRepository {
   /**
    * Execute in transaction
    */
-  async transaction<T>(callback: (tx: any) => Promise<T>): Promise<T> {
+  async transaction<T>(callback: (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(callback);
   }
 
@@ -27,6 +28,63 @@ export abstract class BaseRepository {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Execute optimized raw query with prepared statement
+   */
+  protected async executeRawQuery<T = unknown>(
+    query: string, 
+    params: unknown[] = [],
+  ): Promise<T[]> {
+    const start = Date.now();
+    try {
+      // Use Prisma's $queryRawUnsafe with parameters for prepared statement optimization
+      const result = await this.prisma.$queryRawUnsafe(query, ...params);
+      
+      const duration = Date.now() - start;
+      if (duration > 1000) {
+        // Log slow queries > 1s
+        logger.warn('Slow raw query detected', { 
+          query: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
+          duration: `${duration}ms`,
+          paramCount: params.length,
+        });
+      }
+      
+      return result as T[];
+    } catch (error) {
+      const duration = Date.now() - start;
+      logger.error('Raw query execution failed', { 
+        query: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
+        params: params.length, 
+        duration: `${duration}ms`,
+        error: (error as Error).message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Execute optimized raw query that returns a single result
+   */
+  protected async executeRawQuerySingle<T = unknown>(
+    query: string, 
+    params: unknown[] = [],
+  ): Promise<T | null> {
+    const results = await this.executeRawQuery<T>(query, params);
+    return results.length > 0 ? results[0] : null;
+  }
+
+  /**
+   * Execute count query with prepared statement
+   */
+  protected async executeCountQuery(
+    query: string, 
+    params: unknown[] = [],
+  ): Promise<number> {
+    const result = await this.executeRawQuerySingle<{ count: bigint }>(query, params);
+    return result ? Number(result.count) : 0;
   }
 
   /**
@@ -68,7 +126,7 @@ export abstract class BaseRepository {
     baseQuery: T,
     useCache: boolean = true,
     ttl?: number,
-    cacheKey?: string
+    cacheKey?: string,
   ): CachedQuery<T> {
     if (!useCache) {
       return this.withoutCache(baseQuery);
@@ -76,8 +134,12 @@ export abstract class BaseRepository {
     
     const options: QueryCacheOptions = { useCache };
     
-    if (ttl !== undefined) options.ttl = ttl;
-    if (cacheKey) options.cacheKey = cacheKey;
+    if (ttl !== undefined) {
+      options.ttl = ttl;
+    }
+    if (cacheKey) {
+      options.cacheKey = cacheKey;
+    }
     
     return this.withCache(baseQuery, options);
   }

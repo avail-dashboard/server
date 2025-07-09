@@ -50,6 +50,9 @@ class AvailSubscriptionManager implements SubscriptionManager {
       this.unsubscribe(key),
     );
     await Promise.all(unsubscribePromises);
+    
+    // Clear the map to ensure no lingering references
+    this.subscriptions.clear();
   }
 }
 
