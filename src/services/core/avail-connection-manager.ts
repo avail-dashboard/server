@@ -38,6 +38,7 @@ export class AvailConnectionManager {
   private connectionMetrics: AvailConnectionMetrics;
   private retryConfig: RetryConfig;
   private providers: ConnectionProvider[];
+  private healthCheckInterval: NodeJS.Timeout | null = null;
 
   constructor(providers: ConnectionProvider[], retryConfig?: Partial<RetryConfig>) {
     this.providers = providers;
@@ -134,22 +135,119 @@ export class AvailConnectionManager {
     }
 
     await this.establishPrimaryConnection();
+    
+    // Start periodic health checks
+    this.startHealthCheckMonitoring();
   }
 
   /**
-   * Get a healthy avail-sdk connection
+   * Start periodic health check monitoring
+   */
+  private startHealthCheckMonitoring(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+    
+    // Check connection health every 30 seconds
+    this.healthCheckInterval = setInterval(async () => {
+      try {
+        await this.performHealthCheck();
+      } catch (error) {
+        logger.error('AvailConnectionManager: Health check failed', {
+          component: 'avail-connection-manager',
+          error: (error as Error).message,
+        });
+      }
+    }, 30000);
+    
+    logger.debug('AvailConnectionManager: Health check monitoring started', {
+      component: 'avail-connection-manager',
+      interval: 30000,
+    });
+  }
+
+  /**
+   * Perform proactive health check
+   */
+  private async performHealthCheck(): Promise<void> {
+    if (!this.currentConnection) {
+      return;
+    }
+
+    try {
+      const isHealthy = await this.testConnection(this.currentConnection);
+      
+      if (!isHealthy) {
+        logger.warn('AvailConnectionManager: Health check detected connection failure', {
+          component: 'avail-connection-manager',
+          provider: this.connectionMetrics.currentProvider,
+          url: this.currentConnection.url,
+        });
+        
+        // Switch to a different provider on health check failure
+        await this.switchProvider('health_check_failed');
+      }
+    } catch (error) {
+      logger.error('AvailConnectionManager: Health check error', {
+        component: 'avail-connection-manager',
+        error: (error as Error).message,
+      });
+    }
+  }
+
+  /**
+   * Get a healthy avail-sdk connection with retry logic
    */
   async getHealthyConnection(): Promise<AvailConnection> {
-    if (!this.currentConnection || !this.currentConnection.isConnected) {
-      await this.establishPrimaryConnection();
-    }
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        if (!this.currentConnection || !this.currentConnection.isConnected) {
+          await this.establishPrimaryConnection();
+        }
 
-    if (!this.currentConnection) {
-      throw new Error('No healthy avail-sdk connection available');
-    }
+        if (!this.currentConnection) {
+          throw new Error('No healthy avail-sdk connection available');
+        }
 
-    this.currentConnection.lastActivity = new Date();
-    return this.currentConnection;
+        // Test the connection before returning it
+        await this.testConnection(this.currentConnection);
+        
+        if (!this.currentConnection.isConnected) {
+          throw new Error('Connection test failed');
+        }
+
+        this.currentConnection.lastActivity = new Date();
+        return this.currentConnection;
+        
+      } catch (error) {
+        retryCount++;
+        
+        logger.warn('AvailConnectionManager: getHealthyConnection failed', {
+          component: 'avail-connection-manager',
+          attempt: retryCount,
+          maxRetries,
+          error: (error as Error).message,
+        });
+        
+        if (retryCount < maxRetries) {
+          // Clear current connection to force reconnection
+          this.currentConnection = null;
+          
+          // Wait before retrying
+          const delay = Math.min(
+            this.retryConfig.baseDelay * Math.pow(this.retryConfig.exponentialFactor, retryCount),
+            this.retryConfig.maxDelay
+          );
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    throw new Error(`Failed to get healthy connection after ${maxRetries} attempts`);
   }
 
   /**
@@ -243,6 +341,12 @@ export class AvailConnectionManager {
     logger.info('AvailConnectionManager: Disconnecting all connections', { 
       component: 'avail-connection-manager',
     });
+    
+    // Stop health check monitoring
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
     
     const disconnectPromises = Array.from(this.connections.values()).map(async (connection) => {
       try {

@@ -728,23 +728,17 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       success: boolean;
     }>;
   }> {
-    const connection = await this.connectionManager.getHealthyConnection();
-    const api = connection.api;
-    
-    const hash = typeof hashOrNumber === 'string' 
-      ? hashOrNumber 
-      : (await api.rpc.chain.getBlockHash(hashOrNumber)).toString();
-    
-    logger.debug('Fetching block with data submissions via avail-sdk', { 
+    logger.debug('Fetching block with data submissions via cached method', { 
       component: 'avail-blockchain',
       hashOrNumber,
     });
     
-    const [block] = await Promise.all([
-      api.rpc.chain.getBlock(hash),
-    ]);
-
+    // Use cached getBlock method instead of direct API calls
     const blockData = await this.getBlock(hashOrNumber);
+    
+    // Get raw block data for detailed extrinsic analysis (also cached)
+    const blockNumber = typeof hashOrNumber === 'number' ? hashOrNumber : blockData.number;
+    const rawBlock = await this.getRawBlock(blockNumber);
     const dataSubmissions: Array<{
       extrinsicIndex: number;
       txHash: string;
@@ -753,8 +747,8 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       success: boolean;
     }> = [];
 
-    // Analyze extrinsics for data submissions
-    block.block.extrinsics.forEach((ext: any, index: number) => {
+    // Analyze extrinsics for data submissions using cached raw block data
+    rawBlock.block.extrinsics.forEach((ext: any, index: number) => {
       try {
         if (ext.method.section === 'dataAvailability' && ext.method.method === 'submitData') {
           const submission = {
