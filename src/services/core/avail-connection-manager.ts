@@ -230,6 +230,9 @@ export class AvailConnectionManager {
           attempt: retryCount,
           maxRetries,
           error: (error as Error).message,
+          currentProvider: this.currentConnection?.url,
+          totalConnections: this.connections.size,
+          activeConnections: this.connectionMetrics.activeConnections,
         });
         
         if (retryCount < maxRetries) {
@@ -238,11 +241,14 @@ export class AvailConnectionManager {
           
           // Wait before retrying
           const delay = Math.min(
-            this.retryConfig.baseDelay * Math.pow(this.retryConfig.exponentialFactor, retryCount),
+            this.retryConfig.baseDelay * Math.pow(this.retryConfig.exponentialFactor, retryCount - 1),
             this.retryConfig.maxDelay
           );
-          
-          await new Promise(resolve => setTimeout(resolve, delay));
+          // Add jitter if enabled
+          const jitterDelay = this.retryConfig.jitterEnabled
+            ? delay + Math.random() * 1000
+            : delay;
+          await new Promise(resolve => setTimeout(resolve, jitterDelay));
         }
       }
     }
@@ -269,10 +275,25 @@ export class AvailConnectionManager {
    */
   async testConnection(connection: AvailConnection): Promise<boolean> {
     try {
-      await connection.api.rpc.system.chain();
+      // Test multiple RPC methods to ensure connection is truly healthy
+      const [chain, health, systemName] = await Promise.all([
+        connection.api.rpc.system.chain(),
+        connection.api.rpc.system.health(),
+        connection.api.rpc.system.name(),
+      ]);
+      // Validate responses
+      if (!chain || !health || !systemName) {
+        throw new Error('Invalid RPC responses');
+      }
       connection.lastActivity = new Date();
+      connection.isConnected = true;
       return true;
-    } catch {
+    } catch (error) {
+      logger.warn('AvailConnectionManager: Connection test failed', {
+        component: 'avail-connection-manager',
+        url: connection.url,
+        error: (error as Error).message,
+      });
       connection.isConnected = false;
       return false;
     }
@@ -416,22 +437,23 @@ export class AvailConnectionManager {
     for (const [url, connection] of sortedConnections) {
       try {
         const circuitBreaker = this.circuitBreakers.get(url)!;
-        
+        const provider = this.providers.find(p => p.url === url);
         await circuitBreaker.execute(async () => {
-          await connection.api.rpc.system.chain();
+          // Use comprehensive connection test instead of single RPC call
+          const isHealthy = await this.testConnection(connection);
+          if (!isHealthy) {
+            throw new Error('Connection health test failed');
+          }
           this.currentConnection = connection;
           connection.lastActivity = new Date();
-          this.connectionMetrics.currentProvider = this.providers.find(p => p.url === url)?.provider;
+          this.connectionMetrics.currentProvider = provider?.provider;
         });
-
         logger.info('AvailConnectionManager: Primary connection established', {
           component: 'avail-connection-manager',
           url,
           provider: this.providers.find(p => p.url === url)?.provider,
         });
-        
         return;
-        
       } catch (error) {
         logger.error('AvailConnectionManager: Primary connection establishment failed', {
           component: 'avail-connection-manager',
@@ -441,7 +463,6 @@ export class AvailConnectionManager {
         });
       }
     }
-
     throw new Error('Failed to establish any avail-sdk connection');
   }
 }
@@ -455,8 +476,8 @@ class AvailCircuitBreaker {
     failureCount: 0,
   };
   
-  private readonly failureThreshold = 5;
-  private readonly recoveryTimeout = 30000; // 30 seconds
+  private readonly failureThreshold = 8;
+  private readonly recoveryTimeout = 20000; // 20 seconds
   private readonly halfOpenMaxCalls = 3;
   private halfOpenCalls = 0;
 
@@ -466,10 +487,9 @@ class AvailCircuitBreaker {
         this.state.state = 'HALF_OPEN';
         this.halfOpenCalls = 0;
       } else {
-        throw new Error('Avail SDK circuit breaker is OPEN');
+        throw new Error(`Avail SDK circuit breaker is OPEN - waiting for recovery (${this.state.failureCount} failures)`);
       }
     }
-
     try {
       const result = await operation();
       this.onSuccess();
