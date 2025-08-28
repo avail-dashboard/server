@@ -1,7 +1,6 @@
 import { config as dotenvConfig } from 'dotenv';
 import Joi from 'joi';
 import path from 'path';
-import { JobType } from '../services/types/service';
 import availTypesBundle from './avail-types';
 
 // Load environment variables
@@ -24,7 +23,6 @@ const configSchema = Joi.object({
   
   // Redis Configuration
   REDIS_URL: Joi.string().default('redis://localhost:6379'),
-  REDIS_QUEUE_DB: Joi.number().default(1),
 
   // Feature Flags
   ENABLE_WEBSOCKETS: Joi.boolean().default(true),
@@ -80,83 +78,8 @@ export const config = {
   // Redis Configuration
   redis: {
     url: env.REDIS_URL,
-    queueDb: env.REDIS_QUEUE_DB,
   },
 
-  // Queue Service Configuration
-  queue: {
-    concurrency: 5,
-    jobTimeout: 30000, // 30 seconds
-    retentionDays: 7,
-    defaultJobOptions: {
-      removeOnComplete: 30, // Keep only the last 30 completed jobs in the queue for debugging
-      removeOnFail: 1000,      // Keep only the last 100 failed jobs in the queue for analysis
-      attempts: 2,          // Maximum number of retry attempts before marking a job as failed
-      backoff: {
-        type: 'exponential',
-        delay: 2000,
-      },
-    },
-    // Retry strategies for different job types
-    retryStrategies: {
-      [JobType.BLOCK_INDEXING]: {
-        baseDelay: 5000,
-        maxDelay: 60000,
-        exponentialFactor: 2,
-        jitterEnabled: true,
-      },
-      [JobType.EXTRINSIC_PROCESSING]: {
-        baseDelay: 2000,
-        maxDelay: 30000,
-        exponentialFactor: 1.5,
-        jitterEnabled: true,
-      },
-      [JobType.ANALYTICS_CALCULATION]: {
-        baseDelay: 3000,
-        maxDelay: 45000,
-        exponentialFactor: 2,
-        jitterEnabled: true,
-      },
-      [JobType.BLOCK_RANGE_INDEXING]: {
-        baseDelay: 1000,
-        maxDelay: 15000,
-        exponentialFactor: 1.8,
-        jitterEnabled: true,
-      },
-      [JobType.ROLLUP_STATISTICS]: {
-        baseDelay: 2500,
-        maxDelay: 40000,
-        exponentialFactor: 2,
-        jitterEnabled: true,
-      },
-      [JobType.HEALTH_CHECK]: {
-        baseDelay: 1000,
-        maxDelay: 10000,
-        exponentialFactor: 1.5,
-        jitterEnabled: false,
-      },
-
-      // Phase 2: Dependency Management Job Retry Strategies - Simplified for TASK-010
-      [JobType.DEPENDENCY_DETECTION]: {
-        baseDelay: 2000,
-        maxDelay: 20000,
-        exponentialFactor: 1.8,
-        jitterEnabled: true,
-      },
-      [JobType.DEPENDENCY_RESOLUTION]: {
-        baseDelay: 3000,
-        maxDelay: 30000,
-        exponentialFactor: 2,
-        jitterEnabled: true,
-      },
-      [JobType.DEPENDENCY_BATCH_RESOLUTION]: {
-        baseDelay: 5000,
-        maxDelay: 60000,
-        exponentialFactor: 2,
-        jitterEnabled: true,
-      },
-    },
-  },
 
   // Avail Blockchain Data Sources
   avail: {
@@ -192,8 +115,6 @@ export const config = {
     rateLimiting: env.ENABLE_RATE_LIMITING,
     analytics: env.ENABLE_ANALYTICS,
     metrics: env.ENABLE_METRICS,
-    // Phase 1: Queue Integration - Feature flag for block domain processing
-    useQueueForBlockDomains: false, // Default to existing system for safety
   },
 
   // Phase 2: Block Processing Configuration - Dual-Mode Operation

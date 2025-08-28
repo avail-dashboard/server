@@ -285,9 +285,8 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       hash: hash.substring(0, 20) + '...',
     });
     
-    const [block, events, header] = await Promise.all([
+    const [block, header] = await Promise.all([
       api.rpc.chain.getBlock(hash),
-      api.query.system.events.at(hash),
       api.derive.chain.getHeader(hash),
     ]);
 
@@ -310,9 +309,8 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       });
     }
 
-    // Extract events first to determine extrinsic success
-    const extractedEvents = this.extractEventsData(events as any);
-    const extrinsicSuccessMap = this.determineExtrinsicSuccess(extractedEvents);
+    // Simplified extrinsic processing without events
+    const extrinsicSuccessMap = new Map<number, boolean>();
 
     // Extract more complete information using avail-sdk capabilities
     const blockData: BlockData = {
@@ -324,7 +322,6 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       timestamp: Date.now(), // Should be extracted from timestamp extrinsic
       validator: blockAuthor, // Add the extracted block author
       extrinsics: this.extractExtrinsicsData(block.block.extrinsics, extrinsicSuccessMap),
-      events: extractedEvents,
     };
 
     // Enhanced processing for avail-specific features
@@ -332,7 +329,6 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
       component: 'avail-blockchain',
       blockNumber: blockData.number,
       extrinsicsCount: block.block.extrinsics.length,
-      eventsCount: Array.isArray(events) ? events.length : 0,
       hasAuthor: !!blockData.validator,
     });
 
@@ -374,30 +370,6 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
     return blockData;
   }
 
-  /**
-   * Determine extrinsic success from events
-   */
-  private determineExtrinsicSuccess(extractedEvents: any[]): Map<number, boolean> {
-    const successMap = new Map<number, boolean>();
-    
-    extractedEvents.forEach(event => {
-      // Check if this event has an ApplyExtrinsic phase
-      if (event.phase && typeof event.phase === 'object' && 'applyExtrinsic' in event.phase) {
-        const extrinsicIndex = event.phase.applyExtrinsic;
-        
-        // Check for system success/failure events
-        if (event.section === 'system') {
-          if (event.method === 'ExtrinsicSuccess') {
-            successMap.set(extrinsicIndex, true);
-          } else if (event.method === 'ExtrinsicFailed') {
-            successMap.set(extrinsicIndex, false);
-          }
-        }
-      }
-    });
-    
-    return successMap;
-  }
 
   /**
    * Extract extrinsics data from raw block extrinsics with complete field extraction
@@ -654,68 +626,6 @@ export class AvailBlockchainService implements BaseService, CachedBlockchainApi 
   /**
    * Extract events data from raw events
    */
-  private extractEventsData(rawEvents: any[]): any[] {
-    return rawEvents.map((event, index) => {
-      try {
-        // Extract phase information properly for transfer events
-        let phase: any = { finalization: 0 };
-        if (event.phase) {
-          try {
-            // Handle different phase formats from Substrate/Avail
-            if (event.phase.applyExtrinsic !== undefined) {
-              phase = { applyExtrinsic: event.phase.applyExtrinsic };
-            } else if (event.phase.ApplyExtrinsic !== undefined) {
-              phase = { applyExtrinsic: event.phase.ApplyExtrinsic };
-            } else if (typeof event.phase === 'object' && event.phase.isApplyExtrinsic) {
-              // Handle Substrate type format
-              phase = { applyExtrinsic: event.phase.asApplyExtrinsic.toNumber() };
-            } else if (event.phase.finalization !== undefined) {
-              phase = { finalization: event.phase.finalization };
-            } else {
-              // Try to convert phase to string/number if it's a primitive
-              const phaseStr = event.phase.toString();
-              if (phaseStr.includes('ApplyExtrinsic')) {
-                // Extract extrinsic index from string format
-                const match = phaseStr.match(/ApplyExtrinsic\((\d+)\)/);
-                if (match) {
-                  phase = { applyExtrinsic: parseInt(match[1], 10) };
-                }
-              }
-            }
-          } catch (phaseError) {
-            logger.debug('Failed to extract phase from event', {
-              component: 'avail-blockchain',
-              eventIndex: index,
-              phaseError: (phaseError as Error).message,
-              rawPhase: event.phase,
-            });
-          }
-        }
-        
-        return {
-          index,
-          section: event.event?.section || 'unknown',
-          method: event.event?.method || 'unknown',
-          data: event.event?.data || [],
-          phase,
-        };
-      } catch (error) {
-        logger.warn('Failed to extract event data', {
-          component: 'avail-blockchain',
-          eventIndex: index,
-          error: (error as Error).message,
-        });
-        
-        return {
-          index,
-          section: 'unknown',
-          method: 'unknown',
-          data: [],
-          phase: { finalization: 0 },
-        };
-      }
-    });
-  }
 
   /**
    * Get block with enhanced data submission analysis

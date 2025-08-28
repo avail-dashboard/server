@@ -20,10 +20,15 @@
 
 15. When planning, keep industry standards in mind.
 16. always take advantage of existing solutions online, don't reinvent the wheel.
+17. When i mention "etc", you've to extend the list yourself.
 
+## online resources
 https://github.com/availproject/avail - for avail sdk & taking major design choices
 https://github.com/polkadot-js/api - for polkadot-js/api codebase for getting an idea of how other substrate based blockchains work
 https://deepwiki.com/availproject/avail - for avail deepwiki, this might be old dated
+https://github.com/subquery/subql - for subquery codebase for getting an idea of how other substrate based blockchains work, stored at ./subql-analysis/
+
+Thegraph, Streamingfast, SubQyery, L2BEAT - use these for reference.
 
 
 ## Your position

@@ -6,34 +6,19 @@ import { logger } from '../utils/logger';
 // Core Services
 export { AvailBlockchainService, createAvailBlockchainService } from './core/avail-blockchain';
 export { AvailConnectionManager, createAvailConnectionManager } from './core/avail-connection-manager';
-export { QueueService, createQueueService } from './core/queue';
-export { SyncService, createSyncService } from './core/sync';
-export { SimpleDependencyResolver, createDependencyResolver } from './core/dependency-resolver';
 
 // Integration Services
 // (No integration services currently)
 
 // Domain Services
-export { BlockApiService, createBlockApiService, BlockProcessor, createBlockProcessor } from './domain/block';
+export { BlockApiService, createBlockApiService } from './domain/block';
 export { ExtrinsicService, createExtrinsicService } from './domain/extrinsic';
-export { DataSubmissionApiService, createDataSubmissionApiService, DataSubmissionProcessor, createDataSubmissionProcessor } from './domain/dataSubmission';
-// Phase 4: Legacy services (deprecated - use BlockProcessingOrchestrator instead)
-export { SelfHealingBlockProcessor, createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
+export { DataSubmissionApiService, createDataSubmissionApiService } from './domain/dataSubmission';
 export { SearchService, createSearchService } from './domain/search';
-// Phase 2 Services - Updated for domain structure  
-export { AccountApiService, AccountProcessor, createAccountApiService, createAccountProcessor } from './domain/account';
-export { ValidatorApiService, ValidatorProcessor, createValidatorApiService, createValidatorProcessor } from './domain/validator';
-export { TransferApiService, TransferProcessor, createTransferApiService, createTransferProcessor } from './domain/transfer';
+export { AccountApiService, createAccountApiService } from './domain/account';
+export { ValidatorApiService, createValidatorApiService } from './domain/validator';
+export { TransferApiService, createTransferApiService } from './domain/transfer';
 
-// Phase 3: Domain Indexers - Independent indexing with cross-domain job queuing
-export { BlockIndexer, createBlockIndexer } from './domain/block/BlockIndexer';
-export { AccountIndexer, createAccountIndexer } from './domain/account/AccountIndexer';
-export { ValidatorIndexer, createValidatorIndexer } from './domain/validator/ValidatorIndexer';
-export { TransferIndexer, createTransferIndexer } from './domain/transfer/TransferIndexer';
-export { AvailDataSubmissionIndexer } from './domain/dataSubmission/DataSubmissionIndexer';
-export { ExtrinsicIndexer, createExtrinsicIndexer } from './domain/extrinsic/ExtrinsicIndexer';
-export { EventIndexer, createEventIndexer } from './domain/event/EventIndexer';
-export { EraIndexer, createEraIndexer } from './domain/era/EraIndexer';
 
 // Mappers
 export * from '../mappers';
@@ -51,20 +36,16 @@ import { createDependencyResolver } from './core/dependency-resolver';
 import config from '../config';
 
 // Domain services factory functions
-import { createBlockApiService, createBlockProcessor } from './domain/block';
+import { createBlockApiService } from './domain/block';
 import { createExtrinsicService } from './domain/extrinsic';
-import { createDataSubmissionApiService, createDataSubmissionProcessor } from './domain/dataSubmission';
-import { createSyncService } from './core/sync';
-// Phase 6 Services (replacing DataProcessorService)
-// Phase 3: Legacy service - maintained for compatibility
-import { createSelfHealingBlockProcessor } from './domain/selfHealingProcessor';
+import { createDataSubmissionApiService } from './domain/dataSubmission';
 // Phase 3: Orchestrators removed - using independent domain processing
 import { createSearchService } from './domain/search';
 // Phase 2 Services
-import { createAccountApiService, createAccountProcessor } from './domain/account';
-import { createValidatorApiService, createValidatorProcessor } from './domain/validator';
+import { createAccountApiService } from './domain/account';
+import { createValidatorApiService } from './domain/validator';
 import { createChainService } from './domain/chain';
-import { createTransferApiService, createTransferProcessor } from './domain/transfer';
+import { createTransferApiService } from './domain/transfer';
 import { createAnalyticsService } from '../services/analytics/analytics';
 
 // Mapper imports
@@ -90,7 +71,6 @@ import {
   eraRepository,
   // Phase 3 repositories
   accountRepository,
-  eventRepository,
 } from '../database/repositories';
 
 // Phase 2: Dependency Management Services - Removed (replaced by queue-based approach)
@@ -102,7 +82,6 @@ import { createAccountIndexer } from './domain/account/AccountIndexer';
 import { createTransferIndexer } from './domain/transfer/TransferIndexer';
 import { AvailDataSubmissionIndexer } from './domain/dataSubmission/DataSubmissionIndexer';
 import { createExtrinsicIndexer } from './domain/extrinsic/ExtrinsicIndexer';
-import { createEventIndexer } from './domain/event/EventIndexer';
 import { createEraIndexer } from './domain/era/EraIndexer';
 import { createEraProcessor } from './domain/era/EraProcessor';
 
@@ -373,7 +352,6 @@ export class ServiceFactory {
       const transferIndexer = createTransferIndexer(transferRepository, queueService);
       const dataSubmissionIndexer = new AvailDataSubmissionIndexer(queueService, availBlockchainService);
       const extrinsicIndexer = createExtrinsicIndexer(extrinsicRepository, extrinsicService);
-      const eventIndexer = createEventIndexer(eventRepository);
       const eraIndexer = createEraIndexer(eraRepository, availBlockchainService, queueService);
       const eraProcessor = createEraProcessor(eraRepository, eraIndexer);
       
