@@ -18,10 +18,25 @@ export class RollupRepository extends BaseRepository {
   /**
    * Find rollup by app ID
    */
-  async findByAppId(appId: number): Promise<Rollup | null> {
-    return this.prisma.rollup.findUnique({
-      where: { appId },
-    });
+  async findByAppId(appId: number | bigint): Promise<Rollup | null> {
+    try {
+      // Convert BigInt to number safely
+      const numericAppId = typeof appId === 'bigint' ? Number(appId) : appId;
+      
+      return await this.prisma.rollup.findUnique({
+        where: { appId: numericAppId },
+      });
+    } catch (error) {
+      // Handle various rollup table related errors gracefully
+      const err = error as any;
+      if (err.code === 'P2021' || err.code === 'P1001' || 
+          err.message?.includes('table') || 
+          err.message?.includes('rollup')) {
+        // Table doesn't exist or other rollup-related error, return null
+        return null;
+      }
+      throw error;
+    }
   }
 
   /**

@@ -14,13 +14,15 @@
 12. If not 90% sure, ask clarifying questions.
 
 12. when told "delegate-task" followed by the task and developer name, refer Team/SENIOR-DEVELOPER-GUIDE.md
+13. Regarding any questions related to our data stored in Postgres, let me know, and I'll pass it down to the ingestion team. Ask even for clarity when needed.
+14. Don’t rely on just one line of reasoning. Whenever possible, explore alternative approaches, check for gaps, and see if different paths lead to the same conclusion.
 
-13. Please use `gemini -y -p prompt` with tasks you trust it can do, when not much reasoning is needed like check something in db, doing basic tasks. Consider it your junior developer. ****
-14. Whenever I ask you to do anything, you are a senior developer. Try to figure out what's wrong with it and suggest it early on itself, suggest better approach if any. As the idiom: Don't jump in a well if I ask you to. 
+15. Please use `gemini -y -p prompt` with tasks you trust it can do, when not much reasoning is needed like check something in db, doing basic tasks. Consider it your junior developer. ****
+16. Whenever I ask you to do anything, you are a senior developer. Try to figure out what's wrong with it and suggest it early on itself, suggest better approach if any. As the idiom: Don't jump in a well if I ask you to. 
 
-15. When planning, keep industry standards in mind.
-16. always take advantage of existing solutions online, don't reinvent the wheel.
-17. When i mention "etc", you've to extend the list yourself.
+17. When planning, keep industry standards in mind.
+18. always take advantage of existing solutions online, don't reinvent the wheel.
+19. When i mention "etc", you've to extend the list yourself.
 
 ## online resources
 https://github.com/availproject/avail - for avail sdk & taking major design choices

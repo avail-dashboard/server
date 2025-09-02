@@ -3,8 +3,7 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatErrorResponse } from '../utils/responseFormatter';
-import { serviceFactory } from '../services';
-import { ChainService } from '../services/domain/chain';
+import { simpleServices } from '../services/simple-services';
 
 const router = Router();
 
@@ -13,7 +12,7 @@ router.get('/info',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const chainService = serviceFactory.get<ChainService>('chainService');
+      const chainService = simpleServices.getServices().chain;
       const chainInfo = await chainService.getChainInfo();
       
       res.json({
@@ -33,7 +32,7 @@ router.get('/constants',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const chainService = serviceFactory.get<ChainService>('chainService');
+      const chainService = simpleServices.getServices().chain;
       const constants = await chainService.getConstants();
       
       res.json({

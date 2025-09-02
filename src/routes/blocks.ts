@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { serviceFactory, BlockApiService } from '../services';
+import { simpleServices } from '../services/simple-services';
 import { formatPaginatedResponse, formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
 
 const router = Router();
@@ -10,7 +10,7 @@ const router = Router();
  */
 router.get('/latest', async (req: Request, res: Response) => {
   try {
-    const blockService = serviceFactory.get<BlockApiService>('blockService');
+    const blockService = simpleServices.getServices().blocks;
     const block = await blockService.getLatestBlock();
 
     res.json(formatSingleResponse(block));
@@ -31,7 +31,7 @@ router.get('/', async (req: Request, res: Response) => {
     const sortBy = (req.query.sort_by as string) || 'number';
     const sortOrder = (req.query.sort_order as string) || 'desc';
 
-    const blockService = serviceFactory.get<BlockApiService>('blockService');
+    const blockService = simpleServices.getServices().blocks;
     const result = await blockService.getBlocks(
       { page, limit },
       { sort_by: sortBy, sort_order: sortOrder as 'asc' | 'desc' },
@@ -55,7 +55,7 @@ router.get('/:identifier', async (req: Request, res: Response) => {
     // Parse as number if it's a valid integer, otherwise treat as hash
     const blockIdentifier = /^\d+$/.test(identifier) ? parseInt(identifier) : identifier;
     
-    const blockService = serviceFactory.get<BlockApiService>('blockService');
+    const blockService = simpleServices.getServices().blocks;
     const block = await blockService.getBlock(blockIdentifier);
 
     res.json(formatSingleResponse(block));

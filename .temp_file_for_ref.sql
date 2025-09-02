@@ -3,6 +3,24 @@
 -- Handles BigInt values with NUMERIC(39,0) to prevent data loss
 -- Includes optimized indexes for high-performance reindexing and bulk operations
 
+-- Drop existing tables if they exist (for development)
+DROP TABLE IF EXISTS transfer_events CASCADE;
+DROP TABLE IF EXISTS data_submissions CASCADE;
+DROP TABLE IF EXISTS balance_history CASCADE;
+DROP TABLE IF EXISTS account_profiles CASCADE;
+DROP TABLE IF EXISTS event_data CASCADE;
+DROP TABLE IF EXISTS extrinsic_events CASCADE;
+DROP TABLE IF EXISTS extrinsic_data CASCADE;
+DROP TABLE IF EXISTS network_statistics CASCADE;
+DROP TABLE IF EXISTS balances_summary CASCADE;
+DROP TABLE IF EXISTS storage_states CASCADE;
+DROP TABLE IF EXISTS kate_commitments CASCADE;
+DROP TABLE IF EXISTS block_headers CASCADE;
+-- Empty/unused tables (kept for completeness)
+DROP TABLE IF EXISTS app_registrations CASCADE;
+DROP TABLE IF EXISTS staking_events CASCADE;
+DROP TABLE IF EXISTS schema_migrations CASCADE;
+
 -- ================================
 -- CORE BLOCKCHAIN DATA
 -- ================================
@@ -21,6 +39,23 @@ CREATE TABLE block_headers (
     author_account VARCHAR(256),
     is_finalized BOOLEAN DEFAULT FALSE,
     finalization_delay_ms INTEGER,
+    -- Note: timestamp_utc, author_account, finalization_delay_ms are inserted by code but currently always NULL
+    
+    -- Avail-specific header extension (Kate commitments in header)
+    application_ids TEXT[], -- Application IDs for DA transaction filtering
+    header_extension_version VARCHAR(10),
+    
+    -- BABE consensus information
+    babe_slot NUMERIC(39,0),
+    babe_epoch NUMERIC(39,0),
+    babe_authority_index INTEGER,
+    babe_vrf_output TEXT,
+    
+    -- Block dimensions for DA matrix
+    block_rows INTEGER,
+    block_cols INTEGER,
+    block_size_bytes INTEGER,
+    -- data_root removed - never populated
     
     -- Block statistics
     extrinsics_count INTEGER DEFAULT 0,
@@ -35,6 +70,13 @@ CREATE TABLE block_headers (
     authoring_version NUMERIC(39,0),
     transaction_version NUMERIC(39,0),
     state_version NUMERIC(39,0),
+    
+    -- Runtime metadata (populated by code)
+    spec_name VARCHAR(50),
+    impl_name VARCHAR(50),
+    chain_name VARCHAR(100),
+    node_version VARCHAR(50),
+    chain_properties JSONB,
     
     -- Raw data for reconstruction
     digest_json JSONB,
@@ -53,40 +95,25 @@ CREATE TABLE kate_commitments (
     -- Kate commitment data
     rows INTEGER,
     cols INTEGER,
-    data_root VARCHAR(66),
+    data_root VARCHAR(66), -- Inserted by code but currently always NULL
     block_length NUMERIC(39,0),
     
     -- Commitment proof data
-    commitment_hex TEXT,
+    commitment_hex TEXT, -- Inserted by code but currently always NULL
     proof_data JSONB,
     
     -- DA metrics
     utilization_percentage DECIMAL(5,2),
-    app_data_count INTEGER DEFAULT 0
+    app_data_count INTEGER DEFAULT 0,
+    
+    -- Sampling and extraction data (ACTIVELY POPULATED)
+    sample_data_proof JSONB, -- 1 record populated
+    sample_row_data JSONB, -- 209,635 records populated
+    kate_available BOOLEAN DEFAULT TRUE, -- All 1.8M records populated
+    kate_extraction_note TEXT -- Inserted by code but currently always NULL
 );
 
--- Application Registrations (DA App-Space tracking)
-CREATE TABLE app_registrations (
-    id SERIAL PRIMARY KEY,
-    app_id NUMERIC(39,0) NOT NULL,
-    app_key VARCHAR(48) NOT NULL,
-    owner_account VARCHAR(256),
-    
-    -- Registration details
-    registered_at_block NUMERIC(39,0),
-    registered_at_timestamp TIMESTAMP,
-    
-    -- App metadata
-    app_name VARCHAR(100),
-    app_description TEXT,
-    app_data JSONB,
-    
-    -- Analytics
-    total_submissions INTEGER DEFAULT 0,
-    total_data_size NUMERIC(39,0) DEFAULT 0,
-    last_submission_block NUMERIC(39,0),
-    last_submission_timestamp TIMESTAMP
-);
+-- Application Registrations table removed - not being populated
 
 -- ================================
 -- TRANSACTION AND EXTRINSIC DATA
@@ -114,6 +141,7 @@ CREATE TABLE extrinsic_data (
     -- Execution results
     success BOOLEAN,
     error_message TEXT,
+    -- Note: error_message is inserted by code but currently always NULL
     
     -- Data and signatures  
     method_args JSONB,
@@ -167,6 +195,7 @@ CREATE TABLE account_profiles (
     identity_judgement VARCHAR(20),
     is_validator BOOLEAN DEFAULT FALSE,
     is_nominator BOOLEAN DEFAULT FALSE,
+    -- Note: display_name, identity_judgement are inserted by code but currently always NULL
     
     -- Current state (updated per block)
     current_nonce NUMERIC(39,0) DEFAULT 0,
@@ -184,6 +213,7 @@ CREATE TABLE account_profiles (
     first_seen_timestamp TIMESTAMP,
     last_activity_block NUMERIC(39,0),
     last_activity_timestamp TIMESTAMP
+    -- Note: first_seen_timestamp, last_activity_timestamp are inserted by code but currently always NULL
 );
 
 -- Balance History (snapshots per block)
@@ -227,10 +257,8 @@ CREATE TABLE data_submissions (
     submitter_account VARCHAR(256) NOT NULL,
     data_size INTEGER NOT NULL,
     
-    -- DA specific data
-    data_index INTEGER,
-    data_hash VARCHAR(66),
-    proof_data JSONB,
+    -- DA specific data removed - never populated
+    -- data_index, data_hash, proof_data removed - never populated
     
     -- Fee information
     submission_fee NUMERIC(39,0) DEFAULT 0
@@ -241,8 +269,8 @@ CREATE TABLE transfer_events (
     id SERIAL PRIMARY KEY,
     block_hash VARCHAR(66) NOT NULL,
     block_number NUMERIC(39,0) NOT NULL,
-    extrinsic_id INTEGER,
     event_id INTEGER,
+    -- extrinsic_id removed - never populated
     
     -- Transfer details
     from_account VARCHAR(256) NOT NULL,
@@ -262,33 +290,87 @@ CREATE TABLE transfer_events (
 -- STAKING AND VALIDATION DATA
 -- ================================
 
--- Staking Events and Data
-CREATE TABLE staking_events (
-    id SERIAL PRIMARY KEY,
-    block_hash VARCHAR(66) NOT NULL,
-    block_number NUMERIC(39,0) NOT NULL,
-    event_id INTEGER,
-    
-    -- Staking event details
-    event_type VARCHAR(30) NOT NULL, -- Bonded, Unbonded, Rewarded, Slashed, etc.
-    validator_account VARCHAR(256),
-    nominator_account VARCHAR(256),
-    
-    -- Amounts
-    amount NUMERIC(39,0) DEFAULT 0,
-    
-    -- Era information
-    era_index NUMERIC(39,0),
-    
-    -- Additional data
-    event_data JSONB
-);
+-- Staking Events table removed - not being populated
 
 -- ================================
 -- NETWORK ANALYTICS AND STATISTICS
 -- ================================
 
--- Analytics tables removed - storing only raw blockchain data
+-- Network Statistics (Per-block network metrics)
+CREATE TABLE network_statistics (
+    id SERIAL PRIMARY KEY,
+    block_hash VARCHAR(66) NOT NULL UNIQUE,
+    block_number NUMERIC(39,0) NOT NULL,
+    
+    -- Block statistics
+    extrinsics_count INTEGER,
+    events_count INTEGER,
+    signed_extrinsics_count INTEGER,
+    unsigned_extrinsics_count INTEGER,
+    
+    -- Fee and tip statistics
+    total_tips NUMERIC(39,0) DEFAULT 0,
+    total_fees NUMERIC(39,0) DEFAULT 0,
+    average_tip NUMERIC(39,0) DEFAULT 0,
+    average_fee NUMERIC(39,0) DEFAULT 0,
+    
+    -- DA statistics
+    da_submissions_count INTEGER DEFAULT 0,
+    da_total_data_size NUMERIC(39,0) DEFAULT 0,
+    da_unique_apps_count INTEGER DEFAULT 0,
+    
+    -- Account statistics
+    total_accounts_count INTEGER DEFAULT 0,
+    active_accounts_count INTEGER DEFAULT 0,
+    
+    -- Indexing metadata
+    indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Balance Summary (Per-block balance aggregations)
+CREATE TABLE balances_summary (
+    id SERIAL PRIMARY KEY,
+    block_hash VARCHAR(66) NOT NULL UNIQUE,
+    block_number NUMERIC(39,0) NOT NULL,
+    
+    -- Total supply and balance statistics
+    total_issuance NUMERIC(39,0) NOT NULL,
+    total_balance_accounts INTEGER DEFAULT 0,
+    total_free_balance NUMERIC(39,0) DEFAULT 0,
+    total_reserved_balance NUMERIC(39,0) DEFAULT 0,
+    total_frozen_balance NUMERIC(39,0) DEFAULT 0,
+    
+    -- Processing metadata
+    balance_pages_loaded INTEGER DEFAULT 0,
+    balance_extraction_note TEXT,
+    indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Storage States (Per-block runtime storage snapshots)
+CREATE TABLE storage_states (
+    id SERIAL PRIMARY KEY,
+    block_hash VARCHAR(66) NOT NULL UNIQUE,
+    block_number NUMERIC(39,0) NOT NULL,
+    
+    -- Runtime storage data
+    system_data JSONB,
+    balances_data JSONB,
+    total_issuance NUMERIC(39,0),
+    
+    -- DA app data
+    da_next_app_id NUMERIC(39,0),
+    da_app_keys JSONB,
+    da_data_submissions JSONB,
+    
+    -- Validator/session data
+    session_validators JSONB,
+    session_validator_count INTEGER,
+    staking_current_era NUMERIC(39,0),
+    
+    -- Processing metadata
+    storage_extraction_note TEXT,
+    indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- ================================
 -- INDEXES FOR PERFORMANCE
@@ -317,6 +399,7 @@ CREATE INDEX idx_extrinsic_data_success ON extrinsic_data(success);
 
 -- Composite indexes for common query patterns
 CREATE INDEX idx_extrinsic_data_block_index ON extrinsic_data(block_number, extrinsic_index);
+CREATE INDEX idx_extrinsic_data_method_lookup ON extrinsic_data(method_pallet, method_name, extrinsic_index, block_number);
 CREATE INDEX idx_extrinsic_data_signer_block ON extrinsic_data(signer_account, block_number) WHERE signer_account IS NOT NULL;
 
 -- Partial indexes for common filters
@@ -398,20 +481,28 @@ CREATE INDEX idx_data_submissions_submitter_app ON data_submissions(submitter_ac
 
 -- Analytics indexes removed
 
--- Staking indexes
-CREATE INDEX idx_staking_events_validator ON staking_events(validator_account);
-CREATE INDEX idx_staking_events_nominator ON staking_events(nominator_account);
-CREATE INDEX idx_staking_events_type ON staking_events(event_type);
-CREATE INDEX idx_staking_events_era ON staking_events(era_index);
+-- Staking indexes removed - staking_events table not used
 
 -- Kate commitment indexes
 CREATE INDEX idx_kate_commitments_block ON kate_commitments(block_number);
 CREATE INDEX idx_kate_commitments_hash ON kate_commitments(block_hash);
 
--- App registration indexes
-CREATE INDEX idx_app_registrations_id ON app_registrations(app_id);
-CREATE INDEX idx_app_registrations_owner ON app_registrations(owner_account);
-CREATE INDEX idx_app_registrations_block ON app_registrations(registered_at_block);
+-- Network statistics indexes
+CREATE INDEX idx_network_statistics_block_number ON network_statistics(block_number);
+CREATE INDEX idx_network_statistics_block_hash ON network_statistics(block_hash);
+CREATE INDEX idx_network_statistics_timeseries ON network_statistics(block_number, indexed_at) 
+    INCLUDE (extrinsics_count, events_count, total_accounts_count);
+
+-- Balance summary indexes
+CREATE INDEX idx_balances_summary_block_number ON balances_summary(block_number);
+CREATE INDEX idx_balances_summary_block_hash ON balances_summary(block_hash);
+
+-- Storage states indexes
+CREATE INDEX idx_storage_states_block_number ON storage_states(block_number);
+CREATE INDEX idx_storage_states_block_hash ON storage_states(block_hash);
+CREATE INDEX idx_storage_states_block_lookup ON storage_states(block_number, indexed_at);
+
+-- App registration indexes removed - app_registrations table not used
 
 -- ================================
 -- PERFORMANCE AND MAINTENANCE
@@ -423,17 +514,18 @@ CREATE INDEX idx_app_registrations_block ON app_registrations(registered_at_bloc
 -- CREATE MATERIALIZED VIEW top_accounts_by_activity AS ...
 
 -- Comments for documentation
-COMMENT ON TABLE block_headers IS 'Complete block header data with runtime information and statistics';
-COMMENT ON TABLE kate_commitments IS 'Avail DA specific Kate polynomial commitment data';
-COMMENT ON TABLE app_registrations IS 'Data Availability application registrations and analytics';
-COMMENT ON TABLE extrinsic_data IS 'Comprehensive extrinsic data with execution results';
-COMMENT ON TABLE event_data IS 'All blockchain events with relationship mapping';
-COMMENT ON TABLE account_profiles IS 'Account profiles with activity statistics';
-COMMENT ON TABLE balance_history IS 'Historical balance snapshots per block';
-COMMENT ON TABLE data_submissions IS 'Avail DA data submissions tracking';
-COMMENT ON TABLE transfer_events IS 'AVAIL token transfer events';
-COMMENT ON TABLE staking_events IS 'Staking related events and rewards';
--- Analytics table comments removed
+COMMENT ON TABLE block_headers IS 'Complete block header data with runtime information and statistics (1.8M rows)';
+COMMENT ON TABLE kate_commitments IS 'Avail DA specific Kate polynomial commitment data with sampling (1.8M rows)';
+COMMENT ON TABLE extrinsic_data IS 'Comprehensive extrinsic data with execution results (4.5M rows)';
+COMMENT ON TABLE event_data IS 'All blockchain events with relationship mapping (15.4M rows)';
+COMMENT ON TABLE account_profiles IS 'Account profiles with activity statistics (284K rows)';
+COMMENT ON TABLE balance_history IS 'Historical balance snapshots per block (1.2M rows)';
+COMMENT ON TABLE data_submissions IS 'Avail DA data submissions tracking (324K rows)';
+COMMENT ON TABLE transfer_events IS 'AVAIL token transfer events (668K rows)';
+COMMENT ON TABLE network_statistics IS 'Per-block network metrics and statistics (1.7M rows)';
+COMMENT ON TABLE balances_summary IS 'Per-block balance aggregations and total supply data (1.8M rows)';
+COMMENT ON TABLE storage_states IS 'Per-block runtime storage state snapshots (1.7M rows)';
+-- Note: app_registrations and staking_events exist but are empty (0 rows each)
 
 COMMENT ON COLUMN block_headers.block_number IS 'Block number as NUMERIC(39,0) to handle BigInt values';
 COMMENT ON COLUMN extrinsic_data.tip IS 'Transaction tip in AVAIL base units (plancks)';

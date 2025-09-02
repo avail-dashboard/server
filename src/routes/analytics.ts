@@ -3,8 +3,7 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
-import { serviceFactory } from '../services';
-import { AnalyticsService } from '../services/analytics/analytics';
+import { simpleServices } from '../services/simple-services';
 
 const router = Router();
 
@@ -47,7 +46,7 @@ router.get('/network',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const analyticsService = serviceFactory.get<AnalyticsService>('analyticsService');
+      const analyticsService = simpleServices.getServices().analytics;
       const networkActivity = await analyticsService.getNetworkActivity();
       
       res.json(formatSingleResponse(networkActivity, {
@@ -258,7 +257,7 @@ router.get('/chain-stats',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const analyticsService = serviceFactory.get<AnalyticsService>('analyticsService');
+      const analyticsService = simpleServices.getServices().analytics;
       const chainStats = await analyticsService.getChainStats();
       
       res.json(formatSingleResponse(chainStats, {
@@ -277,7 +276,7 @@ router.get('/historical',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const analyticsService = serviceFactory.get<AnalyticsService>('analyticsService');
+      const analyticsService = simpleServices.getServices().analytics;
       const days = parseInt(req.query.days as string) || 7;
       const historicalData = await analyticsService.getHistoricalData(days);
       
@@ -298,7 +297,7 @@ router.get('/top-metrics',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const analyticsService = serviceFactory.get<AnalyticsService>('analyticsService');
+      const analyticsService = simpleServices.getServices().analytics;
       const topMetrics = await analyticsService.getTopMetrics();
       
       res.json(formatSingleResponse(topMetrics, {

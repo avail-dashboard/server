@@ -1,2 +1,1 @@
-export * from './ExtrinsicApiService';
-export * from './ExtrinsicIndexer'; 
+export * from './ExtrinsicApiService'; 

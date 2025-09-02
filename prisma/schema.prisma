@@ -1,5 +1,5 @@
-// Simplified Prisma schema - ALL foreign key constraints removed
-// Relations kept as string references for application-level handling
+// Avail Explorer Prisma schema matching actual database structure
+// Based on the comprehensive SQL schema and actual table data
 
 generator client {
   provider = "prisma-client-js"
@@ -11,360 +11,281 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
+// Block headers matching actual database structure
 model Block {
-  number               Int              @id
-  hash                 String           @unique @db.VarChar(66)
-  parentHash           String?          @map("parent_hash") @db.VarChar(66)
-  stateRoot            String?          @map("state_root") @db.VarChar(66)
-  extrinsicsRoot       String?          @map("extrinsics_root") @db.VarChar(66)
-  timestamp            DateTime
-  extrinsicsCount      Int              @default(0) @map("extrinsics_count")
-  eventsCount          Int              @default(0) @map("events_count")
+  id                     Int       @id @default(autoincrement())
+  number                 BigInt    @map("block_number")
+  hash                   String    @map("block_hash") @db.VarChar(66)
+  parentHash             String    @map("parent_hash") @db.VarChar(66)
+  stateRoot              String    @map("state_root") @db.VarChar(66)
+  extrinsicsRoot         String    @map("extrinsics_root") @db.VarChar(66)
   
-  // Validator info (no FK constraint)
-  validatorAddress     String?          @map("validator_address") @db.VarChar(64)
+  // Often null columns based on actual data
+  timestamp              DateTime? @map("timestamp_utc")
+  authorAccount          String?   @map("author_account") @db.VarChar(256)
+  finalizationDelayMs    Int?      @map("finalization_delay_ms")
   
-  // Block metadata
-  specVersion          Int?             @map("spec_version")
-  totalFees            Decimal?         @map("total_fees") @db.Decimal(65,18)
-  transferCount        Int?             @map("transfer_count")
-  createdAt            DateTime         @default(now()) @map("created_at")
+  // Block statistics
+  isFinalized            Boolean?  @default(false) @map("is_finalized")
+  extrinsicsCount        Int?      @default(0) @map("extrinsics_count")
+  eventsCount            Int?      @default(0) @map("events_count")
+  dataSubmissionsCount   Int?      @default(0) @map("data_submissions_count")
+  totalFees              BigInt?   @default(0) @map("total_fees")
+  totalTips              BigInt?   @default(0) @map("total_tips")
   
-  // Indexes for performance (FK indexes removed)
-  @@index([timestamp], name: "idx_blocks_timestamp")
-  @@index([hash], name: "idx_blocks_hash")
-  @@index([validatorAddress], name: "idx_blocks_validator")
-  @@index([timestamp, number], name: "idx_blocks_timestamp_number") // Composite for ordering
-  @@index([validatorAddress, timestamp], name: "idx_blocks_validator_timestamp") // Validator blocks by time
-  @@map("blocks")
+  // Runtime information
+  specVersion            BigInt?   @map("spec_version")
+  implVersion            BigInt?   @map("impl_version")
+  authoringVersion       BigInt?   @map("authoring_version")
+  transactionVersion     BigInt?   @map("transaction_version")
+  stateVersion           BigInt?   @map("state_version")
+  
+  // Raw data for reconstruction
+  digestJson             Json?     @map("digest_json")
+  headerRawHex           String?   @map("header_raw_hex")
+  extractionVersion      String?   @default("2.0.0") @map("extraction_version")
+  
+  @@unique([number])
+  @@unique([hash])
+  @@index([timestamp])
+  @@index([number])
+  @@index([authorAccount])
+  @@map("block_headers")
 }
 
+// Kate commitments (Avail DA specific)
+model KateCommitment {
+  id                    Int     @id @default(autoincrement())
+  blockHash             String  @map("block_hash") @db.VarChar(66)
+  blockNumber           BigInt  @map("block_number")
+  
+  rows                  Int?
+  cols                  Int?
+  dataRoot              String? @map("data_root") @db.VarChar(66)  // Often null
+  blockLength           BigInt? @map("block_length")
+  
+  // Often null in actual data
+  commitmentHex         String? @map("commitment_hex")
+  proofData             Json?   @map("proof_data")
+  
+  utilizationPercentage Decimal? @map("utilization_percentage") @db.Decimal(5,2)
+  appDataCount          Int?    @default(0) @map("app_data_count")
+  
+  @@index([blockNumber])
+  @@index([blockHash])
+  @@map("kate_commitments")
+}
+
+// App registrations (currently empty table)
+model AppRegistration {
+  id                        Int       @id @default(autoincrement())
+  appId                     BigInt?   @map("app_id")
+  appKey                    String?   @map("app_key") @db.VarChar(48)
+  ownerAccount              String?   @map("owner_account") @db.VarChar(256)
+  
+  registeredAtBlock         BigInt?   @map("registered_at_block")
+  registeredAtTimestamp     DateTime? @map("registered_at_timestamp")
+  
+  appName                   String?   @map("app_name") @db.VarChar(100)
+  appDescription            String?   @map("app_description")
+  appData                   Json?     @map("app_data")
+  
+  totalSubmissions          Int?      @default(0) @map("total_submissions")
+  totalDataSize             BigInt?   @default(0) @map("total_data_size")
+  lastSubmissionBlock       BigInt?   @map("last_submission_block")
+  lastSubmissionTimestamp   DateTime? @map("last_submission_timestamp")
+  
+  @@index([appId])
+  @@index([ownerAccount])
+  @@index([registeredAtBlock])
+  @@map("app_registrations")
+}
+
+// Extrinsic data
 model Extrinsic {
-  id               Int      @id @default(autoincrement())
-  hash             String   @db.VarChar(66)  // Removed @unique - Substrate allows duplicate hashes across blocks
+  id              Int       @id @default(autoincrement())
+  blockHash       String    @map("block_hash") @db.VarChar(66)
+  blockNumber     BigInt    @map("block_number")
+  extrinsicIndex  Int       @map("extrinsic_index")
+  hash            String    @map("extrinsic_hash") @db.VarChar(66)
   
-  // Block reference (no FK constraint)
-  blockNumber      Int      @map("block_number")
-  blockHash        String?  @map("block_hash") @db.VarChar(66)  // Denormalized
-  blockTimestamp   DateTime? @map("block_timestamp")            // Denormalized
+  isSigned        Boolean   @map("is_signed")
+  signer          String?   @map("signer_account") @db.VarChar(256)
+  module          String    @map("method_pallet") @db.VarChar(50)
+  call            String    @map("method_name") @db.VarChar(50)
   
-  extrinsicIndex   Int      @map("extrinsic_index")
-  module           String?  @db.VarChar(50)
-  call             String?  @db.VarChar(50)
-  success          Boolean?
-  timestamp        DateTime?
-  signer           String?  @db.VarChar(64)
-  fee              Decimal? @db.Decimal(65,18)
+  nonce           BigInt?
+  tip             BigInt?   @default(0)
+  fee             BigInt?   @default(0)
+  success         Boolean?
+  errorMessage    String?   @map("error_message")  // Often null
   
-  // Extrinsic details
-  nonce            Int?
-  lifetime         Json?    // { birth: number, death: number, immortal: boolean }
-  parameters       Json?    // Complete extrinsic arguments
-  signatureInfo    Json?    @map("signature_info") // { signature, signedExtensions }
-  tip              Decimal? @db.Decimal(65,18)
-  actualFee        Decimal? @map("actual_fee") @db.Decimal(65,18) // Calculated from events
-  transferCount    Int?     @map("transfer_count") // Number of transfers in this extrinsic
-  methodObject     Json?    @map("method_object") // Complete method object
-  methodArgs       Json?    @map("method_args") // Method arguments separately
-  extrinsicOrder   Int?     @map("extrinsic_order") // Order within block
-  createdAt        DateTime @default(now()) @map("created_at")
+  methodArgs      Json?     @map("method_args")
+  rawHex          String?   @map("raw_hex")
+  lengthBytes     Int?      @map("length_bytes")
   
-  // Substrate-compatible unique identification: block + extrinsic index
-  @@unique([blockNumber, extrinsicIndex], name: "unique_block_extrinsic")
-  @@index([blockNumber], name: "idx_extrinsics_block")
-  @@index([hash], name: "idx_extrinsics_hash")
-  @@index([hash, blockNumber], name: "idx_extrinsics_hash_block")  // Efficient lookup for hash+block
-  @@index([signer], name: "idx_extrinsics_signer")
-  @@index([timestamp], name: "idx_extrinsics_timestamp")
-  @@index([blockNumber, extrinsicOrder], name: "idx_extrinsics_block_order")
-  @@index([signer, timestamp], name: "idx_extrinsics_signer_timestamp") // Signer activity by time
-  @@index([module, call], name: "idx_extrinsics_module_call") // Module/call combination queries
-  @@index([success, timestamp], name: "idx_extrinsics_success_timestamp") // Success/failure analysis
-  @@map("extrinsics")
+  @@unique([blockHash, extrinsicIndex])
+  @@index([blockNumber])
+  @@index([hash])
+  @@index([signer])
+  @@index([module, call])
+  @@index([success])
+  @@map("extrinsic_data")
 }
 
-model Account {
-  address              String   @id @db.VarChar(64)
-  balance              Decimal? @db.Decimal(65,18)
-  nonce                Int?
-  
-  // Account balances (using Decimal for unlimited precision)
-  currentBalance       Decimal?  @map("current_balance") @db.Decimal(65,18)
-  reservedBalance      Decimal?  @map("reserved_balance") @db.Decimal(65,18)
-  frozenBalance        Decimal?  @map("frozen_balance") @db.Decimal(65,18)
-  
-  // Account metadata
-  accountType          AccountType @default(regular) @map("account_type")
-  identityName         String?  @map("identity_name") @db.VarChar(255)
-  identityInfo         Json?    @map("identity_info")
-  firstSeenBlock       Int?     @map("first_seen_block")
-  lastActivityBlock    Int?     @map("last_activity_block")
-  transactionCount     Int?     @default(0) @map("transaction_count")
-  transferCount        Int?     @default(0) @map("transfer_count")
-  lastUpdated          DateTime @default(now()) @map("last_updated")
-  
-  @@index([balance], name: "idx_accounts_balance")
-  @@index([currentBalance], name: "idx_accounts_current_balance")
-  @@index([accountType], name: "idx_accounts_type")
-  @@index([lastActivityBlock], name: "idx_accounts_last_activity")
-  @@map("accounts")
-}
-
+// Event data
 model Event {
   id             Int      @id @default(autoincrement())
+  blockHash      String   @map("block_hash") @db.VarChar(66)
+  blockNumber    BigInt   @map("block_number")
+  eventIndex     Int      @map("event_index")
   
-  // Block reference (no FK constraint)
-  blockNumber    Int      @map("block_number")
-  blockHash      String?  @map("block_hash") @db.VarChar(66)     // Denormalized
-  blockTimestamp DateTime? @map("block_timestamp")               // Denormalized
-  
+  extrinsicId    Int?     @map("extrinsic_id")
   extrinsicIndex Int?     @map("extrinsic_index")
-  eventIndex     Int?     @map("event_index")
-  module         String?  @db.VarChar(50)
-  eventName      String?  @map("event_name") @db.VarChar(50)
-  data           Json?
-  topics         Json?    // Array of topic strings for event filtering
-  timestamp      DateTime?
+  phaseType      String?  @map("phase_type") @db.VarChar(20)
+  phaseValue     Int?     @map("phase_value")
   
-  // Event details
-  phase          Json?    // Event phase object
-  phaseType      String?  @map("phase_type") @db.VarChar(50) // ApplyExtrinsic, Finalization, Initialization
-  methodObject   Json?    @map("method_object") // Complete method object when available
-  eventOrder     Int?     @map("event_order") // Order within block
-  createdAt      DateTime @default(now()) @map("created_at")
+  pallet         String   @db.VarChar(50)
+  eventName      String   @map("event_name") @db.VarChar(50)
+  topics         String[] // Array of topic strings
   
-  @@index([blockNumber], name: "idx_events_block")
-  @@index([module], name: "idx_events_module")
-  @@index([timestamp], name: "idx_events_timestamp")
-  @@index([phaseType], name: "idx_events_phase_type")
-  @@index([blockNumber, eventOrder], name: "idx_events_block_order")
-  @@map("events")
+  rawData        Json?    @map("raw_data")
+  
+  @@unique([blockHash, eventIndex])
+  @@index([blockNumber])
+  @@index([extrinsicId])
+  @@index([pallet, eventName])
+  @@map("event_data")
 }
 
-model Watchlist {
-  id        Int      @id @default(autoincrement())
-  userId    String?  @map("user_id") @db.VarChar(255)
-  address   String?  @db.VarChar(64)
-  label     String?  @db.VarChar(100)
-  createdAt DateTime @default(now()) @map("created_at")
+// Account profiles 
+model Account {
+  id                      Int       @id @default(autoincrement())
+  accountId               String    @unique @map("account_id") @db.VarChar(256)
   
-  @@index([userId], name: "idx_watchlists_user")
-  @@map("watchlists")
+  // Often null fields based on actual data
+  displayName             String?   @map("display_name") @db.VarChar(100)
+  identityJudgement       String?   @map("identity_judgement") @db.VarChar(20)
+  
+  isValidator             Boolean   @default(false) @map("is_validator")
+  isNominator             Boolean   @default(false) @map("is_nominator")
+  currentNonce            BigInt    @default(0) @map("current_nonce")
+  
+  // Statistics
+  totalExtrinsicsSent     Int       @default(0) @map("total_extrinsics_sent")
+  totalExtrinsicsReceived Int       @default(0) @map("total_extrinsics_received")
+  totalTransfersSent      Int       @default(0) @map("total_transfers_sent")
+  totalTransfersReceived  Int       @default(0) @map("total_transfers_received")
+  totalValueSent          BigInt    @default(0) @map("total_value_sent")
+  totalValueReceived      BigInt    @default(0) @map("total_value_received")
+  
+  // Activity tracking
+  firstSeenBlock          BigInt?   @map("first_seen_block")
+  firstSeenTimestamp      DateTime? @map("first_seen_timestamp")
+  lastActivityBlock       BigInt?   @map("last_activity_block")
+  lastActivityTimestamp   DateTime? @map("last_activity_timestamp")
+  
+  @@index([isValidator])
+  @@index([lastActivityBlock])
+  @@map("account_profiles")
 }
 
-model SyncState {
-  id                  Int       @id @default(autoincrement())
-  lastSyncedBlock     Int       @default(0) @map("last_synced_block")
-  targetBlock         Int?      @map("target_block")
-  syncStatus          SyncStatus @default(idle) @map("sync_status")
-  syncMode            SyncMode   @default(incremental) @map("sync_mode")
-  blocksPerMinute     Int?      @map("blocks_per_minute")
-  estimatedCompletion DateTime? @map("estimated_completion")
-  errorCount          Int       @default(0) @map("error_count")
-  lastError           String?   @map("last_error")
-  lastErrorBlock      Int?      @map("last_error_block")
-  startedAt           DateTime? @map("started_at")
-  pausedAt            DateTime? @map("paused_at")
-  completedAt         DateTime? @map("completed_at")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
+// Balance history
+model BalanceHistory {
+  id              Int     @id @default(autoincrement())
+  accountId       String  @map("account_id") @db.VarChar(256)
+  blockHash       String  @map("block_hash") @db.VarChar(66)
+  blockNumber     BigInt  @map("block_number")
   
-  @@index([syncStatus], name: "idx_sync_state_status")
-  @@index([lastSyncedBlock], name: "idx_sync_state_last_synced")
-  @@map("sync_state")
+  balanceFree     BigInt  @map("balance_free")
+  balanceReserved BigInt  @map("balance_reserved")
+  balanceFrozen   BigInt  @default(0) @map("balance_frozen")
+  
+  nonce           BigInt  @map("nonce")
+  consumers       BigInt  @default(0) @map("consumers")
+  providers       BigInt  @default(0) @map("providers")
+  sufficients     BigInt  @default(0) @map("sufficients")
+  
+  freeChange      BigInt  @default(0) @map("free_change")
+  reservedChange  BigInt  @default(0) @map("reserved_change")
+  
+  @@unique([accountId, blockHash])
+  @@index([accountId])
+  @@index([blockNumber])
+  @@map("balance_history")
 }
 
+// Data submissions
 model DataSubmission {
-  id             Int      @id @default(autoincrement())
-  extrinsicHash  String   @unique @map("extrinsic_hash") @db.VarChar(66)
+  id               Int       @id @default(autoincrement())
+  blockHash        String    @map("block_hash") @db.VarChar(66)
+  blockNumber      BigInt    @map("block_number")
+  extrinsicId      Int?      @map("extrinsic_id")
   
-  // Block reference (no FK constraint)
-  blockNumber    Int      @map("block_number")
-  blockHash      String?  @map("block_hash") @db.VarChar(66)     // Denormalized
-  blockTimestamp DateTime? @map("block_timestamp")               // Denormalized
+  appId            BigInt    @map("app_id")
+  submitter        String    @map("submitter_account") @db.VarChar(256)
+  dataSize         Int       @map("data_size")
   
-  extrinsicIndex Int?     @map("extrinsic_index")
+  // Often null fields based on actual data
+  dataIndex        Int?      @map("data_index")
+  dataHash         String?   @map("data_hash") @db.VarChar(66)
+  proofData        Json?     @map("proof_data")
   
-  // App/Rollup reference (no FK constraint)
-  appId          Int      @map("app_id")
-  rollupName     String?  @map("rollup_name") @db.VarChar(255)   // Denormalized
+  submissionFee    BigInt?   @default(0) @map("submission_fee")
   
-  // Data submission details
-  dataSize       Int      @map("data_size")
-  dataHash       String   @map("data_hash") @db.VarChar(66)
-  submitter      String   @db.VarChar(64)                        // No FK constraint
-  timestamp      DateTime
-  success        Boolean  @default(true)
-  blobData       Bytes?   @map("blob_data")
-  kateCommitment String?  @map("kate_commitment") @db.Text
-  proof          Json?
-  createdAt      DateTime @default(now()) @map("created_at")
-  
-  @@index([blockNumber], name: "idx_data_submissions_block")
-  @@index([appId], name: "idx_data_submissions_app_id")
-  @@index([submitter], name: "idx_data_submissions_submitter")
-  @@index([timestamp], name: "idx_data_submissions_timestamp")
-  @@index([extrinsicHash], name: "idx_data_submissions_hash")
-  @@index([appId, timestamp], name: "idx_data_submissions_app_timestamp") // App submissions by time
-  @@index([submitter, timestamp], name: "idx_data_submissions_submitter_timestamp") // Submitter activity
-  @@index([dataSize, timestamp], name: "idx_data_submissions_size_timestamp") // Size analysis
+  @@index([blockNumber])
+  @@index([appId])
+  @@index([submitter])
+  @@index([appId, blockNumber])
   @@map("data_submissions")
 }
 
-model Rollup {
-  appId             Int      @id @map("app_id")
-  name              String   @db.VarChar(255)
-  description       String?
-  firstSeenBlock    Int?     @map("first_seen_block")
-  lastActiveBlock   Int?     @map("last_active_block")
-  totalSubmissions  Int      @default(0) @map("total_submissions")
-  totalDataSize     Int      @default(0) @map("total_data_size")
-  totalFeesPaid     Int      @default(0) @map("total_fees_paid")
-  website           String?  @db.VarChar(255)
-  logoUrl           String?  @map("logo_url") @db.VarChar(255)
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
-  
-  @@index([name], name: "idx_rollups_name")
-  @@index([lastActiveBlock], name: "idx_rollups_last_active")
-  @@map("rollups")
-}
-
-model Validator {
-  stashAddress        String      @id @map("stash_address") @db.VarChar(64)
-  
-  // Account references (no FK constraints)
-  controllerAddress   String?     @unique @map("controller_address") @db.VarChar(64)
-  rewardAddress       String?     @unique @map("reward_address") @db.VarChar(64)
-  
-  // Validator details
-  commission          Int         // Stored as Perbill (parts per billion)
-  selfBonded          Decimal     @map("self_bonded") @db.Decimal(65,18)
-  totalBonded         Decimal     @map("total_bonded") @db.Decimal(65,18)
-  nominatorCount      Int         @default(0) @map("nominator_count")
-  status              ValidatorStatus @default(inactive)
-  sessionKeys         Json?       @map("session_keys") // All session keys
-  
-  // Identity (denormalized)
-  identityName        String?     @map("identity_name") @db.VarChar(255)
-  identityInfo        Json?       @map("identity_info")
-  
-  // Performance tracking
-  blocksProduced      Int         @default(0) @map("blocks_produced")
-  lastBlockProduced   Int?        @map("last_block_produced")
-  firstSeenBlock      Int?        @map("first_seen_block")
-  createdAt           DateTime    @default(now()) @map("created_at")
-  updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at")
-  
-  @@index([status], name: "idx_validators_status")
-  @@index([totalBonded], name: "idx_validators_total_bonded")
-  @@index([commission], name: "idx_validators_commission")
-  @@index([lastBlockProduced], name: "idx_validators_last_block")
-  @@index([firstSeenBlock], name: "idx_validators_first_seen")
-  @@map("validators")
-}
-
+// Transfer events
 model Transfer {
-  id              String      @id // format: "{extrinsic_hash}-{index}"
+  id              Int       @id @default(autoincrement())
+  blockHash       String    @map("block_hash") @db.VarChar(66)
+  blockNumber     BigInt    @map("block_number")
+  extrinsicId     Int?      @map("extrinsic_id")  // Often null
+  eventId         Int?      @map("event_id")
   
-  // Extrinsic reference (no FK constraint)
-  extrinsicHash   String      @map("extrinsic_hash") @db.VarChar(66)
+  fromAccount     String    @map("from_account") @db.VarChar(256)
+  toAccount       String    @map("to_account") @db.VarChar(256)
+  amount          BigInt    @map("amount")
   
-  // Block reference (no FK constraint)
-  blockNumber     Int         @map("block_number")
-  blockHash       String?     @map("block_hash") @db.VarChar(66)      // Denormalized
-  blockTimestamp  DateTime?   @map("block_timestamp")                 // Denormalized
+  transferType    String    @default("Transfer") @map("transfer_type") @db.VarChar(20)
+  success         Boolean   @default(true)
   
-  extrinsicIndex  Int         @map("extrinsic_index")
+  feePaid         BigInt    @default(0) @map("fee_paid")
+  tipPaid         BigInt    @default(0) @map("tip_paid")
   
-  // Account references (no FK constraints)
-  fromAddress     String      @map("from_address") @db.VarChar(64)
-  toAddress       String      @map("to_address") @db.VarChar(64)
-  
-  // Transfer details
-  amount          Decimal     @db.Decimal(65,18)
-  tokenType       String      @default("AVAIL") @map("token_type") @db.VarChar(10)
-  fees            Decimal     @db.Decimal(65,18)
-  status          TransferStatus @default(success)
-  timestamp       DateTime
-  createdAt       DateTime    @default(now()) @map("created_at")
-  
-  @@index([blockNumber], name: "idx_transfers_block")
-  @@index([extrinsicHash], name: "idx_transfers_extrinsic")
-  @@index([fromAddress], name: "idx_transfers_from")
-  @@index([toAddress], name: "idx_transfers_to")
-  @@index([timestamp], name: "idx_transfers_timestamp")
-  @@index([amount], name: "idx_transfers_amount")
-  @@index([fromAddress, timestamp], name: "idx_transfers_from_timestamp") // From address activity
-  @@index([toAddress, timestamp], name: "idx_transfers_to_timestamp") // To address activity
-  @@index([amount, timestamp], name: "idx_transfers_amount_timestamp") // Large transfers by time
-  @@map("transfers")
+  @@index([fromAccount])
+  @@index([toAccount])
+  @@index([blockNumber])
+  @@index([amount])
+  @@map("transfer_events")
 }
 
-model Nomination {
-  id                String      @id // format: "{nominator}-{validator}"
+// Staking events (currently empty)
+model StakingEvent {
+  id                Int       @id @default(autoincrement())
+  blockHash         String?   @map("block_hash") @db.VarChar(66)
+  blockNumber       BigInt?   @map("block_number")
+  eventId           Int?      @map("event_id")
   
-  // Account and Validator references (no FK constraints)
-  nominatorAddress  String      @map("nominator_address") @db.VarChar(64)
-  validatorAddress  String      @map("validator_address") @db.VarChar(64)
+  eventType         String?   @map("event_type") @db.VarChar(30)
+  validatorAccount  String?   @map("validator_account") @db.VarChar(256)
+  nominatorAccount  String?   @map("nominator_account") @db.VarChar(256)
   
-  amount            Decimal     @db.Decimal(65,18)
-  era               Int?
-  active            Boolean     @default(true)
-  createdAt         DateTime    @default(now()) @map("created_at")
-  updatedAt         DateTime    @default(now()) @updatedAt @map("updated_at")
+  amount            BigInt?   @default(0) @map("amount")
+  eraIndex          BigInt?   @map("era_index")
   
-  @@index([nominatorAddress], name: "idx_nominations_nominator")
-  @@index([validatorAddress], name: "idx_nominations_validator")
-  @@index([era], name: "idx_nominations_era")
-  @@index([active], name: "idx_nominations_active")
-  @@map("nominations")
-}
-
-model Era {
-  number          Int         @id
-  startBlock      Int         @map("start_block")
-  endBlock        Int?        @map("end_block")
-  totalStaked     Decimal     @map("total_staked") @db.Decimal(65,18)
-  validatorCount  Int         @map("validator_count")
-  active          Boolean     @default(true)
-  createdAt       DateTime    @default(now()) @map("created_at")
+  eventData         Json?     @map("event_data")
   
-  @@index([startBlock], name: "idx_eras_start_block")
-  @@index([active], name: "idx_eras_active")
-  @@map("eras")
-}
-
-model Reward {
-  id                String      @id // format: "{address}-{era}-{type}"
-  
-  // Account reference (no FK constraint)
-  address           String      @db.VarChar(64)
-  
-  // Validator reference (no FK constraint)
-  validatorAddress  String?     @map("validator_address") @db.VarChar(64)
-  
-  amount            Decimal     @db.Decimal(65,18)
-  
-  // Era reference (no FK constraint)
-  era               Int
-  
-  rewardType        RewardType  @map("reward_type")
-  
-  // Block reference (no FK constraint)
-  blockNumber       Int         @map("block_number")
-  blockHash         String?     @map("block_hash") @db.VarChar(66)      // Denormalized
-  blockTimestamp    DateTime?   @map("block_timestamp")                 // Denormalized
-  
-  timestamp         DateTime
-  createdAt         DateTime    @default(now()) @map("created_at")
-  
-  @@index([address], name: "idx_rewards_address")
-  @@index([validatorAddress], name: "idx_rewards_validator")
-  @@index([era], name: "idx_rewards_era")
-  @@index([rewardType], name: "idx_rewards_type")
-  @@index([blockNumber], name: "idx_rewards_block")
-  @@map("rewards")
+  @@index([validatorAccount])
+  @@index([nominatorAccount])
+  @@index([eventType])
+  @@index([eraIndex])
+  @@map("staking_events")
 }
 
 // ===== ENUMS =====

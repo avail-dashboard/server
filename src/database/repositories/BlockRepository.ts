@@ -123,9 +123,7 @@ export class BlockRepository extends BaseRepository {
       orderBy: { number: 'desc' as const },
     };
 
-    return this.prisma.block.findFirst(
-      this.buildCachedQuery(query, useCache, 60, 'latest-block'), // 1 minute cache for latest block
-    );
+    return this.prisma.block.findFirst(query); // Temporarily disable cache to test schema
   }
 
   /**

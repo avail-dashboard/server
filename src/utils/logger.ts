@@ -25,7 +25,9 @@ const logFormat = winston.format.combine(
     log += ` [${level.toUpperCase()}]: ${message}`;
     
     if (Object.keys(meta).length > 0) {
-      log += ` ${JSON.stringify(meta)}`;
+      log += ` ${JSON.stringify(meta, (key, value) => 
+        typeof value === 'bigint' ? value.toString() : value
+      )}`;
     }
     
     if (stack) {

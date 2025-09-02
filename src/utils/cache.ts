@@ -156,7 +156,9 @@ class CacheService {
     }
 
     try {
-      const serialized = JSON.stringify(value);
+      const serialized = JSON.stringify(value, (key, value) => 
+        typeof value === 'bigint' ? value.toString() : value
+      );
       
       if (ttl) {
         await this.redis.setex(key, ttl, serialized);

@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { serviceFactory } from '../services';
-import { ExtrinsicService } from '../services/domain/extrinsic';
+import { simpleServices } from '../services/simple-services';
 import { formatPaginatedResponse, formatErrorResponse, formatSingleResponse } from '../utils/responseFormatter';
 
 const router = Router();
@@ -16,7 +15,7 @@ router.get('/', async (req: Request, res: Response) => {
     const sortBy = (req.query.sort_by as string) || 'id';
     const sortOrder = (req.query.sort_order as string) || 'desc';
 
-    const extrinsicService = serviceFactory.get<ExtrinsicService>('extrinsicService');
+    const extrinsicService = simpleServices.getServices().extrinsics;
     const result = await extrinsicService.getExtrinsics(
       { page, limit },
       { sort_by: sortBy, sort_order: sortOrder as 'asc' | 'desc' },
@@ -45,7 +44,7 @@ router.get('/:hash', async (req: Request, res: Response) => {
   try {
     const { hash } = req.params;
 
-    const extrinsicService = serviceFactory.get<ExtrinsicService>('extrinsicService');
+    const extrinsicService = simpleServices.getServices().extrinsics;
     const extrinsic = await extrinsicService.getExtrinsic(hash);
 
     if (!extrinsic) {
@@ -74,7 +73,7 @@ router.get('/block/:blockNumber', async (req: Request, res: Response) => {
       return;
     }
 
-    const extrinsicService = serviceFactory.get<ExtrinsicService>('extrinsicService');
+    const extrinsicService = simpleServices.getServices().extrinsics;
     const extrinsics = await extrinsicService.getExtrinsicsForBlock(blockNumber);
 
     res.json(formatSingleResponse(extrinsics));
@@ -99,7 +98,7 @@ router.get('/block/:blockNumber/:index', async (req: Request, res: Response) => 
       return;
     }
 
-    const extrinsicService = serviceFactory.get<ExtrinsicService>('extrinsicService');
+    const extrinsicService = simpleServices.getServices().extrinsics;
     const blockExtrinsics = await extrinsicService.getExtrinsicsForBlock(blockNumber);
     
     // Find the extrinsic with the specified index

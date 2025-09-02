@@ -3,8 +3,8 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
-import { serviceFactory } from '../services';
-import { TransferService, TransferFilters, PaginationOptions } from '../services/domain/transfer';
+import { simpleServices } from '../services/simple-services';
+import { TransferFilters, PaginationOptions } from '../services/domain/transfer';
 
 const router = Router();
 
@@ -13,7 +13,7 @@ router.get('/',
   cacheMiddleware(config.cache.ttl.blockByHash),
   async (req: Request, res: Response) => {
     try {
-      const transferService = serviceFactory.get<TransferService>('transferService');
+      const transferService = simpleServices.getServices().transfers;
       
       // Parse query parameters for filtering
       const filters: TransferFilters = {};
@@ -53,7 +53,7 @@ router.get('/stats',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const transferService = serviceFactory.get<TransferService>('transferService');
+      const transferService = simpleServices.getServices().transfers;
       const period = req.query.period as string || '24h';
       
       const stats = await transferService.getTransferStatistics(period);
@@ -74,7 +74,7 @@ router.get('/hash/:hash',
   cacheMiddleware(config.cache.ttl.blockByHash),
   async (req: Request, res: Response) => {
     try {
-      const transferService = serviceFactory.get<TransferService>('transferService');
+      const transferService = simpleServices.getServices().transfers;
       const hash = req.params.hash;
 
       const transfer = await transferService.getTransferByHash(hash);
@@ -100,7 +100,7 @@ router.get('/block/:blockNumber',
   cacheMiddleware(config.cache.ttl.blockByHash),
   async (req: Request, res: Response) => {
     try {
-      const transferService = serviceFactory.get<TransferService>('transferService');
+      const transferService = simpleServices.getServices().transfers;
       const blockNumber = parseInt(req.params.blockNumber);
 
       if (isNaN(blockNumber)) {
@@ -135,7 +135,7 @@ router.get('/account/:address',
   cacheMiddleware(config.cache.ttl.blockByHash),
   async (req: Request, res: Response) => {
     try {
-      const transferService = serviceFactory.get<TransferService>('transferService');
+      const transferService = simpleServices.getServices().transfers;
       const address = req.params.address;
 
       // Basic address validation
@@ -171,7 +171,7 @@ router.get('/:id',
   cacheMiddleware(config.cache.ttl.blockByHash),
   async (req: Request, res: Response) => {
     try {
-      const transferService = serviceFactory.get<TransferService>('transferService');
+      const transferService = simpleServices.getServices().transfers;
       const transferId = req.params.id;
 
       const transfer = await transferService.getTransfer(transferId);

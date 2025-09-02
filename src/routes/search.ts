@@ -2,8 +2,7 @@ import { Router, Request, Response } from 'express';
 import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
-import { serviceFactory } from '../services';
-import { SearchService } from '../services/domain/search';
+import { simpleServices } from '../services/simple-services';
 
 const router = Router();
 
@@ -24,7 +23,7 @@ router.get('/',
       }
 
       // Get search service from factory
-      const searchService = serviceFactory.get<SearchService>('searchService');
+      const searchService = simpleServices.getServices().search;
       
       // Perform search
       const searchResponse = await searchService.search(query);

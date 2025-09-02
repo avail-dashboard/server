@@ -17,20 +17,20 @@ export class DataSubmissionMapper implements IDataSubmissionMapper {
   toApiResponse(submission: any): DataSubmissionApiResponse {
     return {
       id: submission.id,
-      extrinsic_hash: submission.extrinsicHash || submission.extrinsic_hash,
-      block_number: submission.blockNumber || submission.block_number,
-      extrinsic_index: submission.extrinsicIndex || submission.extrinsic_index,
-      app_id: submission.appId || submission.app_id,
-      rollup_name: submission.rollupName || submission.rollup_name || undefined,
-      data_size: submission.dataSize || submission.data_size,
-      data_hash: submission.dataHash || submission.data_hash,
+      extrinsic_hash: submission.blockHash,
+      block_number: Number(submission.blockNumber), // Convert BigInt
+      extrinsic_index: submission.extrinsicId,
+      app_id: Number(submission.appId), // Convert BigInt
+      rollup_name: undefined, // No rollups table exists
+      data_size: submission.dataSize,
+      data_hash: submission.dataHash,
       submitter: submission.submitter,
-      timestamp: submission.timestamp ? new Date(submission.timestamp).toISOString() : new Date().toISOString(),
-      success: submission.success !== undefined ? submission.success : true,
-      blob_data: submission.blobData || submission.blob_data || undefined,
-      kate_commitment: submission.kateCommitment || submission.kate_commitment || undefined,
-      proof: submission.proof || undefined,
-      created_at: submission.createdAt ? new Date(submission.createdAt).toISOString() : new Date().toISOString(),
+      timestamp: new Date().toISOString(), // No timestamp in DB, use current time
+      success: true, // Assume success if not specified
+      blob_data: undefined, // Not stored in this database
+      kate_commitment: undefined, // Not in data_submissions table
+      proof: submission.proofData,
+      created_at: new Date().toISOString(), // No created_at in DB
     };
   }
 

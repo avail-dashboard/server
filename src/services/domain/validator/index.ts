@@ -7,8 +7,6 @@
 
 // Core services
 export { ValidatorApiService, createValidatorApiService } from './ValidatorApiService';
-export { ValidatorProcessor, createValidatorProcessor } from './ValidatorProcessor';
-export { ValidatorIndexer, createValidatorIndexer } from './ValidatorIndexer';
 
 // Interfaces and types
 export {
@@ -23,11 +21,6 @@ export {
   PaginationOptions,
   IValidatorService,
 } from './ValidatorInterfaces';
-export {
-  IValidatorIndexer,
-  ValidatorIndexingResult,
-  ValidatorData,
-} from './ValidatorIndexer';
 
 // Re-export for backward compatibility during migration
 export { ValidatorApiService as ValidatorService } from './ValidatorApiService';

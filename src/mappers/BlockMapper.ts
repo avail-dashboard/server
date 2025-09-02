@@ -16,7 +16,7 @@ export class BlockMapper implements IBlockMapper {
    */
   toApiResponse(block: any): BlockApiResponse {
     return {
-      number: block.number,
+      number: Number(block.number), // Convert BigInt to number
       hash: block.hash,
       parent_hash: block.parentHash || block.parent_hash || undefined,
       state_root: block.stateRoot || block.state_root || undefined,
@@ -41,7 +41,7 @@ export class BlockMapper implements IBlockMapper {
    */
   toWithMetadataApiResponse(block: any): BlockWithMetadataApiResponse {
     return {
-      number: block.number,
+      number: Number(block.number), // Convert BigInt to number
       hash: block.hash,
       parent_hash: block.parentHash || block.parent_hash || undefined,
       state_root: block.stateRoot || block.state_root || undefined,

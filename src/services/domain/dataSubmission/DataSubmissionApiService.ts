@@ -1,8 +1,7 @@
 import { logger, logError } from '../../../utils/logger';
 import { AvailBlockchainService } from '../../core/avail-blockchain';
-import { DataSubmissionRepository, RollupRepository } from '../../../database/repositories';
-import { Rollup } from '@prisma/client';
-import { IDataSubmissionMapper, IRollupMapper } from '../../../mappers';
+import { DataSubmissionRepository } from '../../../database/repositories';
+import { IDataSubmissionMapper } from '../../../mappers';
 import {
   IDataSubmissionService,
   DataSubmissionFilterOptions,
@@ -24,23 +23,17 @@ import {
  */
 export class DataSubmissionApiService implements IDataSubmissionService {
   private dataSubmissionRepository: DataSubmissionRepository;
-  private rollupRepository: RollupRepository;
   private blockchain: AvailBlockchainService;
   private dataSubmissionMapper: IDataSubmissionMapper;
-  private rollupMapper: IRollupMapper;
 
   constructor(
     dataSubmissionRepository: DataSubmissionRepository,
-    rollupRepository: RollupRepository,
     blockchain: AvailBlockchainService,
     dataSubmissionMapper: IDataSubmissionMapper,
-    rollupMapper: IRollupMapper,
   ) {
     this.dataSubmissionRepository = dataSubmissionRepository;
-    this.rollupRepository = rollupRepository;
     this.blockchain = blockchain;
     this.dataSubmissionMapper = dataSubmissionMapper;
-    this.rollupMapper = rollupMapper;
   }
 
   /**
@@ -80,16 +73,11 @@ export class DataSubmissionApiService implements IDataSubmissionService {
         { page, limit, orderBy: sortOrder }
       );
 
-      // Enhance submissions with rollup details
-      const enhancedSubmissions: DataSubmissionWithDetails[] = await Promise.all(
-        submissions.map(async (submission) => {
-          const rollup = await this.rollupRepository.findByAppId(submission.appId);
-          return {
-            ...submission,
-            rollup: rollup || undefined,
-          };
-        })
-      );
+      // Map submissions to response format (no rollup data available)
+      const enhancedSubmissions: DataSubmissionWithDetails[] = submissions.map((submission) => ({
+        ...submission,
+        rollup: undefined, // Rollups table doesn't exist
+      }));
 
       const totalPages = Math.ceil(total / limit);
       const result: DataSubmissionList = {
@@ -142,15 +130,9 @@ export class DataSubmissionApiService implements IDataSubmissionService {
         return null;
       }
 
-      // Get rollup information if appId exists
-      let rollup = undefined;
-      if (submission.appId) {
-        rollup = await this.rollupRepository.findByAppId(submission.appId);
-      }
-
       const result: DataSubmissionWithDetails = {
         ...submission,
-        rollup: rollup || undefined,
+        rollup: undefined, // Rollups table doesn't exist
       };
 
       logger.debug('DataSubmissionApiService: Data submission retrieved', {
@@ -187,19 +169,11 @@ export class DataSubmissionApiService implements IDataSubmissionService {
       // Use findByBlock method for efficient block-specific query
       const submissions = await this.dataSubmissionRepository.findByBlock(blockNumber);
       
-      // Enhance with rollup details
-      const enhancedSubmissions: DataSubmissionWithDetails[] = await Promise.all(
-        submissions.map(async (submission) => {
-          let rollup = undefined;
-          if (submission.appId) {
-            rollup = await this.rollupRepository.findByAppId(submission.appId);
-          }
-          return {
-            ...submission,
-            rollup: rollup || undefined,
-          };
-        })
-      );
+      // Map to response format (no rollup data available)
+      const enhancedSubmissions: DataSubmissionWithDetails[] = submissions.map((submission) => ({
+        ...submission,
+        rollup: undefined, // Rollups table doesn't exist
+      }));
 
       // Apply pagination if specified
       const { page = 1, limit = 20 } = options || {};
@@ -263,16 +237,11 @@ export class DataSubmissionApiService implements IDataSubmissionService {
         { page, limit }
       );
 
-      // Enhance submissions with rollup details
-      const enhancedSubmissions: DataSubmissionWithDetails[] = await Promise.all(
-        submissions.map(async (submission) => {
-          const rollup = await this.rollupRepository.findByAppId(submission.appId);
-          return {
-            ...submission,
-            rollup: rollup || undefined,
-          };
-        })
-      );
+      // Map submissions to response format (no rollup data available)
+      const enhancedSubmissions: DataSubmissionWithDetails[] = submissions.map((submission) => ({
+        ...submission,
+        rollup: undefined, // Rollups table doesn't exist
+      }));
 
       const totalPages = Math.ceil(total / limit);
       const result: DataSubmissionList = {
@@ -406,55 +375,26 @@ export class DataSubmissionApiService implements IDataSubmissionService {
   }
 
   /**
-   * Get rollup information by app ID
+   * Get rollup information by app ID (currently not available)
    */
-  async getRollupInfo(appId: number): Promise<Rollup | null> {
-    try {
-      logger.debug('DataSubmissionApiService: Getting rollup info', {
-        component: 'data-submission-api-service',
-        appId,
-      });
-
-      const rollup = await this.rollupRepository.findByAppId(appId);
-      
-      if (rollup) {
-        logger.debug('DataSubmissionApiService: Rollup info retrieved', {
-          component: 'data-submission-api-service',
-          appId,
-          rollupName: rollup.name,
-        });
-      } else {
-        logger.debug('DataSubmissionApiService: Rollup not found', {
-          component: 'data-submission-api-service',
-          appId,
-        });
-      }
-
-      return rollup;
-    } catch (error) {
-      logError(error as Error, {
-        component: 'data-submission-api-service',
-        action: 'getRollupInfo',
-        appId,
-      });
-      throw error;
-    }
+  async getRollupInfo(appId: number): Promise<null> {
+    logger.debug('DataSubmissionApiService: Rollup info not available - rollups table does not exist', {
+      component: 'data-submission-api-service',
+      appId,
+    });
+    return null;
   }
 }
 
 // Factory function
 export const createDataSubmissionApiService = (
   dataSubmissionRepository: DataSubmissionRepository,
-  rollupRepository: RollupRepository,
   blockchain: AvailBlockchainService,
   dataSubmissionMapper: IDataSubmissionMapper,
-  rollupMapper: IRollupMapper,
 ): DataSubmissionApiService => {
   return new DataSubmissionApiService(
     dataSubmissionRepository,
-    rollupRepository,
     blockchain,
     dataSubmissionMapper,
-    rollupMapper,
   );
 };

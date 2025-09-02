@@ -7,8 +7,6 @@
 
 // Core services
 export { AccountApiService, createAccountApiService } from './AccountApiService';
-export { AccountProcessor, createAccountProcessor } from './AccountProcessor';
-export { AccountIndexer, createAccountIndexer } from './AccountIndexer';
 
 // Interfaces and types
 export {
@@ -20,11 +18,6 @@ export {
   HistoryOptions,
   IAccountService,
 } from './AccountInterfaces';
-export {
-  IAccountIndexer,
-  AccountIndexingResult,
-  AccountData,
-} from './AccountIndexer';
 
 // Re-export for backward compatibility during migration
 export { AccountApiService as AccountService } from './AccountApiService';

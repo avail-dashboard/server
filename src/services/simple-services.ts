@@ -16,12 +16,13 @@ import { createAccountApiService } from './domain/account';
 import { createValidatorApiService } from './domain/validator';
 import { createTransferApiService } from './domain/transfer';
 import { createSearchService } from './domain/search';
+import { createChainService } from './domain/chain';
+import { createAnalyticsService } from './analytics/analytics';
 
 // Database repositories (keep for API services)
 import { 
   blockRepository,
   dataSubmissionRepository,
-  rollupRepository,
   extrinsicRepository,
   validatorRepository,
   transferRepository,
@@ -33,7 +34,6 @@ import {
   BlockMapper,
   ExtrinsicMapper,
   DataSubmissionMapper,
-  RollupMapper,
 } from '../mappers';
 
 /**
@@ -53,6 +53,8 @@ export class SimpleServiceContainer {
   private validatorApi!: any;
   private transferApi!: any;
   private searchApi!: any;
+  private chainApi!: any;
+  private analyticsApi!: any;
   
   constructor() {
     // Simple direct instantiation
@@ -73,11 +75,13 @@ export class SimpleServiceContainer {
       try {
         this.blockApi = createBlockApiService(blockRepository, this.blockchain, new BlockMapper());
         this.extrinsicApi = createExtrinsicService(extrinsicRepository, new ExtrinsicMapper(), this.blockchain, validatorRepository);
-        this.dataSubmissionApi = createDataSubmissionApiService(dataSubmissionRepository, rollupRepository, new DataSubmissionMapper(), new RollupMapper(), this.blockchain);
+        this.dataSubmissionApi = createDataSubmissionApiService(dataSubmissionRepository, this.blockchain, new DataSubmissionMapper());
         this.accountApi = createAccountApiService(accountRepository, this.blockchain, transferRepository, extrinsicRepository, validatorRepository);
         this.validatorApi = createValidatorApiService(validatorRepository, this.blockchain, blockRepository, transferRepository, extrinsicRepository, accountRepository);
         this.transferApi = createTransferApiService(transferRepository, accountRepository, extrinsicRepository);
         this.searchApi = createSearchService(blockRepository, extrinsicRepository, accountRepository, validatorRepository);
+        this.chainApi = createChainService(this.blockchain);
+        this.analyticsApi = createAnalyticsService(this.blockchain, blockRepository, extrinsicRepository, transferRepository, validatorRepository, dataSubmissionRepository);
         logger.info('✅ All API services initialized');
       } catch (error) {
         logger.warn('⚠️ Some API services failed to initialize, but core functionality available', { error });
@@ -104,6 +108,8 @@ export class SimpleServiceContainer {
       validators: this.validatorApi,
       transfers: this.transferApi,
       search: this.searchApi,
+      chain: this.chainApi,
+      analytics: this.analyticsApi,
     };
   }
   

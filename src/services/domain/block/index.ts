@@ -6,21 +6,12 @@
 
 // Core services
 export { BlockApiService, createBlockApiService } from './BlockApiService';
-export { BlockProcessor, createBlockProcessor } from './BlockProcessor';
-export { BlockIndexer, createBlockIndexer } from './BlockIndexer';
 
 // Interfaces and types
 export {
   IBlockService,
-  IBlockProcessor,
-  BlockProcessingOptions,
-  BlockProcessingResult,
   BlockValidationResult,
 } from './BlockInterfaces';
-export {
-  IBlockIndexer,
-  BlockIndexingResult,
-} from './BlockIndexer';
 
 // Re-export for backward compatibility during migration
 export { BlockApiService as BlockService } from './BlockApiService';

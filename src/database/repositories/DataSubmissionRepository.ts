@@ -146,7 +146,7 @@ export class DataSubmissionRepository extends BaseRepository {
         where,
         skip,
         take: limit,
-        orderBy: { timestamp: orderBy },
+        orderBy: { blockNumber: orderBy },
       }),
       this.prisma.dataSubmission.count({ where }),
     ]);

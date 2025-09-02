@@ -3,8 +3,7 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatSingleResponse, formatErrorResponse } from '../utils/responseFormatter';
-import { ServiceFactory } from '../services';
-import { IValidatorService } from '../services/domain/validator';
+import { simpleServices } from '../services/simple-services';
 
 const router = Router();
 
@@ -15,8 +14,7 @@ router.get('/',
     try {
       const { page = '1', limit = '20', status, minStake, maxStake, hasIdentity } = req.query;
 
-      const serviceFactory = ServiceFactory.getInstance();
-      const validatorService = serviceFactory.get<IValidatorService>('validatorApiService');
+      const validatorService = simpleServices.getServices().validators;
 
       // Parse pagination
       const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
@@ -63,8 +61,7 @@ router.get('/:address',
         return;
       }
 
-      const serviceFactory = ServiceFactory.getInstance();
-      const validatorService = serviceFactory.get<IValidatorService>('validatorApiService');
+      const validatorService = simpleServices.getServices().validators;
 
       const validatorDetails = await validatorService.getValidator(address);
 
@@ -90,8 +87,7 @@ router.get('/staking/overview',
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const serviceFactory = ServiceFactory.getInstance();
-      const validatorService = serviceFactory.get<IValidatorService>('validatorApiService');
+      const validatorService = simpleServices.getServices().validators;
 
       const stakingOverview = await validatorService.getStakingOverview();
 

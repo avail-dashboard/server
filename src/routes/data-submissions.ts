@@ -3,8 +3,8 @@ import { logError } from '../utils/logger';
 import { pagination, cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatPaginatedResponse, formatErrorResponse, formatSingleResponse } from '../utils/responseFormatter';
-import { serviceFactory } from '../services';
-import { IDataSubmissionService, DataSubmissionFilterOptions } from '../services/domain/dataSubmission';
+import { simpleServices } from '../services/simple-services';
+import { DataSubmissionFilterOptions } from '../services/domain/dataSubmission';
 
 const router = Router();
 
@@ -23,7 +23,7 @@ router.get('/',
       const sortBy = (req.query.sort_by as string) || 'block_number';
       const sortOrder = (req.query.sort_order as string) || 'desc';
 
-      const dataSubmissionService = serviceFactory.get<IDataSubmissionService>('dataSubmissionApiService');
+      const dataSubmissionService = simpleServices.getServices().dataSubmissions;
       const filters: DataSubmissionFilterOptions = { appId: undefined, submitter: undefined, success: undefined };
       const result = await dataSubmissionService.getDataSubmissions(
         filters,
@@ -56,7 +56,7 @@ router.get(
   cacheMiddleware(config.cache.ttl.chainStats),
   async (req: Request, res: Response) => {
     try {
-      const dataSubmissionService = serviceFactory.get<IDataSubmissionService>('dataSubmissionApiService');
+      const dataSubmissionService = simpleServices.getServices().dataSubmissions;
       const stats = await dataSubmissionService.getDataSubmissionStatistics();
 
       res.json(formatSingleResponse(stats));
@@ -81,7 +81,7 @@ router.get('/rollup/:appId',
       const { appId } = req.params;
 
       // Get data submissions for the specific rollup (returns array, not paginated)
-      const dataSubmissionService = serviceFactory.get<IDataSubmissionService>('dataSubmissionApiService');
+      const dataSubmissionService = simpleServices.getServices().dataSubmissions;
       const result = await dataSubmissionService.getDataSubmissionsByApp(parseInt(appId, 10));
       const submissions = result.data;
 
@@ -127,7 +127,7 @@ router.get('/:submissionId',
         return;
       }
 
-      const dataSubmissionService = serviceFactory.get<IDataSubmissionService>('dataSubmissionApiService');
+      const dataSubmissionService = simpleServices.getServices().dataSubmissions;
       const blockResult = await dataSubmissionService.getDataSubmissionsByBlock(blockNumber);
       const submission = blockResult.data.find((sub: any) => sub.extrinsicIndex === extrinsicIndex);
 
