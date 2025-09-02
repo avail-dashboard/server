@@ -3,8 +3,108 @@ import { logError } from '../utils/logger';
 import { cacheMiddleware } from '../middleware';
 import config from '../config';
 import { formatSingleResponse } from '../utils/responseFormatter';
+import { simpleServices } from '../services/simple-services';
+import { getBlockTimestamps } from '../utils/timestamp';
 
 const router = Router();
+
+// GET /api/rollups/active - Get active rollups with real aggregated data
+router.get('/active',
+  cacheMiddleware(config.cache.ttl.chainStats),
+  async (req: Request, res: Response) => {
+    try {
+      const db = simpleServices.getServices().db;
+      
+      // Define active threshold (rollups active in last 24 hours)
+      const activeThreshold = new Date();
+      activeThreshold.setHours(activeThreshold.getHours() - 24);
+      
+      // Query to get active rollups aggregated data
+      // This aggregates from data_submissions where each submission represents rollup activity
+      const activeRollups = await db.$queryRaw<Array<{
+        app_id: bigint;
+        total_submissions: bigint;
+        total_data_size: bigint;
+        unique_submitters: bigint;
+        last_active_block: bigint;
+        avg_submission_fee: bigint;
+      }>>`
+        SELECT 
+          ds.app_id,
+          COUNT(*) as total_submissions,
+          SUM(ds.data_size) as total_data_size,
+          COUNT(DISTINCT ds.submitter_account) as unique_submitters,
+          MAX(ds.block_number) as last_active_block,
+          AVG(ds.submission_fee) as avg_submission_fee
+        FROM data_submissions ds
+        WHERE ds.block_number >= (
+          SELECT MAX(block_number) - 7200 FROM data_submissions  -- ~24 hours of blocks (12s block time)
+        )
+        GROUP BY ds.app_id
+        HAVING COUNT(*) >= 1  -- At least 1 submission to be considered active
+        ORDER BY total_data_size DESC
+        LIMIT 20
+      `;
+
+      // Get total network data size for market share calculation
+      const networkTotal = await db.$queryRaw<Array<{
+        total_network_size: bigint;
+      }>>`
+        SELECT SUM(ds.data_size) as total_network_size
+        FROM data_submissions ds
+        WHERE ds.block_number >= (
+          SELECT MAX(block_number) - 7200 FROM data_submissions
+        )
+      `;
+
+      const totalNetworkSize = Number(networkTotal[0]?.total_network_size || 1n);
+
+      // Get timestamps for all blocks efficiently
+      const blockNumbers = activeRollups.map(rollup => rollup.last_active_block);
+      const timestampMap = await getBlockTimestamps(db, blockNumbers);
+
+      // Transform the raw data to match the API specification
+      const activeRollupsData = activeRollups.map((rollup) => {
+        const dataSizeBytes = Number(rollup.total_data_size);
+        const dataSizeMB = dataSizeBytes / (1024 * 1024);
+        const avgFeeAVAIL = Number(rollup.avg_submission_fee) / 1e18; // Convert from plancks to AVAIL
+        const avgCostPerMB = dataSizeMB > 0 ? (avgFeeAVAIL / dataSizeMB) : 0;
+        const marketShare = totalNetworkSize > 0 ? (dataSizeBytes / totalNetworkSize) * 100 : 0;
+
+        // Get real timestamp for the last active block
+        const lastActiveTimestamp = timestampMap.get(rollup.last_active_block.toString());
+
+        return {
+          id: Number(rollup.app_id),
+          name: `App ID ${rollup.app_id}`, // No rollup registry yet
+          appId: Number(rollup.app_id),
+          status: 'active' as const,
+          totalSize: dataSizeBytes,
+          submissions: Number(rollup.total_submissions),
+          lastActive: lastActiveTimestamp || new Date().toISOString(),
+          submitters: Number(rollup.unique_submitters),
+          avgCostPerMB: Number(avgCostPerMB.toFixed(6)),
+          marketShare: Number(marketShare.toFixed(1)),
+        };
+      });
+
+      res.json(formatSingleResponse(activeRollupsData, {
+        source: 'database',
+        timestamp: new Date().toISOString(),
+        period: '24h',
+      }));
+    } catch (error) {
+      logError(error as Error, { component: 'rollups-route', action: 'getActive' });
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch active rollups',
+        },
+      });
+    }
+  },
+);
 
 // GET /api/rollups/leaderboard - Get rollup leaderboard (must be before /:appId route)
 router.get('/leaderboard',

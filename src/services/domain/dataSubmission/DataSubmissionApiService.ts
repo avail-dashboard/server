@@ -1,6 +1,7 @@
 import { logger, logError } from '../../../utils/logger';
 import { AvailBlockchainService } from '../../core/avail-blockchain';
 import { DataSubmissionRepository } from '../../../database/repositories';
+import { DataSubmissionWithTimestamp } from '../../../database/repositories/DataSubmissionRepository';
 import { IDataSubmissionMapper } from '../../../mappers';
 import {
   IDataSubmissionService,
@@ -44,7 +45,7 @@ export class DataSubmissionApiService implements IDataSubmissionService {
     options?: PaginationOptions
   ): Promise<DataSubmissionList> {
     try {
-      const { page = 1, limit = 20, sortBy = 'timestamp', sortOrder = 'desc' } = options || {};
+      const { page = 1, limit = 20, sortBy = 'blockNumber', sortOrder = 'desc' } = options || {};
       
       logger.debug('DataSubmissionApiService: Getting data submissions', {
         component: 'data-submission-api-service',
@@ -61,9 +62,6 @@ export class DataSubmissionApiService implements IDataSubmissionService {
       if (filters?.submitter) {
         repositoryFilters.submitter = filters.submitter;
       }
-      if (filters?.success !== undefined) {
-        repositoryFilters.success = filters.success;
-      }
       if (filters?.blockNumber !== undefined) {
         repositoryFilters.blockNumber = filters.blockNumber;
       }
@@ -73,10 +71,16 @@ export class DataSubmissionApiService implements IDataSubmissionService {
         { page, limit, orderBy: sortOrder }
       );
 
-      // Map submissions to response format (no rollup data available)
-      const enhancedSubmissions: DataSubmissionWithDetails[] = submissions.map((submission) => ({
+      // Map submissions to response format - submissions now include computed timestamps
+      const enhancedSubmissions: DataSubmissionWithDetails[] = submissions.map((submission: DataSubmissionWithTimestamp) => ({
         ...submission,
-        rollup: undefined, // Rollups table doesn't exist
+        // Convert BigInt fields to numbers/strings for JSON serialization
+        id: submission.id,
+        blockNumber: Number(submission.blockNumber),
+        appId: Number(submission.appId),
+        submissionFee: submission.submissionFee ? submission.submissionFee.toString() : '0',
+        timestamp: submission.timestamp, // Now computed from block number
+        rollup: undefined, // No rollup data available
       }));
 
       const totalPages = Math.ceil(total / limit);

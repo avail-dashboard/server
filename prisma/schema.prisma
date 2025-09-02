@@ -11,7 +11,7 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
-// Block headers matching actual database structure
+// Block headers matching CURRENT database structure (will be migrated)
 model Block {
   id                     Int       @id @default(autoincrement())
   number                 BigInt    @map("block_number")
@@ -20,13 +20,13 @@ model Block {
   stateRoot              String    @map("state_root") @db.VarChar(66)
   extrinsicsRoot         String    @map("extrinsics_root") @db.VarChar(66)
   
-  // Often null columns based on actual data
-  timestamp              DateTime? @map("timestamp_utc")
+  // Current structure (before migration)
+  timestampUtc           DateTime? @map("timestamp_utc")
   authorAccount          String?   @map("author_account") @db.VarChar(256)
+  isFinalized            Boolean?  @default(false) @map("is_finalized")
   finalizationDelayMs    Int?      @map("finalization_delay_ms")
   
   // Block statistics
-  isFinalized            Boolean?  @default(false) @map("is_finalized")
   extrinsicsCount        Int?      @default(0) @map("extrinsics_count")
   eventsCount            Int?      @default(0) @map("events_count")
   dataSubmissionsCount   Int?      @default(0) @map("data_submissions_count")
@@ -43,12 +43,17 @@ model Block {
   // Raw data for reconstruction
   digestJson             Json?     @map("digest_json")
   headerRawHex           String?   @map("header_raw_hex")
-  extractionVersion      String?   @default("2.0.0") @map("extraction_version")
+  extractionVersion      String?   @default("2.0.0") @map("extraction_version") @db.VarChar(10)
+  specName               String?   @map("spec_name") @db.VarChar(50)
+  implName               String?   @map("impl_name") @db.VarChar(50)
+  chainName              String?   @map("chain_name") @db.VarChar(100)
+  nodeVersion            String?   @map("node_version") @db.VarChar(50)
+  chainProperties        Json?     @map("chain_properties")
   
   @@unique([number])
   @@unique([hash])
-  @@index([timestamp])
   @@index([number])
+  @@index([timestampUtc])
   @@index([authorAccount])
   @@map("block_headers")
 }
@@ -59,49 +64,34 @@ model KateCommitment {
   blockHash             String  @map("block_hash") @db.VarChar(66)
   blockNumber           BigInt  @map("block_number")
   
+  // Kate commitment data
   rows                  Int?
   cols                  Int?
-  dataRoot              String? @map("data_root") @db.VarChar(66)  // Often null
+  dataRoot              String? @map("data_root") @db.VarChar(66)
   blockLength           BigInt? @map("block_length")
   
-  // Often null in actual data
+  // Commitment proof data
   commitmentHex         String? @map("commitment_hex")
   proofData             Json?   @map("proof_data")
   
+  // DA metrics
   utilizationPercentage Decimal? @map("utilization_percentage") @db.Decimal(5,2)
   appDataCount          Int?    @default(0) @map("app_data_count")
+  
+  // Sampling and extraction data (ACTIVELY POPULATED)
+  sampleDataProof       Json?   @map("sample_data_proof")
+  sampleRowData         Json?   @map("sample_row_data")
+  kateAvailable         Boolean? @default(true) @map("kate_available")
+  kateExtractionNote    String? @map("kate_extraction_note")
   
   @@index([blockNumber])
   @@index([blockHash])
   @@map("kate_commitments")
 }
 
-// App registrations (currently empty table)
-model AppRegistration {
-  id                        Int       @id @default(autoincrement())
-  appId                     BigInt?   @map("app_id")
-  appKey                    String?   @map("app_key") @db.VarChar(48)
-  ownerAccount              String?   @map("owner_account") @db.VarChar(256)
-  
-  registeredAtBlock         BigInt?   @map("registered_at_block")
-  registeredAtTimestamp     DateTime? @map("registered_at_timestamp")
-  
-  appName                   String?   @map("app_name") @db.VarChar(100)
-  appDescription            String?   @map("app_description")
-  appData                   Json?     @map("app_data")
-  
-  totalSubmissions          Int?      @default(0) @map("total_submissions")
-  totalDataSize             BigInt?   @default(0) @map("total_data_size")
-  lastSubmissionBlock       BigInt?   @map("last_submission_block")
-  lastSubmissionTimestamp   DateTime? @map("last_submission_timestamp")
-  
-  @@index([appId])
-  @@index([ownerAccount])
-  @@index([registeredAtBlock])
-  @@map("app_registrations")
-}
+// Application Registrations table removed - not being populated
 
-// Extrinsic data
+// Comprehensive Extrinsic Data
 model Extrinsic {
   id              Int       @id @default(autoincrement())
   blockHash       String    @map("block_hash") @db.VarChar(66)
@@ -109,18 +99,26 @@ model Extrinsic {
   extrinsicIndex  Int       @map("extrinsic_index")
   hash            String    @map("extrinsic_hash") @db.VarChar(66)
   
+  // Extrinsic metadata
   isSigned        Boolean   @map("is_signed")
   signer          String?   @map("signer_account") @db.VarChar(256)
   module          String    @map("method_pallet") @db.VarChar(50)
   call            String    @map("method_name") @db.VarChar(50)
   
+  // Transaction details
   nonce           BigInt?
   tip             BigInt?   @default(0)
   fee             BigInt?   @default(0)
-  success         Boolean?
-  errorMessage    String?   @map("error_message")  // Often null
   
+  // Execution results
+  success         Boolean?
+  errorMessage    String?   @map("error_message")
+  
+  // Data and signatures  
   methodArgs      Json?     @map("method_args")
+  // signatureData, eraData removed: parse from rawHex when needed
+  
+  // Raw data for reconstruction
   rawHex          String?   @map("raw_hex")
   lengthBytes     Int?      @map("length_bytes")
   
@@ -158,17 +156,18 @@ model Event {
   @@map("event_data")
 }
 
-// Account profiles 
+// Account profiles with metadata
 model Account {
   id                      Int       @id @default(autoincrement())
   accountId               String    @unique @map("account_id") @db.VarChar(256)
   
-  // Often null fields based on actual data
+  // Account metadata
   displayName             String?   @map("display_name") @db.VarChar(100)
   identityJudgement       String?   @map("identity_judgement") @db.VarChar(20)
-  
   isValidator             Boolean   @default(false) @map("is_validator")
   isNominator             Boolean   @default(false) @map("is_nominator")
+  
+  // Current state (updated per block)
   currentNonce            BigInt    @default(0) @map("current_nonce")
   
   // Statistics
@@ -215,22 +214,22 @@ model BalanceHistory {
   @@map("balance_history")
 }
 
-// Data submissions
+// Data Submissions (Avail DA specific)
 model DataSubmission {
   id               Int       @id @default(autoincrement())
   blockHash        String    @map("block_hash") @db.VarChar(66)
   blockNumber      BigInt    @map("block_number")
   extrinsicId      Int?      @map("extrinsic_id")
   
+  // Submission details
   appId            BigInt    @map("app_id")
   submitter        String    @map("submitter_account") @db.VarChar(256)
   dataSize         Int       @map("data_size")
   
-  // Often null fields based on actual data
-  dataIndex        Int?      @map("data_index")
-  dataHash         String?   @map("data_hash") @db.VarChar(66)
-  proofData        Json?     @map("proof_data")
+  // DA specific data removed - never populated
+  // dataIndex, dataHash, proofData removed - never populated
   
+  // Fee information
   submissionFee    BigInt?   @default(0) @map("submission_fee")
   
   @@index([blockNumber])
@@ -240,21 +239,24 @@ model DataSubmission {
   @@map("data_submissions")
 }
 
-// Transfer events
+// AVAIL Transfer Events
 model Transfer {
   id              Int       @id @default(autoincrement())
   blockHash       String    @map("block_hash") @db.VarChar(66)
   blockNumber     BigInt    @map("block_number")
-  extrinsicId     Int?      @map("extrinsic_id")  // Often null
   eventId         Int?      @map("event_id")
+  // extrinsicId removed - never populated
   
+  // Transfer details
   fromAccount     String    @map("from_account") @db.VarChar(256)
   toAccount       String    @map("to_account") @db.VarChar(256)
   amount          BigInt    @map("amount")
   
-  transferType    String    @default("Transfer") @map("transfer_type") @db.VarChar(20)
+  // Transfer metadata
+  transferType    String    @default("Transfer") @map("transfer_type") @db.VarChar(20) // Transfer, Reserve, Unreserve, etc.
   success         Boolean   @default(true)
   
+  // Fee information
   feePaid         BigInt    @default(0) @map("fee_paid")
   tipPaid         BigInt    @default(0) @map("tip_paid")
   
@@ -265,28 +267,103 @@ model Transfer {
   @@map("transfer_events")
 }
 
-// Staking events (currently empty)
-model StakingEvent {
-  id                Int       @id @default(autoincrement())
-  blockHash         String?   @map("block_hash") @db.VarChar(66)
-  blockNumber       BigInt?   @map("block_number")
-  eventId           Int?      @map("event_id")
+// ================================
+// NETWORK ANALYTICS AND STATISTICS
+// ================================
+
+// Network Statistics (Per-block network metrics)
+model NetworkStatistics {
+  id                     Int       @id @default(autoincrement())
+  blockHash              String    @unique @map("block_hash") @db.VarChar(66)
+  blockNumber            BigInt    @map("block_number")
   
-  eventType         String?   @map("event_type") @db.VarChar(30)
-  validatorAccount  String?   @map("validator_account") @db.VarChar(256)
-  nominatorAccount  String?   @map("nominator_account") @db.VarChar(256)
+  // Block statistics
+  extrinsicsCount        Int?      @map("extrinsics_count")
+  eventsCount            Int?      @map("events_count")
+  signedExtrinsicsCount  Int?      @map("signed_extrinsics_count")
+  unsignedExtrinsicsCount Int?     @map("unsigned_extrinsics_count")
   
-  amount            BigInt?   @default(0) @map("amount")
-  eraIndex          BigInt?   @map("era_index")
+  // Fee and tip statistics
+  totalTips              BigInt?   @default(0) @map("total_tips")
+  totalFees              BigInt?   @default(0) @map("total_fees")
+  averageTip             BigInt?   @default(0) @map("average_tip")
+  averageFee             BigInt?   @default(0) @map("average_fee")
   
-  eventData         Json?     @map("event_data")
+  // DA statistics
+  daSubmissionsCount     Int?      @default(0) @map("da_submissions_count")
+  daTotalDataSize        BigInt?   @default(0) @map("da_total_data_size")
+  daUniqueAppsCount      Int?      @default(0) @map("da_unique_apps_count")
   
-  @@index([validatorAccount])
-  @@index([nominatorAccount])
-  @@index([eventType])
-  @@index([eraIndex])
-  @@map("staking_events")
+  // Account statistics
+  totalAccountsCount     Int?      @default(0) @map("total_accounts_count")
+  activeAccountsCount    Int?      @default(0) @map("active_accounts_count")
+  
+  // Indexing metadata
+  indexedAt              DateTime? @default(now()) @map("indexed_at")
+  
+  @@index([blockNumber])
+  @@index([blockHash])
+  @@map("network_statistics")
 }
+
+// Balance Summary (Per-block balance aggregations)
+model BalanceSummary {
+  id                     Int       @id @default(autoincrement())
+  blockHash              String    @unique @map("block_hash") @db.VarChar(66)
+  blockNumber            BigInt    @map("block_number")
+  
+  // Total supply and balance statistics
+  totalIssuance          BigInt    @map("total_issuance")
+  totalBalanceAccounts   Int?      @default(0) @map("total_balance_accounts")
+  totalFreeBalance       BigInt?   @default(0) @map("total_free_balance")
+  totalReservedBalance   BigInt?   @default(0) @map("total_reserved_balance")
+  totalFrozenBalance     BigInt?   @default(0) @map("total_frozen_balance")
+  
+  // Processing metadata
+  balancePagesLoaded     Int?      @default(0) @map("balance_pages_loaded")
+  balanceExtractionNote  String?   @map("balance_extraction_note")
+  indexedAt              DateTime? @default(now()) @map("indexed_at")
+  
+  @@index([blockNumber])
+  @@index([blockHash])
+  @@map("balances_summary")
+}
+
+// Storage States (Per-block runtime storage snapshots)
+model StorageState {
+  id                     Int       @id @default(autoincrement())
+  blockHash              String    @unique @map("block_hash") @db.VarChar(66)
+  blockNumber            BigInt    @map("block_number")
+  
+  // Runtime storage data
+  systemData             Json?     @map("system_data")
+  balancesData           Json?     @map("balances_data")
+  totalIssuance          BigInt?   @map("total_issuance")
+  
+  // DA app data
+  daNextAppId            BigInt?   @map("da_next_app_id")
+  daAppKeys              Json?     @map("da_app_keys")
+  daDataSubmissions      Json?     @map("da_data_submissions")
+  
+  // Validator/session data
+  sessionValidators      Json?     @map("session_validators")
+  sessionValidatorCount  Int?      @map("session_validator_count")
+  stakingCurrentEra      BigInt?   @map("staking_current_era")
+  
+  // Processing metadata
+  storageExtractionNote  String?   @map("storage_extraction_note")
+  indexedAt              DateTime? @default(now()) @map("indexed_at")
+  
+  @@index([blockNumber])
+  @@index([blockHash])
+  @@map("storage_states")
+}
+
+// NOTE: Validator data is derived from event_data table (staking events)
+// No dedicated validators table exists yet - validator metrics come from events
+// See sql/create_validator_views.sql for views that provide validator data
+
+// Staking Events table removed - not being populated
 
 // ===== ENUMS =====
 

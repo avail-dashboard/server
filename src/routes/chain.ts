@@ -47,4 +47,24 @@ router.get('/constants',
   },
 );
 
+// GET /api/chain/stats - Get chain statistics (CRITICAL - Frontend needs this)
+router.get('/stats', 
+  cacheMiddleware(config.cache.ttl.chainStats),
+  async (req: Request, res: Response) => {
+    try {
+      const chainService = simpleServices.getServices().chain;
+      const stats = await chainService.getChainStats();
+      
+      res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      logError(error as Error, { component: 'chain-route', action: 'getChainStats' });
+      
+      res.status(500).json(formatErrorResponse('Failed to fetch chain statistics', 'INTERNAL_SERVER_ERROR'));
+    }
+  },
+);
+
 export default router; 

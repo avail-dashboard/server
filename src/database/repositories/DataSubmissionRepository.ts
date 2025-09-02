@@ -1,26 +1,14 @@
 import { DataSubmission, Prisma } from '@prisma/client';
 import { BaseRepository } from './BaseRepository';
 import { logger } from '../../utils/logger';
+import { getBlockTimestamp, getBlockTimestamps } from '../../utils/timestamp';
 
-export type DataSubmissionWithRollup = DataSubmission;
-
-export type DataSubmissionCreateInput = {
-  extrinsicHash: string;
-  blockNumber: number;
-  blockHash?: string | null;
-  blockTimestamp?: Date | null;
-  extrinsicIndex?: number | null;
-  appId: number;
-  rollupName?: string | null;
-  dataSize: number;
-  dataHash: string;
-  submitter: string;
-  timestamp: Date;
-  success?: boolean;
-  blobData?: Buffer | null;
-  kateCommitment?: string | null;
-  proof?: any;
+// DataSubmission with computed timestamp from block
+export type DataSubmissionWithTimestamp = DataSubmission & {
+  timestamp: string; // ISO string computed from block number
 };
+
+export type DataSubmissionCreateInput = Omit<DataSubmission, 'id'>;
 
 export interface DataSubmissionFilters {
   appId?: number;
@@ -35,26 +23,52 @@ export interface DataSubmissionFilters {
 
 export class DataSubmissionRepository extends BaseRepository {
   /**
-   * Find data submission by extrinsic hash
+   * Find data submission by ID
    */
-  async findByExtrinsicHash(hash: string): Promise<DataSubmission | null> {
-    return this.prisma.dataSubmission.findUnique({
-      where: { extrinsicHash: hash },
+  async findById(id: number): Promise<DataSubmissionWithTimestamp | null> {
+    const submission = await this.prisma.dataSubmission.findUnique({
+      where: { id },
     });
+    
+    if (!submission) return null;
+    
+    const timestamp = await getBlockTimestamp(this.prisma, submission.blockNumber);
+    return {
+      ...submission,
+      timestamp: timestamp || new Date().toISOString(),
+    };
   }
 
   /**
-   * Check if data submission exists by ID or extrinsic hash
+   * Find data submission by extrinsic hash
+   */
+  async findByExtrinsicHash(extrinsicHash: string): Promise<DataSubmissionWithTimestamp | null> {
+    // Join with extrinsic_data table to find by hash
+    const result = await this.prisma.$queryRaw<DataSubmission[]>`
+      SELECT ds.*
+      FROM data_submissions ds
+      JOIN extrinsic_data ed ON ds.extrinsic_id = ed.id
+      WHERE ed.extrinsic_hash = ${extrinsicHash}
+      LIMIT 1
+    `;
+    
+    if (!result || result.length === 0) return null;
+    
+    const submission = result[0];
+    const timestamp = await getBlockTimestamp(this.prisma, submission.blockNumber);
+    return {
+      ...submission,
+      timestamp: timestamp || new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Check if data submission exists by ID
    */
   async exists(submissionId: string): Promise<boolean> {
     try {
       const result = await this.prisma.dataSubmission.findFirst({
-        where: { 
-          OR: [
-            { id: parseInt(submissionId, 10) || 0 },
-            { extrinsicHash: submissionId },
-          ],
-        },
+        where: { id: parseInt(submissionId, 10) || 0 },
         select: { id: true },
       });
       return result !== null;
@@ -69,47 +83,64 @@ export class DataSubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Find data submission by data hash
-   */
-  async findByHash(dataHash: string): Promise<DataSubmission | null> {
-    return this.prisma.dataSubmission.findFirst({
-      where: { dataHash },
-    });
-  }
-
-  /**
    * Get data submissions for a block
    */
-  async findByBlock(blockNumber: number): Promise<DataSubmission[]> {
-    return this.prisma.dataSubmission.findMany({
-      where: { blockNumber },
-      orderBy: { extrinsicIndex: 'asc' },
+  async findByBlock(blockNumber: number): Promise<DataSubmissionWithTimestamp[]> {
+    const submissions = await this.prisma.dataSubmission.findMany({
+      where: { blockNumber: BigInt(blockNumber) },
+      orderBy: { id: 'asc' },
     });
+
+    // Get timestamps for each submission efficiently
+    const blockNumbers = submissions.map(s => s.blockNumber);
+    const timestampMap = await getBlockTimestamps(this.prisma, blockNumbers);
+    
+    const submissionsWithTimestamp = submissions.map((submission) => {
+      const timestamp = timestampMap.get(submission.blockNumber.toString());
+      return {
+        ...submission,
+        timestamp: timestamp || new Date().toISOString(),
+      };
+    });
+
+    return submissionsWithTimestamp;
   }
 
   /**
-   * Get data submissions for a rollup
+   * Get data submissions for an app/rollup
    */
   async findByAppId(
     appId: number,
     params: { page?: number; limit?: number } = {},
-  ): Promise<{ submissions: DataSubmissionWithRollup[]; total: number }> {
+  ): Promise<{ submissions: DataSubmissionWithTimestamp[]; total: number }> {
     const { page = 1, limit = 20 } = params;
     const skip = (page - 1) * limit;
 
     const [submissions, total] = await Promise.all([
       this.prisma.dataSubmission.findMany({
-        where: { appId },
+        where: { appId: BigInt(appId) },
         skip,
         take: limit,
-        orderBy: { timestamp: 'desc' },
+        orderBy: { blockNumber: 'desc' },
       }),
       this.prisma.dataSubmission.count({
-        where: { appId },
+        where: { appId: BigInt(appId) },
       }),
     ]);
 
-    return { submissions, total };
+    // Get timestamps for each submission efficiently
+    const blockNumbers = submissions.map(s => s.blockNumber);
+    const timestampMap = await getBlockTimestamps(this.prisma, blockNumbers);
+    
+    const submissionsWithTimestamp = submissions.map((submission) => {
+      const timestamp = timestampMap.get(submission.blockNumber.toString());
+      return {
+        ...submission,
+        timestamp: timestamp || new Date().toISOString(),
+      };
+    });
+
+    return { submissions: submissionsWithTimestamp, total };
   }
 
   /**
@@ -118,51 +149,60 @@ export class DataSubmissionRepository extends BaseRepository {
   async findMany(
     filters: DataSubmissionFilters = {},
     params: { page?: number; limit?: number; orderBy?: 'asc' | 'desc' } = {},
-  ): Promise<{ submissions: DataSubmissionWithRollup[]; total: number }> {
+  ): Promise<{ submissions: DataSubmissionWithTimestamp[]; total: number }> {
     const { page = 1, limit = 20, orderBy = 'desc' } = params;
     const skip = (page - 1) * limit;
 
     // Build where clause from filters
     const where: Prisma.DataSubmissionWhereInput = {};
     
-    if (filters.appId !== undefined) {where.appId = filters.appId;}
-    if (filters.submitter) {where.submitter = filters.submitter;}
-    if (filters.success !== undefined) {where.success = filters.success;}
-    
-    if (filters.fromTimestamp || filters.toTimestamp) {
-      where.timestamp = {};
-      if (filters.fromTimestamp) {where.timestamp.gte = filters.fromTimestamp;}
-      if (filters.toTimestamp) {where.timestamp.lte = filters.toTimestamp;}
+    if (filters.appId !== undefined) {
+      where.appId = BigInt(filters.appId);
+    }
+    if (filters.submitter) {
+      where.submitter = filters.submitter;
+    }
+    if (filters.blockNumber !== undefined) {
+      where.blockNumber = BigInt(filters.blockNumber);
     }
 
     if (filters.fromBlock || filters.toBlock) {
       where.blockNumber = {};
-      if (filters.fromBlock) {where.blockNumber.gte = filters.fromBlock;}
-      if (filters.toBlock) {where.blockNumber.lte = filters.toBlock;}
+      if (filters.fromBlock) {where.blockNumber.gte = BigInt(filters.fromBlock);}
+      if (filters.toBlock) {where.blockNumber.lte = BigInt(filters.toBlock);}
     }
 
-    const [submissions, total] = await Promise.all([
-      this.prisma.dataSubmission.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { blockNumber: orderBy },
-      }),
-      this.prisma.dataSubmission.count({ where }),
-    ]);
+    const total = await this.prisma.dataSubmission.count({ where });
 
-    return { submissions, total };
+    // Use raw query to join with extrinsic_data and get real timestamps
+    // For now, keep it simple and use the simpler approach with individual timestamp lookups
+    const submissions = await this.prisma.dataSubmission.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { blockNumber: orderBy },
+    });
+
+    // Get timestamps for each submission efficiently using batch query
+    const blockNumbers = submissions.map(s => s.blockNumber);
+    const timestampMap = await getBlockTimestamps(this.prisma, blockNumbers);
+    
+    const submissionsWithTimestamp = submissions.map((submission) => {
+      const timestamp = timestampMap.get(submission.blockNumber.toString());
+      return {
+        ...submission,
+        timestamp: timestamp || new Date().toISOString(), // fallback if timestamp not found
+      };
+    });
+
+    return { submissions: submissionsWithTimestamp, total };
   }
 
   /**
    * Create new data submission
    */
   async create(data: DataSubmissionCreateInput): Promise<DataSubmission> {
-    return this.prisma.dataSubmission.upsert({
-      where: { extrinsicHash: data.extrinsicHash },
-      update: {}, // Don't update existing submissions, just return them
-      create: data,
-    });
+    return this.prisma.dataSubmission.create({ data });
   }
 
   /**
@@ -181,24 +221,22 @@ export class DataSubmissionRepository extends BaseRepository {
   async getStats(filters: DataSubmissionFilters = {}) {
     const where: Prisma.DataSubmissionWhereInput = {};
     
-    if (filters.appId !== undefined) {where.appId = filters.appId;}
-    if (filters.fromTimestamp || filters.toTimestamp) {
-      where.timestamp = {};
-      if (filters.fromTimestamp) {where.timestamp.gte = filters.fromTimestamp;}
-      if (filters.toTimestamp) {where.timestamp.lte = filters.toTimestamp;}
+    if (filters.appId !== undefined) {
+      where.appId = BigInt(filters.appId);
+    }
+    if (filters.fromBlock || filters.toBlock) {
+      where.blockNumber = {};
+      if (filters.fromBlock) where.blockNumber.gte = BigInt(filters.fromBlock);
+      if (filters.toBlock) where.blockNumber.lte = BigInt(filters.toBlock);
     }
 
     const [
       totalCount,
-      successCount,
       totalDataSize,
       uniqueSubmitters,
-      uniqueRollups,
+      uniqueApps,
     ] = await Promise.all([
       this.prisma.dataSubmission.count({ where }),
-      this.prisma.dataSubmission.count({ 
-        where: { ...where, success: true }, 
-      }),
       this.prisma.dataSubmission.aggregate({
         where,
         _sum: { dataSize: true },
@@ -217,30 +255,40 @@ export class DataSubmissionRepository extends BaseRepository {
 
     return {
       totalSubmissions: totalCount,
-      successfulSubmissions: successCount,
-      failedSubmissions: totalCount - successCount,
       totalDataSize: totalDataSize._sum.dataSize || 0,
       uniqueSubmitters: uniqueSubmitters.length,
-      uniqueRollups: uniqueRollups.length,
+      uniqueApps: uniqueApps.length,
     };
   }
 
   /**
-   * Update data submission
+   * Update data submission by extrinsic hash
    */
   async update(extrinsicHash: string, data: Partial<DataSubmissionCreateInput>): Promise<DataSubmission> {
+    // First find the submission to get its ID
+    const submission = await this.findByExtrinsicHash(extrinsicHash);
+    if (!submission) {
+      throw new Error(`Data submission not found for extrinsic hash: ${extrinsicHash}`);
+    }
+    
     return this.prisma.dataSubmission.update({
-      where: { extrinsicHash },
+      where: { id: submission.id },
       data,
     });
   }
 
   /**
-   * Delete data submission
+   * Delete data submission by extrinsic hash
    */
   async delete(extrinsicHash: string): Promise<DataSubmission> {
+    // First find the submission to get its ID
+    const submission = await this.findByExtrinsicHash(extrinsicHash);
+    if (!submission) {
+      throw new Error(`Data submission not found for extrinsic hash: ${extrinsicHash}`);
+    }
+    
     return this.prisma.dataSubmission.delete({
-      where: { extrinsicHash },
+      where: { id: submission.id },
     });
   }
 
@@ -275,7 +323,7 @@ export class DataSubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get count of unique app IDs
+   * Get unique app count
    */
   async getUniqueAppCount(): Promise<number> {
     const result = await this.prisma.dataSubmission.groupBy({
@@ -286,14 +334,27 @@ export class DataSubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get count of submissions since a specific date
+   * Get count since date (estimated using block time)
    */
   async getCountSince(date: Date): Promise<number> {
+    // Since we don't have timestamps, we'll estimate based on block time
+    const now = new Date();
+    const hoursSince = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    const blocksSince = Math.floor(hoursSince * 300); // ~300 blocks per hour with 12s block time
+    
+    // Get current max block and subtract
+    const maxBlock = await this.prisma.dataSubmission.findFirst({
+      orderBy: { blockNumber: 'desc' },
+      select: { blockNumber: true },
+    });
+    
+    if (!maxBlock) return 0;
+    
+    const fromBlock = Number(maxBlock.blockNumber) - blocksSince;
+    
     return this.prisma.dataSubmission.count({
       where: {
-        timestamp: {
-          gte: date,
-        },
+        blockNumber: { gte: BigInt(Math.max(fromBlock, 0)) },
       },
     });
   }

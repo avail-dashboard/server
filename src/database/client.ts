@@ -50,14 +50,14 @@ prisma.$use(async (params, next) => {
   return result;
 });
 
-// Add query event listener for monitoring (only if supported)
-if (prisma.$on) {
-  prisma.$on('query', (e: { query: string; duration: number }) => {
-    if (e.duration > 1000) { // Log slow queries > 1s
-      console.warn(`Slow query: ${e.query} took ${e.duration}ms`);
-    }
-  });
-}
+// Add query event listener for monitoring (disabled - not supported in this Prisma version)
+// if (prisma.$on) {
+//   prisma.$on('query', (e: { query: string; duration: number }) => {
+//     if (e.duration > 1000) { // Log slow queries > 1s
+//       console.warn(`Slow query: ${e.query} took ${e.duration}ms`);
+//     }
+//   });
+// }
 
 // Ensure single instance in development
 if (process.env.NODE_ENV !== 'production') {
@@ -67,10 +67,10 @@ if (process.env.NODE_ENV !== 'production') {
 // Graceful shutdown with proper cleanup
 process.on('beforeExit', async () => {
   try {
-    // Remove event listeners to prevent memory leaks (if supported)
-    if (prisma.$off) {
-      prisma.$off('query', () => {});
-    }
+    // Remove event listeners to prevent memory leaks (not supported in this Prisma version)
+    // if (prisma.$off) {
+    //   prisma.$off('query', () => {});
+    // }
     await prisma.$disconnect();
   } catch (error) {
     console.error('Error during Prisma disconnect:', error);

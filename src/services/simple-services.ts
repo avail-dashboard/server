@@ -73,14 +73,14 @@ export class SimpleServiceContainer {
       // Initialize API services using factory functions with basic dependencies
       // (Some may fail, but the container will still work for basic functionality)
       try {
-        this.blockApi = createBlockApiService(blockRepository, this.blockchain, new BlockMapper());
-        this.extrinsicApi = createExtrinsicService(extrinsicRepository, new ExtrinsicMapper(), this.blockchain, validatorRepository);
-        this.dataSubmissionApi = createDataSubmissionApiService(dataSubmissionRepository, this.blockchain, new DataSubmissionMapper());
+        this.blockApi = createBlockApiService(blockRepository, this.blockchain, new BlockMapper(this.db));
+        this.extrinsicApi = createExtrinsicService(extrinsicRepository, new ExtrinsicMapper(this.db), this.blockchain, validatorRepository);
+        this.dataSubmissionApi = createDataSubmissionApiService(dataSubmissionRepository, this.blockchain, new DataSubmissionMapper(this.db));
         this.accountApi = createAccountApiService(accountRepository, this.blockchain, transferRepository, extrinsicRepository, validatorRepository);
         this.validatorApi = createValidatorApiService(validatorRepository, this.blockchain, blockRepository, transferRepository, extrinsicRepository, accountRepository);
         this.transferApi = createTransferApiService(transferRepository, accountRepository, extrinsicRepository);
         this.searchApi = createSearchService(blockRepository, extrinsicRepository, accountRepository, validatorRepository);
-        this.chainApi = createChainService(this.blockchain);
+        this.chainApi = createChainService(this.blockchain, this.db);
         this.analyticsApi = createAnalyticsService(this.blockchain, blockRepository, extrinsicRepository, transferRepository, validatorRepository, dataSubmissionRepository);
         logger.info('✅ All API services initialized');
       } catch (error) {

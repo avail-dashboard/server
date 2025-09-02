@@ -149,12 +149,8 @@ export class BlockRepository extends BaseRepository {
     const countQuery = {};
 
     const [blocks, total] = await Promise.all([
-      this.prisma.block.findMany(
-        this.buildCachedQuery(blocksQuery, useCache, 300, cacheKey), // 5 minutes for paginated results
-      ),
-      this.prisma.block.count(
-        this.buildCachedQuery(countQuery, useCache, 300, 'blocks-total-count'), // 5 minutes for count
-      ),
+      this.prisma.block.findMany(blocksQuery),  // Temporarily disable cache to fix error
+      this.prisma.block.count(countQuery),     // Temporarily disable cache to fix error
     ]);
 
     return { blocks, total };

@@ -40,22 +40,7 @@ CREATE TABLE block_headers (
     is_finalized BOOLEAN DEFAULT FALSE,
     finalization_delay_ms INTEGER,
     -- Note: timestamp_utc, author_account, finalization_delay_ms are inserted by code but currently always NULL
-    
-    -- Avail-specific header extension (Kate commitments in header)
-    application_ids TEXT[], -- Application IDs for DA transaction filtering
-    header_extension_version VARCHAR(10),
-    
-    -- BABE consensus information
-    babe_slot NUMERIC(39,0),
-    babe_epoch NUMERIC(39,0),
-    babe_authority_index INTEGER,
-    babe_vrf_output TEXT,
-    
-    -- Block dimensions for DA matrix
-    block_rows INTEGER,
-    block_cols INTEGER,
-    block_size_bytes INTEGER,
-    -- data_root removed - never populated
+    -- Note: Avail DA-specific columns (application_ids, babe_*, block_*) do NOT exist in actual database
     
     -- Block statistics
     extrinsics_count INTEGER DEFAULT 0,
