@@ -192,3 +192,8 @@ yarn.lock
 
 # Redis dump files 
 /src/generated/prisma
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
